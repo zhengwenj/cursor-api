@@ -1,48 +1,47 @@
-# 构建阶段
-FROM rust:1.83.0-slim-bookworm as builder
-
+# AMD64 构建阶段
+FROM --platform=linux/amd64 rust:1.83.0-slim-bookworm as builder-amd64
 WORKDIR /app
-
-# 安装构建依赖
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential \
-    protobuf-compiler \
-    pkg-config \
-    libssl-dev \
-    nodejs \
-    npm \
+    build-essential protobuf-compiler pkg-config libssl-dev nodejs npm \
     && rm -rf /var/lib/apt/lists/*
-
-# 复制项目文件
 COPY . .
+RUN cargo build --release && \
+    cp target/release/cursor-api /app/cursor-api
 
-# 构建
-RUN rustup target add x86_64-unknown-linux-gnu && \
-    cargo build --target x86_64-unknown-linux-gnu --release && \
-    cp target/x86_64-unknown-linux-gnu/release/cursor-api /app/cursor-api
-
-# 运行阶段
-FROM debian:bookworm-slim
-
+# ARM64 构建阶段
+FROM --platform=linux/arm64 rust:1.83.0-slim-bookworm as builder-arm64
 WORKDIR /app
-
-ENV TZ=Asia/Shanghai
-
-# 安装运行时依赖
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    ca-certificates \
-    tzdata \
+    build-essential protobuf-compiler pkg-config libssl-dev nodejs npm \
     && rm -rf /var/lib/apt/lists/*
+COPY . .
+RUN cargo build --release && \
+    cp target/release/cursor-api /app/cursor-api
 
-# 复制构建产物
-COPY --from=builder /app/cursor-api .
+# AMD64 运行阶段
+FROM --platform=linux/amd64 debian:bookworm-slim as run-amd64
+WORKDIR /app
+ENV TZ=Asia/Shanghai
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder-amd64 /app/cursor-api .
 
-# 设置默认端口
+# ARM64 运行阶段
+FROM --platform=linux/arm64 debian:bookworm-slim as run-arm64
+WORKDIR /app
+ENV TZ=Asia/Shanghai
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder-arm64 /app/cursor-api .
+
+# 通用配置
+FROM run-${TARGETARCH}
 ENV PORT=3000
-
-# 动态暴露端口
 EXPOSE ${PORT}
-
 CMD ["./cursor-api"]

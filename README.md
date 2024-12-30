@@ -4,7 +4,7 @@
 
 1. 访问 [www.cursor.com](https://www.cursor.com) 并完成注册登录（赠送 250 次快速响应，可通过删除账号再注册重置）
 2. 在浏览器中打开开发者工具（F12）
-3. 找到 Application-Cookies 中名为 `WorkosCursorSessionToken` 的值并保存(相当于 openai 的密钥)
+3. 找到 Application-Cookies 中名为 `WorkosCursorSessionToken` 的值并复制其第3个字段，%3A%3A是::的编码，cookie用:分隔值
 
 ## 接口说明
 
@@ -74,7 +74,9 @@
 1. `.token` 文件：每行一个token，支持以下格式：
 
    ```
+   # 这是注释
    token1
+   # alias与标签的作用差不多
    alias::token2
    ```
 
@@ -84,8 +86,10 @@
 2. `.token-list` 文件：每行为token和checksum的对应关系：
 
    ```
+   # 这里的#表示这行在下次读取要删除
    token1,checksum1
-   token2,checksum2
+   # 支持像.token一样的alias，冲突时以.token为准
+   alias::token2,checksum2
    ```
 
    该文件可以被自动管理，但用户仅可在确认自己拥有修改能力时修改，一般仅有以下情况需要手动修改：
@@ -97,17 +101,19 @@
 
 写死了，后续也不会会支持自定义模型列表
 ```
-cursor-small
+claude-3.5-sonnet
+gpt-4
+gpt-4o
 claude-3-opus
 cursor-fast
+cursor-small
+gpt-3.5
 gpt-3.5-turbo
 gpt-4-turbo-2024-04-09
-gpt-4
 gpt-4o-128k
 gemini-1.5-flash-500k
 claude-3-haiku-200k
 claude-3-5-sonnet-200k
-claude-3-5-sonnet-20240620
 claude-3-5-sonnet-20241022
 gpt-4o-mini
 o1-mini
@@ -121,43 +127,12 @@ gemini-2.0-flash-exp
 
 ## 部署
 
-### 本地部署
-
-#### 从源码编译
-
-需要安装 Rust 工具链和依赖：
-
-```bash
-# 安装rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# 安装依赖（Debian/Ubuntu）
-apt-get install -y build-essential protobuf-compiler pkg-config libssl-dev nodejs npm
-
-# 原生编译
-cargo build --release
-
-# 交叉编译，以x86_64-unknown-linux-gnu为例，老实说，这也算原生编译，因为使用了docker
-cross build --target x86_64-unknown-linux-gnu --release
-```
-
-#### 使用预编译二进制
-
-从 [Releases](https://github.com/wisdgod/cursor-api/releases) 下载对应平台的二进制文件。
-
 ### Docker 部署
 
 #### Docker 运行示例
 
 ```bash
 docker run -d -e PORT=3000 -e AUTH_TOKEN=your_token -p 3000:3000 wisdgod/cursor-api:latest
-```
-
-#### Docker 构建示例
-
-```bash
-docker build -t cursor-api .
-docker run -p 3000:3000 cursor-api
 ```
 
 ### huggingface部署
@@ -190,6 +165,8 @@ docker run -p 3000:3000 cursor-api
    TOKEN_LIST_FILE=.token-list
    ```
 
+   更多变量示例可访问 /env-example
+
 3. 重新部署
 
    点击`Factory rebuild`，等待部署完成
@@ -210,15 +187,7 @@ docker run -p 3000:3000 cursor-api
 
 ### 跨平台编译
 
-使用提供的构建脚本：
-
-```bash
-# 仅编译当前平台
-./scripts/build.sh
-
-# 交叉编译所有支持的平台
-./scripts/build.sh --cross
-```
+自行配置cross编译环境
 
 支持的平台：
 

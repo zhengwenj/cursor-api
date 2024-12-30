@@ -2,6 +2,12 @@ name: Docker Build and Push
 
 on:
   workflow_dispatch:
+    inputs:
+      update_latest:
+        description: '是否更新 latest 标签'
+        required: true
+        type: boolean
+        default: false
   push:
     tags:
       - 'v*'
@@ -36,6 +42,7 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && inputs.update_latest }}
             type=raw,value=${{ steps.cargo_version.outputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
             type=ref,event=tag,enable=${{ github.event_name == 'push' }}
 
@@ -44,12 +51,14 @@ jobs:
         with:
           driver-opts: |
             image=moby/buildkit:latest
+            network=host
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6.10.0
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
