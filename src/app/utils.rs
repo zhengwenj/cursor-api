@@ -1,3 +1,6 @@
+mod checksum;
+pub use checksum::*;
+
 pub fn parse_bool_from_env(key: &str, default: bool) -> bool {
     std::env::var(key)
         .ok()

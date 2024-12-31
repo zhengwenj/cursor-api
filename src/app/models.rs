@@ -1,6 +1,5 @@
 use super::{constant::*, token::UserUsageInfo};
-use crate::message::Message;
-use chrono::{DateTime, Local};
+use crate::chat::models::Message;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::sync::RwLock;
@@ -23,20 +22,19 @@ impl Default for PageContent {
     }
 }
 
+mod usage_check;
+pub use usage_check::UsageCheck;
+
 // 静态配置
 #[derive(Clone)]
 pub struct AppConfig {
-    enable_stream_check: bool,
-    include_stop_stream: bool,
+    stream_check: bool,
+    stop_stream: bool,
     vision_ability: VisionAbility,
-    enable_slow_pool: bool,
+    slow_pool: bool,
     allow_claude: bool,
-    auth_token: String,
-    token_file: String,
-    token_list_file: String,
-    route_prefix: String,
-    pub start_time: chrono::DateTime<chrono::Local>,
     pages: Pages,
+    usage_check: UsageCheck,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -50,12 +48,12 @@ pub enum VisionAbility {
 }
 
 impl VisionAbility {
-    pub fn from_str(s: &str) -> Result<Self, &'static str> {
+    pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
-            "none" | "disabled" => Ok(Self::None),
-            "base64" | "base64-only" => Ok(Self::Base64),
-            "all" | "base64-http" => Ok(Self::All),
-            _ => Err("Invalid VisionAbility value"),
+            "none" | "disabled" => Self::None,
+            "base64" | "base64-only" => Self::Base64,
+            "all" | "base64-http" => Self::All,
+            _ => Self::default(),
         }
     }
 }
@@ -66,7 +64,7 @@ impl Default for VisionAbility {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Pages {
     pub root_content: PageContent,
     pub logs_content: PageContent,
@@ -74,19 +72,8 @@ pub struct Pages {
     pub tokeninfo_content: PageContent,
     pub shared_styles_content: PageContent,
     pub shared_js_content: PageContent,
-}
-
-impl Default for Pages {
-    fn default() -> Self {
-        Self {
-            root_content: PageContent::Default,
-            logs_content: PageContent::Default,
-            config_content: PageContent::Default,
-            tokeninfo_content: PageContent::Default,
-            shared_styles_content: PageContent::Default,
-            shared_js_content: PageContent::Default,
-        }
-    }
+    pub about_content: PageContent,
+    pub readme_content: PageContent,
 }
 
 // 运行时状态
@@ -105,58 +92,72 @@ lazy_static! {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            enable_stream_check: true,
-            include_stop_stream: true,
+            stream_check: true,
+            stop_stream: true,
             vision_ability: VisionAbility::Base64,
-            enable_slow_pool: false,
+            slow_pool: false,
             allow_claude: false,
-            auth_token: String::new(),
-            token_file: ".token".to_string(),
-            token_list_file: ".token-list".to_string(),
-            route_prefix: String::new(),
-            start_time: chrono::Local::now(),
             pages: Pages::default(),
+            usage_check: UsageCheck::default(),
         }
     }
 }
 
+macro_rules! config_methods {
+    ($($field:ident: $type:ty, $default:expr;)*) => {
+        $(
+            paste::paste! {
+                pub fn [<get_ $field>]() -> $type {
+                    APP_CONFIG
+                        .read()
+                        .map(|config| config.$field.clone())
+                        .unwrap_or($default)
+                }
+                
+                pub fn [<update_ $field>](value: $type) -> Result<(), &'static str> {
+                    if let Ok(mut config) = APP_CONFIG.write() {
+                        config.$field = value;
+                        Ok(())
+                    } else {
+                        Err(ERR_UPDATE_CONFIG)
+                    }
+                }
+                
+                pub fn [<reset_ $field>]() -> Result<(), &'static str> {
+                    if let Ok(mut config) = APP_CONFIG.write() {
+                        config.$field = $default;
+                        Ok(())
+                    } else {
+                        Err(ERR_RESET_CONFIG)
+                    }
+                }
+            }
+        )*
+    };
+}
+
 impl AppConfig {
     pub fn init(
-        enable_stream_check: bool,
-        include_stop_stream: bool,
+        stream_check: bool,
+        stop_stream: bool,
         vision_ability: VisionAbility,
-        enable_slow_pool: bool,
+        slow_pool: bool,
         allow_claude: bool,
-        auth_token: String,
-        token_file: String,
-        token_list_file: String,
-        route_prefix: String,
     ) {
         if let Ok(mut config) = APP_CONFIG.write() {
-            config.enable_stream_check = enable_stream_check;
-            config.include_stop_stream = include_stop_stream;
+            config.stream_check = stream_check;
+            config.stop_stream = stop_stream;
             config.vision_ability = vision_ability;
-            config.enable_slow_pool = enable_slow_pool;
+            config.slow_pool = slow_pool;
             config.allow_claude = allow_claude;
-            config.auth_token = auth_token;
-            config.token_file = token_file;
-            config.token_list_file = token_list_file;
-            config.route_prefix = route_prefix;
         }
     }
 
-    pub fn get_stream_check() -> bool {
-        APP_CONFIG
-            .read()
-            .map(|config| config.enable_stream_check)
-            .unwrap_or(true)
-    }
-
-    pub fn get_stop_stream() -> bool {
-        APP_CONFIG
-            .read()
-            .map(|config| config.include_stop_stream)
-            .unwrap_or(true)
+    config_methods! {
+        stream_check: bool, true;
+        stop_stream: bool, true;
+        slow_pool: bool, false;
+        allow_claude: bool, false;
     }
 
     pub fn get_vision_ability() -> VisionAbility {
@@ -166,137 +167,62 @@ impl AppConfig {
             .unwrap_or_default()
     }
 
-    pub fn get_slow_pool() -> bool {
-        APP_CONFIG
-            .read()
-            .map(|config| config.enable_slow_pool)
-            .unwrap_or(false)
-    }
-
-    pub fn get_allow_claude() -> bool {
-        APP_CONFIG
-            .read()
-            .map(|config| config.allow_claude)
-            .unwrap_or(false)
-    }
-
-    pub fn get_auth_token() -> String {
-        APP_CONFIG
-            .read()
-            .map(|config| config.auth_token.clone())
-            .unwrap_or_default()
-    }
-
-    pub fn get_token_file() -> String {
-        APP_CONFIG
-            .read()
-            .map(|config| config.token_file.clone())
-            .unwrap_or_default()
-    }
-
-    pub fn get_token_list_file() -> String {
-        APP_CONFIG
-            .read()
-            .map(|config| config.token_list_file.clone())
-            .unwrap_or_default()
-    }
-
-    pub fn get_route_prefix() -> String {
-        APP_CONFIG
-            .read()
-            .map(|config| config.route_prefix.clone())
-            .unwrap_or_default()
-    }
-
     pub fn get_page_content(path: &str) -> Option<PageContent> {
         APP_CONFIG.read().ok().map(|config| match path {
-            ROUTER_ROOT_PATH => config.pages.root_content.clone(),
-            ROUTER_LOGS_PATH => config.pages.logs_content.clone(),
-            ROUTER_CONFIG_PATH => config.pages.config_content.clone(),
-            ROUTER_TOKENINFO_PATH => config.pages.tokeninfo_content.clone(),
-            ROUTER_SHARED_STYLES_PATH => config.pages.shared_styles_content.clone(),
-            ROUTER_SHARED_JS_PATH => config.pages.shared_js_content.clone(),
-            _ => PageContent::Default,
+            ROUTE_ROOT_PATH => config.pages.root_content.clone(),
+            ROUTE_LOGS_PATH => config.pages.logs_content.clone(),
+            ROUTE_CONFIG_PATH => config.pages.config_content.clone(),
+            ROUTE_TOKENINFO_PATH => config.pages.tokeninfo_content.clone(),
+            ROUTE_SHARED_STYLES_PATH => config.pages.shared_styles_content.clone(),
+            ROUTE_SHARED_JS_PATH => config.pages.shared_js_content.clone(),
+            ROUTE_ABOUT_PATH => config.pages.about_content.clone(),
+            ROUTE_README_PATH => config.pages.readme_content.clone(),
+            _ => PageContent::default(),
         })
     }
 
-    pub fn update_stream_check(enable: bool) -> Result<(), &'static str> {
-        if let Ok(mut config) = APP_CONFIG.write() {
-            config.enable_stream_check = enable;
-            Ok(())
-        } else {
-            Err("无法更新配置")
-        }
+    pub fn get_usage_check() -> UsageCheck {
+        APP_CONFIG
+            .read()
+            .map(|config| config.usage_check.clone())
+            .unwrap_or_default()
     }
 
-    pub fn update_stop_stream(enable: bool) -> Result<(), &'static str> {
-        if let Ok(mut config) = APP_CONFIG.write() {
-            config.include_stop_stream = enable;
-            Ok(())
-        } else {
-            Err("无法更新配置")
-        }
-    }
 
     pub fn update_vision_ability(new_ability: VisionAbility) -> Result<(), &'static str> {
         if let Ok(mut config) = APP_CONFIG.write() {
             config.vision_ability = new_ability;
             Ok(())
         } else {
-            Err("无法更新配置")
-        }
-    }
-
-    pub fn update_slow_pool(enable: bool) -> Result<(), &'static str> {
-        if let Ok(mut config) = APP_CONFIG.write() {
-            config.enable_slow_pool = enable;
-            Ok(())
-        } else {
-            Err("无法更新配置")
-        }
-    }
-
-    pub fn update_allow_claude(enable: bool) -> Result<(), &'static str> {
-        if let Ok(mut config) = APP_CONFIG.write() {
-            config.allow_claude = enable;
-            Ok(())
-        } else {
-            Err("无法更新配置")
+            Err(ERR_UPDATE_CONFIG)
         }
     }
 
     pub fn update_page_content(path: &str, content: PageContent) -> Result<(), &'static str> {
         if let Ok(mut config) = APP_CONFIG.write() {
             match path {
-                ROUTER_ROOT_PATH => config.pages.root_content = content,
-                ROUTER_LOGS_PATH => config.pages.logs_content = content,
-                ROUTER_CONFIG_PATH => config.pages.config_content = content,
-                ROUTER_TOKENINFO_PATH => config.pages.tokeninfo_content = content,
-                ROUTER_SHARED_STYLES_PATH => config.pages.shared_styles_content = content,
-                ROUTER_SHARED_JS_PATH => config.pages.shared_js_content = content,
-                _ => return Err("无效的路径"),
+                ROUTE_ROOT_PATH => config.pages.root_content = content,
+                ROUTE_LOGS_PATH => config.pages.logs_content = content,
+                ROUTE_CONFIG_PATH => config.pages.config_content = content,
+                ROUTE_TOKENINFO_PATH => config.pages.tokeninfo_content = content,
+                ROUTE_SHARED_STYLES_PATH => config.pages.shared_styles_content = content,
+                ROUTE_SHARED_JS_PATH => config.pages.shared_js_content = content,
+                ROUTE_ABOUT_PATH => config.pages.about_content = content,
+                ROUTE_README_PATH => config.pages.readme_content = content,
+                _ => return Err(ERR_INVALID_PATH),
             }
             Ok(())
         } else {
-            Err("无法更新配置")
+            Err(ERR_UPDATE_CONFIG)
         }
     }
 
-    pub fn reset_stream_check() -> Result<(), &'static str> {
+    pub fn update_usage_check(rule: UsageCheck) -> Result<(), &'static str> {
         if let Ok(mut config) = APP_CONFIG.write() {
-            config.enable_stream_check = true;
+            config.usage_check = rule;
             Ok(())
         } else {
-            Err("无法重置配置")
-        }
-    }
-
-    pub fn reset_stop_stream() -> Result<(), &'static str> {
-        if let Ok(mut config) = APP_CONFIG.write() {
-            config.include_stop_stream = true;
-            Ok(())
-        } else {
-            Err("无法重置配置")
+            Err(ERR_UPDATE_CONFIG)
         }
     }
 
@@ -305,44 +231,37 @@ impl AppConfig {
             config.vision_ability = VisionAbility::Base64;
             Ok(())
         } else {
-            Err("无法重置配置")
-        }
-    }
-
-    pub fn reset_slow_pool() -> Result<(), &'static str> {
-        if let Ok(mut config) = APP_CONFIG.write() {
-            config.enable_slow_pool = false;
-            Ok(())
-        } else {
-            Err("无法重置配置")
-        }
-    }
-
-    pub fn reset_allow_claude() -> Result<(), &'static str> {
-        if let Ok(mut config) = APP_CONFIG.write() {
-            config.allow_claude = false;
-            Ok(())
-        } else {
-            Err("无法重置配置")
+            Err(ERR_RESET_CONFIG)
         }
     }
 
     pub fn reset_page_content(path: &str) -> Result<(), &'static str> {
         if let Ok(mut config) = APP_CONFIG.write() {
             match path {
-                ROUTER_ROOT_PATH => config.pages.root_content = PageContent::Default,
-                ROUTER_LOGS_PATH => config.pages.logs_content = PageContent::Default,
-                ROUTER_CONFIG_PATH => config.pages.config_content = PageContent::Default,
-                ROUTER_TOKENINFO_PATH => config.pages.tokeninfo_content = PageContent::Default,
-                ROUTER_SHARED_STYLES_PATH => {
-                    config.pages.shared_styles_content = PageContent::Default
+                ROUTE_ROOT_PATH => config.pages.root_content = PageContent::default(),
+                ROUTE_LOGS_PATH => config.pages.logs_content = PageContent::default(),
+                ROUTE_CONFIG_PATH => config.pages.config_content = PageContent::default(),
+                ROUTE_TOKENINFO_PATH => config.pages.tokeninfo_content = PageContent::default(),
+                ROUTE_SHARED_STYLES_PATH => {
+                    config.pages.shared_styles_content = PageContent::default()
                 }
-                ROUTER_SHARED_JS_PATH => config.pages.shared_js_content = PageContent::Default,
-                _ => return Err("无效的路径"),
+                ROUTE_SHARED_JS_PATH => config.pages.shared_js_content = PageContent::default(),
+                ROUTE_ABOUT_PATH => config.pages.about_content = PageContent::default(),
+                ROUTE_README_PATH => config.pages.readme_content = PageContent::default(),
+                _ => return Err(ERR_INVALID_PATH),
             }
             Ok(())
         } else {
-            Err("无法重置配置")
+            Err(ERR_RESET_CONFIG)
+        }
+    }
+
+    pub fn reset_usage_check() -> Result<(), &'static str> {
+        if let Ok(mut config) = APP_CONFIG.write() {
+            config.usage_check = UsageCheck::default();
+            Ok(())
+        } else {
+            Err(ERR_RESET_CONFIG)
         }
     }
 }
@@ -362,31 +281,16 @@ impl AppState {
     }
 }
 
-// 模型定义
-#[derive(Serialize, Clone)]
-pub struct Model {
-    pub id: String,
-    pub created: i64,
-    pub object: String,
-    pub owned_by: String,
-}
-
-// impl Model {
-//     pub fn is_pesticide(&self) -> bool {
-//         !(self.owned_by.as_str() == CURSOR || self.id.as_str() == "gpt-4o-mini") 
-//     }
-// }
-
 // 请求日志
 #[derive(Serialize, Clone)]
 pub struct RequestLog {
-    pub timestamp: DateTime<Local>,
+    pub timestamp: chrono::DateTime<chrono::Local>,
     pub model: String,
     pub token_info: TokenInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
     pub stream: bool,
-    pub status: String,
+    pub status: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -423,25 +327,4 @@ pub struct TokenUpdateRequest {
     pub tokens: String,
     #[serde(default)]
     pub token_list: Option<String>,
-}
-
-// 添加用于接收更新请求的结构体
-#[derive(Deserialize)]
-pub struct ConfigUpdateRequest {
-    #[serde(default)]
-    pub action: String, // "get", "update", "reset"
-    #[serde(default)]
-    pub path: String,
-    #[serde(default)]
-    pub content: Option<PageContent>, // "default", "text", "html"
-    #[serde(default)]
-    pub enable_stream_check: Option<bool>,
-    #[serde(default)]
-    pub include_stop_stream: Option<bool>,
-    #[serde(default)]
-    pub vision_ability: Option<VisionAbility>,
-    #[serde(default)]
-    pub enable_slow_pool: Option<bool>,
-    #[serde(default)]
-    pub enable_all_claude: Option<bool>,
 }

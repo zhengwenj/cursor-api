@@ -2,9 +2,9 @@
 
 ## 获取key
 
-1. 访问 [www.cursor.com](https://www.cursor.com) 并完成注册登录（赠送 250 次快速响应，可通过删除账号再注册重置）
+1. 访问 [www.cursor.com](https://www.cursor.com) 并完成注册登录
 2. 在浏览器中打开开发者工具（F12）
-3. 找到 Application-Cookies 中名为 `WorkosCursorSessionToken` 的值并复制其第3个字段，%3A%3A是::的编码，cookie用:分隔值
+3. 在 Application-Cookies 中查找名为 `WorkosCursorSessionToken` 的条目，并复制其第三个字段。请注意，%3A%3A 是 :: 的 URL 编码形式，cookie 的值使用冒号 (:) 进行分隔。
 
 ## 接口说明
 
@@ -107,7 +107,6 @@ gpt-4o
 claude-3-opus
 cursor-fast
 cursor-small
-gpt-3.5
 gpt-3.5-turbo
 gpt-4-turbo-2024-04-09
 gpt-4o-128k

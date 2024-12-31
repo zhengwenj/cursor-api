@@ -1,64 +1,71 @@
-pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const PKG_NAME: &str = env!("CARGO_PKG_NAME");
-pub const PKG_DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
-pub const PKG_AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
-pub const PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
+macro_rules! def_pub_const {
+    ($name:ident, $value:expr) => {
+        pub const $name: &'static str = $value;
+    };
+}
 
-pub const ROUTER_ROOT_PATH: &str = "/";
-pub const ROUTER_HEALTH_PATH: &str = "/health";
-pub const ROUTER_GET_CHECKSUM: &str = "/get-checksum";
-pub const ROUTER_GET_USER_INFO_PATH: &str = "/get-user-info";
-pub const ROUTER_LOGS_PATH: &str = "/logs";
-pub const ROUTER_CONFIG_PATH: &str = "/config";
-pub const ROUTER_TOKENINFO_PATH: &str = "/tokeninfo";
-pub const ROUTER_GET_TOKENINFO_PATH: &str = "/get-tokeninfo";
-pub const ROUTER_UPDATE_TOKENINFO_PATH: &str = "/update-tokeninfo";
-pub const ROUTER_ENV_EXAMPLE_PATH: &str = "/env-example";
-pub const ROUTER_SHARED_STYLES_PATH: &str = "/static/shared-styles.css";
-pub const ROUTER_SHARED_JS_PATH: &str = "/static/shared.js";
+def_pub_const!(PKG_VERSION, env!("CARGO_PKG_VERSION"));
+def_pub_const!(PKG_NAME, env!("CARGO_PKG_NAME"));
+def_pub_const!(PKG_DESCRIPTION, env!("CARGO_PKG_DESCRIPTION"));
+def_pub_const!(PKG_AUTHORS, env!("CARGO_PKG_AUTHORS"));
+def_pub_const!(PKG_REPOSITORY, env!("CARGO_PKG_REPOSITORY"));
 
-pub const STATUS: &str = "status";
-pub const MESSAGE: &str = "message";
-pub const ERROR: &str = "error";
+def_pub_const!(EMPTY_STRING, "");
 
-pub const TOKEN_FILE: &str = "token_file";
-pub const TOKEN_LIST_FILE: &str = "token_list_file";
-pub const TOKENS: &str = "tokens";
-pub const TOKEN_LIST: &str = "token_list";
+def_pub_const!(ROUTE_ROOT_PATH, "/");
+def_pub_const!(ROUTE_HEALTH_PATH, "/health");
+def_pub_const!(ROUTE_GET_CHECKSUM, "/get-checksum");
+def_pub_const!(ROUTE_GET_USER_INFO_PATH, "/get-user-info");
+def_pub_const!(ROUTE_LOGS_PATH, "/logs");
+def_pub_const!(ROUTE_CONFIG_PATH, "/config");
+def_pub_const!(ROUTE_TOKENINFO_PATH, "/tokeninfo");
+def_pub_const!(ROUTE_GET_TOKENINFO_PATH, "/get-tokeninfo");
+def_pub_const!(ROUTE_UPDATE_TOKENINFO_PATH, "/update-tokeninfo");
+def_pub_const!(ROUTE_ENV_EXAMPLE_PATH, "/env-example");
+def_pub_const!(ROUTE_STATIC_PATH, "/static/:path");
+def_pub_const!(ROUTE_SHARED_STYLES_PATH, "/static/shared-styles.css");
+def_pub_const!(ROUTE_SHARED_JS_PATH, "/static/shared.js");
+def_pub_const!(ROUTE_ABOUT_PATH, "/about");
+def_pub_const!(ROUTE_README_PATH, "/readme");
 
-pub const STATUS_SUCCESS: &str = "success";
-pub const STATUS_FAILED: &str = "failed";
+def_pub_const!(STATUS, "status");
+def_pub_const!(MESSAGE, "message");
+def_pub_const!(ERROR, "error");
 
-pub const HEADER_NAME_CONTENT_TYPE: &str = "content-type";
-pub const HEADER_NAME_AUTHORIZATION: &str = "Authorization";
+def_pub_const!(TOKEN_FILE, "token_file");
+def_pub_const!(DEFAULT_TOKEN_FILE_NAME, ".token");
+def_pub_const!(TOKEN_LIST_FILE, "token_list_file");
+def_pub_const!(DEFAULT_TOKEN_LIST_FILE_NAME, ".token-list");
+def_pub_const!(TOKENS, "tokens");
+def_pub_const!(TOKEN_LIST, "token_list");
 
-pub const CONTENT_TYPE_PROTO: &str = "application/proto";
-pub const CONTENT_TYPE_CONNECT_PROTO: &str = "application/connect+proto";
-pub const CONTENT_TYPE_TEXT_HTML_WITH_UTF8: &str = "text/html;charset=utf-8";
-pub const CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8: &str = "text/plain;charset=utf-8";
+def_pub_const!(STATUS_SUCCESS, "success");
+def_pub_const!(STATUS_FAILED, "failed");
 
-pub const AUTHORIZATION_BEARER_PREFIX: &str = "Bearer ";
+def_pub_const!(HEADER_NAME_CONTENT_TYPE, "content-type");
+def_pub_const!(HEADER_NAME_AUTHORIZATION, "authorization");
+def_pub_const!(HEADER_NAME_LOCATION, "Location");
 
-pub const OBJECT_CHAT_COMPLETION: &str = "chat.completion";
-pub const OBJECT_CHAT_COMPLETION_CHUNK: &str = "chat.completion.chunk";
+def_pub_const!(CONTENT_TYPE_PROTO, "application/proto");
+def_pub_const!(CONTENT_TYPE_CONNECT_PROTO, "application/connect+proto");
+def_pub_const!(CONTENT_TYPE_TEXT_HTML_WITH_UTF8, "text/html;charset=utf-8");
+def_pub_const!(CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8, "text/plain;charset=utf-8");
+def_pub_const!(CONTENT_TYPE_TEXT_CSS_WITH_UTF8, "text/css;charset=utf-8");
+def_pub_const!(CONTENT_TYPE_TEXT_JS_WITH_UTF8, "text/javascript;charset=utf-8");
 
-pub const CURSOR_API2_HOST: &str = "api2.cursor.sh";
-pub const CURSOR_API2_BASE_URL: &str = "https://api2.cursor.sh/aiserver.v1.AiService/";
+def_pub_const!(AUTHORIZATION_BEARER_PREFIX, "Bearer ");
 
-pub const CURSOR_API2_STREAM_CHAT: &str = "StreamChat";
-pub const CURSOR_API2_GET_USER_INFO: &str = "GetUserInfo";
+def_pub_const!(OBJECT_CHAT_COMPLETION, "chat.completion");
+def_pub_const!(OBJECT_CHAT_COMPLETION_CHUNK, "chat.completion.chunk");
 
-pub const FINISH_REASON_STOP: &str = "stop";
+def_pub_const!(CURSOR_API2_HOST, "api2.cursor.sh");
+def_pub_const!(CURSOR_API2_BASE_URL, "https://api2.cursor.sh/aiserver.v1.AiService/");
 
-pub const LONG_CONTEXT_MODELS: [&str; 4] = [
-    "gpt-4o-128k",
-    "gemini-1.5-flash-500k",
-    "claude-3-haiku-200k",
-    "claude-3-5-sonnet-200k",
-];
+def_pub_const!(CURSOR_API2_STREAM_CHAT, "StreamChat");
+def_pub_const!(CURSOR_API2_GET_USER_INFO, "GetUserInfo");
 
-pub const MODEL_OBJECT: &str = "model";
-pub const ANTHROPIC: &str = "anthropic";
-pub const CURSOR: &str = "cursor";
-pub const GOOGLE: &str = "google";
-pub const OPENAI: &str = "openai";
+def_pub_const!(FINISH_REASON_STOP, "stop");
+
+def_pub_const!(ERR_UPDATE_CONFIG, "无法更新配置");
+def_pub_const!(ERR_RESET_CONFIG, "无法重置配置");
+def_pub_const!(ERR_INVALID_PATH, "无效的路径");

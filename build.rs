@@ -139,7 +139,7 @@ fn minify_assets() -> Result<()> {
 
 fn main() -> Result<()> {
     // Proto 文件处理
-    println!("cargo:rerun-if-changed=src/aiserver/v1/aiserver.proto");
+    println!("cargo:rerun-if-changed=src/chat/aiserver/v1/aiserver.proto");
     let mut config = prost_build::Config::new();
     // config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
     // config.type_attribute(
@@ -147,7 +147,7 @@ fn main() -> Result<()> {
     //     "#[derive(serde::Serialize, serde::Deserialize)]"
     // );
     config
-        .compile_protos(&["src/aiserver/v1/aiserver.proto"], &["src/aiserver/v1/"])
+        .compile_protos(&["src/chat/aiserver/v1/aiserver.proto"], &["src/chat/aiserver/v1/"])
         .unwrap();
 
     // 静态资源文件处理

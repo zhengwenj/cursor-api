@@ -16,6 +16,4 @@ node_modules
 /cursor-api.exe
 /release
 
-/static/readme.html
 /*.py
-/src/decoder.rs

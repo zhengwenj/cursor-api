@@ -1,23 +1,25 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use image::guess_format;
 use prost::Message as _;
-use rand::Rng;
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-mod aiserver;
-use aiserver::v1::*;
-
-pub mod message;
-use message::*;
+pub mod common;
 
 pub mod app;
-use app::{models::*,constant::*};
+use app::{constant::EMPTY_STRING, models::*};
 
 pub mod chat;
+use chat::{
+    aiserver::v1::{
+        conversation_message, image_proto, ConversationMessage, ExplicitContext, GetChatRequest,
+        ImageProto, ModelDetails,
+    },
+    constant::{LONG_CONTEXT_MODELS, ERR_UNSUPPORTED_GIF, ERR_UNSUPPORTED_IMAGE_FORMAT},
+    models::{Message, MessageContent, Role},
+};
 
 async fn process_chat_inputs(inputs: Vec<Message>) -> (String, Vec<ConversationMessage>) {
-    // 收集 system 和 developer 指令
+    // 收集 system 指令
     let instructions = inputs
         .iter()
         .filter(|input| input.role == Role::System)
@@ -56,7 +58,7 @@ async fn process_chat_inputs(inputs: Vec<Message>) -> (String, Vec<ConversationM
         return (
             instructions,
             vec![ConversationMessage {
-                text: " ".to_string(),
+                text: EMPTY_STRING.into(),
                 r#type: conversation_message::MessageType::Human as i32,
                 attached_code_chunks: vec![],
                 codebase_context_chunks: vec![],
@@ -101,7 +103,7 @@ async fn process_chat_inputs(inputs: Vec<Message>) -> (String, Vec<ConversationM
             0,
             Message {
                 role: Role::User,
-                content: MessageContent::Text(" ".to_string()),
+                content: MessageContent::Text(EMPTY_STRING.into()),
             },
         );
     }
@@ -119,7 +121,7 @@ async fn process_chat_inputs(inputs: Vec<Message>) -> (String, Vec<ConversationM
                 i,
                 Message {
                     role: insert_role,
-                    content: MessageContent::Text(" ".to_string()),
+                    content: MessageContent::Text(EMPTY_STRING.into()),
                 },
             );
         }
@@ -133,7 +135,7 @@ async fn process_chat_inputs(inputs: Vec<Message>) -> (String, Vec<ConversationM
     {
         chat_inputs.push(Message {
             role: Role::User,
-            content: MessageContent::Text(" ".to_string()),
+            content: MessageContent::Text(EMPTY_STRING.into()),
         });
     }
 
@@ -259,7 +261,7 @@ fn process_base64_image(
         && !format.contains("webp")
         && !format.contains("gif")
     {
-        return Err("不支持的图片格式，仅支持 PNG、JPEG、WEBP 和非动态 GIF".into());
+        return Err(ERR_UNSUPPORTED_IMAGE_FORMAT.into());
     }
 
     let image_data = BASE64.decode(parts[1])?;
@@ -268,7 +270,7 @@ fn process_base64_image(
     if format.contains("gif") {
         if let Ok(frames) = gif::DecodeOptions::new().read_info(std::io::Cursor::new(&image_data)) {
             if frames.into_iter().count() > 1 {
-                return Err("不支持动态 GIF".into());
+                return Err(ERR_UNSUPPORTED_GIF.into());
             }
         }
     }
@@ -304,11 +306,11 @@ async fn process_http_image(
                 gif::DecodeOptions::new().read_info(std::io::Cursor::new(&image_data))
             {
                 if frames.into_iter().count() > 1 {
-                    return Err("不支持动态 GIF".into());
+                    return Err(ERR_UNSUPPORTED_GIF.into());
                 }
             }
         }
-        _ => return Err("不支持的图片格式，仅支持 PNG、JPEG、WEBP 和非动态 GIF".into()),
+        _ => return Err(ERR_UNSUPPORTED_IMAGE_FORMAT.into()),
     }
 
     // 获取图片尺寸
@@ -398,45 +400,4 @@ pub async fn encode_chat_message(
     let content = hex::encode_upper(&encoded);
 
     Ok(hex::decode(len_prefix + &content)?)
-}
-
-pub fn generate_hash() -> String {
-    let random_bytes = rand::thread_rng().gen::<[u8; 32]>();
-    let mut hasher = Sha256::new();
-    hasher.update(random_bytes);
-    hex::encode(hasher.finalize())
-}
-
-fn obfuscate_bytes(bytes: &mut [u8]) {
-    let mut prev: u8 = 165;
-    for (idx, byte) in bytes.iter_mut().enumerate() {
-        let old_value = *byte;
-        *byte = (old_value ^ prev).wrapping_add((idx % 256) as u8);
-        prev = *byte;
-    }
-}
-
-pub fn generate_checksum(device_id: &str, mac_addr: Option<&str>) -> String {
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis()
-        / 1_000_000;
-
-    let mut timestamp_bytes = vec![
-        ((timestamp >> 40) & 255) as u8,
-        ((timestamp >> 32) & 255) as u8,
-        ((timestamp >> 24) & 255) as u8,
-        ((timestamp >> 16) & 255) as u8,
-        ((timestamp >> 8) & 255) as u8,
-        (255 & timestamp) as u8,
-    ];
-
-    obfuscate_bytes(&mut timestamp_bytes);
-    let encoded = BASE64.encode(&timestamp_bytes);
-
-    match mac_addr {
-        Some(mac) => format!("{}{}/{}", encoded, device_id, mac),
-        None => format!("{}{}", encoded, device_id),
-    }
 }

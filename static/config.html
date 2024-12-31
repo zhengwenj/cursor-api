@@ -23,13 +23,15 @@
         <option value="/tokeninfo">Token 信息页面 (/tokeninfo)</option>
         <option value="/static/shared-styles.css">共享样式 (/static/shared-styles.css)</option>
         <option value="/static/shared.js">共享脚本 (/static/shared.js)</option>
+        <option value="/about">关于页面 (/about)</option>
+        <option value="/readme">ReadMe文档 (/readme)</option>
       </select>
     </div>
 
     <div class="form-group">
       <label>内容类型:</label>
       <select id="content_type">
-        <option value="default">默认行为</option>
+        <option value="default">默认</option>
         <option value="text">纯文本</option>
         <option value="html">HTML</option>
       </select>
@@ -91,6 +93,18 @@
       <input type="password" id="authToken">
     </div>
 
+    <div class="form-group">
+      <label>使用量检查模型规则:</label>
+      <select id="check_usage_models_type">
+        <option value="">保持不变</option>
+        <option value="none">禁用</option>
+        <option value="default">默认</option>
+        <option value="all">所有</option>
+        <option value="list">自定义列表</option>
+      </select>
+      <input type="text" id="check_usage_models_list" placeholder="模型列表，以逗号分隔" style="display: none;">
+    </div>
+
     <div class="button-group">
       <button onclick="updateConfig('get')">获取配置</button>
       <button onclick="updateConfig('update')">更新配置</button>
@@ -147,6 +161,8 @@
           parseStringFromBoolean(data.data.enable_slow_pool, '');
         document.getElementById('enable_all_claude').value =
           parseStringFromBoolean(data.data.enable_all_claude, '');
+        document.getElementById('check_usage_models_type').value = data.data.check_usage_models?.type || '';
+        document.getElementById('check_usage_models_list').value = data.data.check_usage_models?.type === 'list' ? data.data.check_usage_models?.content || '' : document.getElementById('check_usage_models_list').value;
       }
     }
 
@@ -186,6 +202,14 @@
         }),
         ...(document.getElementById('enable_all_claude').value && {
           enable_all_claude: parseBooleanFromString(document.getElementById('enable_all_claude').value)
+        }),
+        ...(document.getElementById('check_usage_models_type').value && {
+          check_usage_models: {
+            type: document.getElementById('check_usage_models_type').value,
+            ...(document.getElementById('check_usage_models_type').value === 'list' && {
+              content: document.getElementById('check_usage_models_list').value
+            })
+          }
         })
       };
 
@@ -220,6 +244,12 @@
 
     // 初始化 token 处理
     initializeTokenHandling('authToken');
+
+    // 添加使用量检查模型类型变更处理
+    document.getElementById('check_usage_models_type').addEventListener('change', function() {
+      const input = document.getElementById('check_usage_models_list');
+      input.style.display = this.value === 'list' ? 'inline-block' : 'none';
+    });
   </script>
 </body>
 

@@ -1,4 +1,4 @@
-use crate::aiserver::v1::throw_error_check_request::Error as ErrorType;
+use super::aiserver::v1::throw_error_check_request::Error as ErrorType;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
@@ -31,9 +31,9 @@ pub struct ErrorDebug {
 }
 
 impl ErrorDebug {
-    pub fn is_valid(&self) -> bool {
-        ErrorType::from_str_name(&self.error).is_some()
-    }
+    // pub fn is_valid(&self) -> bool {
+    //     ErrorType::from_str_name(&self.error).is_some()
+    // }
 
     pub fn status_code(&self) -> u16 {
         match ErrorType::from_str_name(&self.error) {
@@ -82,6 +82,8 @@ pub struct ErrorDetails {
     #[serde(rename = "isRetryable")]
     pub is_retryable: bool,
 }
+
+use crate::common::models::{ApiStatus, ErrorResponse as CommonErrorResponse};
 
 impl ChatError {
     pub fn to_json(&self) -> serde_json::Value {
@@ -134,6 +136,15 @@ impl ErrorResponse {
 
     pub fn native_code(&self) -> String {
         self.code.replace("_", " ").to_lowercase()
+    }
+
+    pub fn to_common(self) -> CommonErrorResponse {
+        CommonErrorResponse {
+            status: ApiStatus::Error,
+            code: Some(self.status),
+            error: self.error.as_ref().map(|error| error.message.clone()).or(Some(self.code.clone())),
+            message: self.error.as_ref().map(|error| error.details.clone()),
+        }
     }
 }
 

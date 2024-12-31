@@ -1,9 +1,10 @@
 use super::{
     constant::*,
-    models::{AppConfig, AppState, TokenInfo, TokenUpdateRequest},
-    utils::i32_to_u32,
+    models::{AppState, TokenInfo, TokenUpdateRequest},
+    statics::*,
+    utils::{generate_checksum, generate_hash, i32_to_u32},
 };
-use crate::aiserver::v1::GetUserInfoResponse;
+use crate::{chat::aiserver::v1::GetUserInfoResponse, common::models::{ApiStatus, NormalResponseNoData}};
 use axum::http::HeaderMap;
 use axum::{
     extract::{Query, State},
@@ -41,13 +42,13 @@ fn parse_token_alias(token_part: &str, line: &str) -> Option<(String, Option<Str
 
 // Token 加载函数
 pub fn load_tokens() -> Vec<TokenInfo> {
-    let token_file = AppConfig::get_token_file();
-    let token_list_file = AppConfig::get_token_list_file();
+    let token_file = get_token_file();
+    let token_list_file = get_token_list_file();
 
     // 确保文件存在
     for file in [&token_file, &token_list_file] {
         if !std::path::Path::new(file).exists() {
-            if let Err(e) = std::fs::write(file, "") {
+            if let Err(e) = std::fs::write(file, EMPTY_STRING) {
                 eprintln!("警告: 无法创建文件 '{}': {}", file, e);
             }
         }
@@ -118,8 +119,7 @@ pub fn load_tokens() -> Vec<TokenInfo> {
             }
         } else {
             // 为新token生成checksum
-            let checksum =
-                crate::generate_checksum(&crate::generate_hash(), Some(&crate::generate_hash()));
+            let checksum = generate_checksum(&generate_hash(), Some(&generate_hash()));
             token_map.insert(token, (checksum, alias));
         }
     }
@@ -153,10 +153,20 @@ pub fn load_tokens() -> Vec<TokenInfo> {
         .collect()
 }
 
+#[derive(Serialize)]
+pub struct ChecksumResponse {
+    pub checksum: String,
+}
+
+pub async fn handle_get_checksum() -> Json<ChecksumResponse> {
+    let checksum = generate_checksum(&generate_hash(), Some(&generate_hash()));
+    Json(ChecksumResponse { checksum })
+}
+
 // 更新 TokenInfo 处理
 pub async fn handle_update_tokeninfo(
     State(state): State<Arc<Mutex<AppState>>>,
-) -> Json<serde_json::Value> {
+) -> Json<NormalResponseNoData> {
     // 重新加载 tokens
     let token_infos = load_tokens();
 
@@ -166,20 +176,20 @@ pub async fn handle_update_tokeninfo(
         state.token_infos = token_infos;
     }
 
-    Json(serde_json::json!({
-        STATUS: STATUS_SUCCESS,
-        MESSAGE: "Token list has been reloaded"
-    }))
+    Json(NormalResponseNoData {
+        status: ApiStatus::Success,
+        message: Some("Token list has been reloaded".to_string()),
+    })
 }
 
 // 获取 TokenInfo 处理
 pub async fn handle_get_tokeninfo(
     State(_state): State<Arc<Mutex<AppState>>>,
     headers: HeaderMap,
-) -> Result<Json<serde_json::Value>, StatusCode> {
-    let auth_token = AppConfig::get_auth_token();
-    let token_file = AppConfig::get_token_file();
-    let token_list_file = AppConfig::get_token_list_file();
+) -> Result<Json<TokenInfoResponse>, StatusCode> {
+    let auth_token = get_auth_token();
+    let token_file = get_token_file();
+    let token_list_file = get_token_list_file();
 
     // 验证 AUTH_TOKEN
     let auth_header = headers
@@ -196,23 +206,40 @@ pub async fn handle_get_tokeninfo(
     let tokens = std::fs::read_to_string(&token_file).unwrap_or_else(|_| String::new());
     let token_list = std::fs::read_to_string(&token_list_file).unwrap_or_else(|_| String::new());
 
-    Ok(Json(serde_json::json!({
-        STATUS: STATUS_SUCCESS,
-        "token_file": token_file,
-        "token_list_file": token_list_file,
-        "tokens": tokens,
-        "token_list": token_list
-    })))
+    Ok(Json(TokenInfoResponse {
+        status: ApiStatus::Success,
+        token_file: token_file.clone(),
+        token_list_file: token_list_file.clone(),
+        tokens: Some(tokens.clone()),
+        tokens_count: Some(tokens.len()),
+        token_list: Some(token_list),
+        message: None,
+    }))
+}
+
+#[derive(Serialize)]
+pub struct TokenInfoResponse {
+    pub status: ApiStatus,
+    pub token_file: String,
+    pub token_list_file: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_list: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 pub async fn handle_update_tokeninfo_post(
     State(state): State<Arc<Mutex<AppState>>>,
     headers: HeaderMap,
     Json(request): Json<TokenUpdateRequest>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
-    let auth_token = AppConfig::get_auth_token();
-    let token_file = AppConfig::get_token_file();
-    let token_list_file = AppConfig::get_token_list_file();
+) -> Result<Json<TokenInfoResponse>, StatusCode> {
+    let auth_token = get_auth_token();
+    let token_file = get_token_file();
+    let token_list_file = get_token_list_file();
 
     // 验证 AUTH_TOKEN
     let auth_header = headers
@@ -244,13 +271,15 @@ pub async fn handle_update_tokeninfo_post(
         state.token_infos = token_infos;
     }
 
-    Ok(Json(serde_json::json!({
-        STATUS: STATUS_SUCCESS,
-        MESSAGE: "Token files have been updated and reloaded",
-        "token_file": token_file,
-        "token_list_file": token_list_file,
-        "token_count": token_infos_len
-    })))
+    Ok(Json(TokenInfoResponse {
+        status: ApiStatus::Success,
+        token_file: token_file.clone(),
+        token_list_file: token_list_file.clone(),
+        tokens: None,
+        tokens_count: Some(token_infos_len),
+        token_list: None,
+        message: Some("Token files have been updated and reloaded".to_string()),
+    }))
 }
 
 #[derive(Deserialize)]
@@ -262,14 +291,13 @@ pub async fn get_user_info(
     State(state): State<Arc<Mutex<AppState>>>,
     Query(query): Query<GetUserInfoQuery>,
 ) -> Json<GetUserInfo> {
-    let (auth_token, checksum) = match {
-        let app_token_infos = &state.lock().await.token_infos;
-        app_token_infos
-            .iter()
-            .find(|token_info| token_info.alias == Some(query.alias.clone()))
-            .map(|token_info| (token_info.token.clone(), token_info.checksum.clone()))
-    } {
-        Some(token) => token,
+    let token_infos = &state.lock().await.token_infos;
+    let token_info = token_infos
+        .iter()
+        .find(|token_info| token_info.alias == Some(query.alias.clone()));
+
+    let (auth_token, checksum) = match token_info {
+        Some(token_info) => (token_info.token.clone(), token_info.checksum.clone()),
         None => return Json(GetUserInfo::Error("No data".to_string())),
     };
 
@@ -300,9 +328,9 @@ pub async fn get_user_usage(auth_token: &str, checksum: &str) -> Option<UserUsag
 
 #[derive(Serialize)]
 pub enum GetUserInfo {
-    #[serde[rename = "usage"]]
+    #[serde(rename = "usage")]
     Usage(UserUsageInfo),
-    #[serde[rename = "error"]]
+    #[serde(rename = "error")]
     Error(String),
 }
 

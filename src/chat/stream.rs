@@ -1,4 +1,4 @@
-use crate::aiserver::v1::StreamChatResponse;
+use super::aiserver::v1::StreamChatResponse;
 use flate2::read::GzDecoder;
 use prost::Message;
 use std::io::Read;

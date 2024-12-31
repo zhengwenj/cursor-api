@@ -76,3 +76,32 @@ pub struct Usage {
     pub completion_tokens: i32,
     pub total_tokens: i32,
 }
+
+// 模型定义
+#[derive(Serialize, Clone)]
+pub struct Model {
+    pub id: &'static str,
+    pub created: i64,
+    pub object: &'static str,
+    pub owned_by: &'static str,
+}
+
+use crate::{AppConfig, UsageCheck};
+use super::constant::USAGE_CHECK_MODELS;
+
+impl Model {
+    pub fn is_usage_check(&self) -> bool {
+        match AppConfig::get_usage_check() {
+            UsageCheck::None => false,
+            UsageCheck::Default => USAGE_CHECK_MODELS.contains(&self.id),
+            UsageCheck::All => true,
+            UsageCheck::Custom(models) => models.contains(&self.id),
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct ModelsResponse {
+    pub object: &'static str,
+    pub data: &'static [Model],
+}
