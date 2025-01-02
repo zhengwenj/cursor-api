@@ -72,21 +72,21 @@ pub struct Delta {
 
 #[derive(Serialize)]
 pub struct Usage {
-    pub prompt_tokens: i32,
-    pub completion_tokens: i32,
-    pub total_tokens: i32,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
 }
 
 // 模型定义
 #[derive(Serialize, Clone)]
 pub struct Model {
     pub id: &'static str,
-    pub created: i64,
+    pub created: &'static i64,
     pub object: &'static str,
     pub owned_by: &'static str,
 }
 
-use crate::{AppConfig, UsageCheck};
+use crate::app::model::{AppConfig, UsageCheck};
 use super::constant::USAGE_CHECK_MODELS;
 
 impl Model {

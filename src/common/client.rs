@@ -1,4 +1,8 @@
-use crate::app::constant::*;
+use crate::app::constant::{
+    AUTHORIZATION_BEARER_PREFIX, CONTENT_TYPE_CONNECT_PROTO, CONTENT_TYPE_PROTO,
+    CURSOR_API2_BASE_URL, CURSOR_API2_HOST, CURSOR_API2_STREAM_CHAT, HEADER_NAME_AUTHORIZATION,
+    HEADER_NAME_CONTENT_TYPE,
+};
 use reqwest::Client;
 use uuid::Uuid;
 
@@ -7,15 +11,18 @@ pub fn build_client(auth_token: &str, checksum: &str, endpoint: &str) -> reqwest
     let client = Client::new();
     let trace_id = Uuid::new_v4().to_string();
     let content_type = if endpoint == CURSOR_API2_STREAM_CHAT {
-      CONTENT_TYPE_CONNECT_PROTO
+        CONTENT_TYPE_CONNECT_PROTO
     } else {
-      CONTENT_TYPE_PROTO
+        CONTENT_TYPE_PROTO
     };
 
     client
         .post(format!("{}{}", CURSOR_API2_BASE_URL, endpoint))
         .header(HEADER_NAME_CONTENT_TYPE, content_type)
-        .header(HEADER_NAME_AUTHORIZATION, format!("{}{}", AUTHORIZATION_BEARER_PREFIX, auth_token))
+        .header(
+            HEADER_NAME_AUTHORIZATION,
+            format!("{}{}", AUTHORIZATION_BEARER_PREFIX, auth_token),
+        )
         .header("connect-accept-encoding", "gzip,br")
         .header("connect-protocol-version", "1")
         .header("user-agent", "connect-es/1.6.1")

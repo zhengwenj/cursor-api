@@ -1,35 +1,33 @@
+mod app;
+mod chat;
+mod common;
+
+use app::{
+    config::handle_config_update,
+    constant::{
+        EMPTY_STRING, PKG_VERSION, ROUTE_ABOUT_PATH, ROUTE_CONFIG_PATH, ROUTE_ENV_EXAMPLE_PATH,
+        ROUTE_GET_CHECKSUM, ROUTE_GET_TOKENINFO_PATH, ROUTE_GET_USER_INFO_PATH, ROUTE_HEALTH_PATH,
+        ROUTE_LOGS_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH, ROUTE_STATIC_PATH,
+        ROUTE_TOKENINFO_PATH, ROUTE_UPDATE_TOKENINFO_PATH,
+    },
+    model::*,
+    lazy::{AUTH_TOKEN, ROUTE_CHAT_PATH, ROUTE_MODELS_PATH},
+};
 use axum::{
-    body::Body,
-    extract::{Path, State},
-    http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
+    Router,
 };
-use chrono::Local;
-use cursor_api::{
-    app::{
-        config::handle_config_update,
-        constant::*,
-        models::*,
-        statics::*,
-        token::{
-            get_user_info, handle_get_checksum, handle_get_tokeninfo, handle_update_tokeninfo,
-            handle_update_tokeninfo_post, load_tokens,
-        },
-        utils::{parse_bool_from_env, parse_string_from_env},
+use chat::{
+    route::{
+        get_user_info, handle_about, handle_config_page, handle_env_example, handle_get_checksum,
+        handle_get_tokeninfo, handle_health, handle_logs, handle_logs_post, handle_readme,
+        handle_root, handle_static, handle_tokeninfo_page, handle_update_tokeninfo,
+        handle_update_tokeninfo_post,
     },
-    chat::{
-        constant::AVAILABLE_MODELS,
-        service::{handle_chat, handle_models},
-    },
-    common::models::{
-        health::{CpuInfo, HealthCheckResponse, MemoryInfo, SystemInfo, SystemStats},
-        ApiStatus,
-    },
+    service::{handle_chat, handle_models},
 };
+use common::utils::{parse_bool_from_env, parse_string_from_env, tokens::load_tokens};
 use std::sync::Arc;
-use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 
@@ -48,7 +46,7 @@ async fn main() {
     // 加载环境变量
     dotenvy::dotenv().ok();
 
-    if get_auth_token() == EMPTY_STRING {
+    if AUTH_TOKEN.is_empty() {
         panic!("AUTH_TOKEN must be set")
     };
 
@@ -98,258 +96,7 @@ async fn main() {
     let addr = format!("0.0.0.0:{}", port);
     println!("服务器运行在端口 {}", port);
     println!("当前版本: v{}", PKG_VERSION);
-    // if !std::env::args().any(|arg| arg == "--no-instruction") {
-    //     println!(include_str!("../start_instruction"));
-    // }
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-// 根路由处理
-async fn handle_root() -> impl IntoResponse {
-    match AppConfig::get_page_content(ROUTE_ROOT_PATH).unwrap_or_default() {
-        PageContent::Default => Response::builder()
-            .status(StatusCode::TEMPORARY_REDIRECT)
-            .header(HEADER_NAME_LOCATION, ROUTE_HEALTH_PATH)
-            .body(Body::empty())
-            .unwrap(),
-        PageContent::Text(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8)
-            .body(Body::from(content.clone()))
-            .unwrap(),
-        PageContent::Html(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(Body::from(content.clone()))
-            .unwrap(),
-    }
-}
-
-async fn handle_health(State(state): State<Arc<Mutex<AppState>>>) -> Json<HealthCheckResponse> {
-    let start_time = get_start_time();
-
-    // 创建系统信息实例，只监控 CPU 和内存
-    let mut sys = System::new_with_specifics(
-        RefreshKind::nothing()
-            .with_memory(MemoryRefreshKind::everything())
-            .with_cpu(CpuRefreshKind::everything()),
-    );
-
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-
-    // 刷新 CPU 和内存信息
-    sys.refresh_memory();
-    sys.refresh_cpu_usage();
-
-    let pid = std::process::id() as usize;
-    let process = sys.process(pid.into());
-
-    // 获取内存信息
-    let memory = process.map(|p| p.memory()).unwrap_or(0);
-
-    // 获取 CPU 使用率
-    let cpu_usage = sys.global_cpu_usage();
-
-    let state = state.lock().await;
-    let uptime = (Local::now() - start_time).num_seconds();
-
-    Json(HealthCheckResponse {
-        status: ApiStatus::Healthy,
-        version: PKG_VERSION,
-        uptime,
-        stats: SystemStats {
-            started: start_time.to_string(),
-            total_requests: state.total_requests,
-            active_requests: state.active_requests,
-            system: SystemInfo {
-                memory: MemoryInfo {
-                    rss: memory, // 物理内存使用量(字节)
-                },
-                cpu: CpuInfo {
-                    usage: cpu_usage, // CPU 使用率(百分比)
-                },
-            },
-        },
-        models: AVAILABLE_MODELS.iter().map(|m| m.id).collect::<Vec<_>>(),
-        endpoints: vec![
-            ROUTE_CHAT_PATH.as_str(),
-            ROUTE_MODELS_PATH.as_str(),
-            ROUTE_GET_CHECKSUM,
-            ROUTE_TOKENINFO_PATH,
-            ROUTE_UPDATE_TOKENINFO_PATH,
-            ROUTE_GET_TOKENINFO_PATH,
-            ROUTE_LOGS_PATH,
-            ROUTE_GET_USER_INFO_PATH,
-            ROUTE_ENV_EXAMPLE_PATH,
-            ROUTE_CONFIG_PATH,
-            ROUTE_STATIC_PATH,
-            ROUTE_ABOUT_PATH,
-            ROUTE_README_PATH
-
-        ],
-    })
-}
-
-async fn handle_tokeninfo_page() -> impl IntoResponse {
-    match AppConfig::get_page_content(ROUTE_TOKENINFO_PATH).unwrap_or_default() {
-        PageContent::Default => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(include_str!("../static/tokeninfo.min.html").to_string())
-            .unwrap(),
-        PageContent::Text(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8)
-            .body(content.clone())
-            .unwrap(),
-        PageContent::Html(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(content.clone())
-            .unwrap(),
-    }
-}
-
-// 日志处理
-async fn handle_logs() -> impl IntoResponse {
-    match AppConfig::get_page_content(ROUTE_LOGS_PATH).unwrap_or_default() {
-        PageContent::Default => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(Body::from(
-                include_str!("../static/logs.min.html").to_string(),
-            ))
-            .unwrap(),
-        PageContent::Text(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8)
-            .body(Body::from(content.clone()))
-            .unwrap(),
-        PageContent::Html(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(Body::from(content.clone()))
-            .unwrap(),
-    }
-}
-
-async fn handle_logs_post(
-    State(state): State<Arc<Mutex<AppState>>>,
-    headers: HeaderMap,
-) -> Result<Json<LogsResponse>, StatusCode> {
-    let auth_token = get_auth_token();
-
-    // 验证 AUTH_TOKEN
-    let auth_header = headers
-        .get(HEADER_NAME_AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX))
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    if auth_header != auth_token {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
-    let state = state.lock().await;
-    Ok(Json(LogsResponse {
-        status: ApiStatus::Success,
-        total: state.request_logs.len(),
-        logs: state.request_logs.clone(),
-        timestamp: Local::now().to_string(),
-    }))
-}
-
-#[derive(serde::Serialize)]
-struct LogsResponse {
-    status: ApiStatus,
-    total: usize,
-    logs: Vec<RequestLog>,
-    timestamp: String,
-}
-
-async fn handle_env_example() -> impl IntoResponse {
-    Response::builder()
-        .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8)
-        .body(include_str!("../.env.example").to_string())
-        .unwrap()
-}
-
-// 配置页面处理函数
-async fn handle_config_page() -> impl IntoResponse {
-    match AppConfig::get_page_content(ROUTE_CONFIG_PATH).unwrap_or_default() {
-        PageContent::Default => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(include_str!("../static/config.min.html").to_string())
-            .unwrap(),
-        PageContent::Text(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8)
-            .body(content.clone())
-            .unwrap(),
-        PageContent::Html(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(content.clone())
-            .unwrap(),
-    }
-}
-
-async fn handle_static(Path(path): Path<String>) -> impl IntoResponse {
-    match path.as_str() {
-        "shared-styles.css" => {
-            match AppConfig::get_page_content(ROUTE_SHARED_STYLES_PATH).unwrap_or_default() {
-                PageContent::Default => Response::builder()
-                    .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_CSS_WITH_UTF8)
-                    .body(include_str!("../static/shared-styles.min.css").to_string())
-                    .unwrap(),
-                PageContent::Text(content) | PageContent::Html(content) => Response::builder()
-                    .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_CSS_WITH_UTF8)
-                    .body(content.clone())
-                    .unwrap(),
-            }
-        }
-        "shared.js" => {
-            match AppConfig::get_page_content(ROUTE_SHARED_JS_PATH).unwrap_or_default() {
-                PageContent::Default => Response::builder()
-                    .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_JS_WITH_UTF8)
-                    .body(include_str!("../static/shared.min.js").to_string())
-                    .unwrap(),
-                PageContent::Text(content) | PageContent::Html(content) => Response::builder()
-                    .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_JS_WITH_UTF8)
-                    .body(content.clone())
-                    .unwrap(),
-            }
-        }
-        _ => Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body("Not found".to_string())
-            .unwrap(),
-    }
-}
-
-async fn handle_about() -> impl IntoResponse {
-    match AppConfig::get_page_content(ROUTE_ABOUT_PATH).unwrap_or_default() {
-        PageContent::Default => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(include_str!("../static/readme.min.html").to_string())
-            .unwrap(),
-        PageContent::Text(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8)
-            .body(content.clone())
-            .unwrap(),
-        PageContent::Html(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(content.clone())
-            .unwrap(),
-    }
-}
-
-async fn handle_readme() -> impl IntoResponse {
-    match AppConfig::get_page_content(ROUTE_README_PATH).unwrap_or_default() {
-        PageContent::Default => Response::builder()
-            .status(StatusCode::TEMPORARY_REDIRECT)
-            .header(HEADER_NAME_LOCATION, ROUTE_ABOUT_PATH)
-            .body(Body::empty())
-            .unwrap(),
-        PageContent::Text(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8)
-            .body(Body::from(content.clone()))
-            .unwrap(),
-        PageContent::Html(content) => Response::builder()
-            .header(HEADER_NAME_CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
-            .body(Body::from(content.clone()))
-            .unwrap(),
-    }
 }

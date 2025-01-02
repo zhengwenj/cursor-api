@@ -3,19 +3,19 @@ use image::guess_format;
 use prost::Message as _;
 use uuid::Uuid;
 
-pub mod common;
+use crate::app::{
+    constant::EMPTY_STRING,
+    model::{AppConfig, VisionAbility},
+    lazy::DEFAULT_INSTRUCTIONS,
+};
 
-pub mod app;
-use app::{constant::EMPTY_STRING, models::*};
-
-pub mod chat;
-use chat::{
+use super::{
     aiserver::v1::{
         conversation_message, image_proto, ConversationMessage, ExplicitContext, GetChatRequest,
         ImageProto, ModelDetails,
     },
-    constant::{LONG_CONTEXT_MODELS, ERR_UNSUPPORTED_GIF, ERR_UNSUPPORTED_IMAGE_FORMAT},
-    models::{Message, MessageContent, Role},
+    constant::{ERR_UNSUPPORTED_GIF, ERR_UNSUPPORTED_IMAGE_FORMAT, LONG_CONTEXT_MODELS},
+    model::{Message, MessageContent, Role},
 };
 
 async fn process_chat_inputs(inputs: Vec<Message>) -> (String, Vec<ConversationMessage>) {
@@ -42,7 +42,7 @@ async fn process_chat_inputs(inputs: Vec<Message>) -> (String, Vec<ConversationM
 
     // 使用默认指令或收集到的指令
     let instructions = if instructions.is_empty() {
-        "Respond in Chinese by default".to_string()
+        DEFAULT_INSTRUCTIONS.clone()
     } else {
         instructions
     };

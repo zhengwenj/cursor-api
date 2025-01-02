@@ -1,7 +1,7 @@
 use super::{
-    constant::*,
-    models::{AppConfig, AppState},
-    statics::*,
+    constant::{HEADER_NAME_AUTHORIZATION, AUTHORIZATION_BEARER_PREFIX},
+    model::{AppConfig, AppState},
+    lazy::AUTH_TOKEN,
 };
 use crate::common::models::{
     config::{ConfigData, ConfigUpdateRequest},
@@ -14,6 +14,44 @@ use axum::{
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+// 定义处理更新操作的宏
+macro_rules! handle_update {
+    ($request:expr, $field:ident, $update_fn:expr, $field_name:expr) => {
+        if let Some($field) = $request.$field {
+            if let Err(e) = $update_fn($field) {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        status: ApiStatus::Failed,
+                        code: Some(500),
+                        error: Some(format!("更新 {} 失败: {}", $field_name, e)),
+                        message: None,
+                    }),
+                ));
+            }
+        }
+    };
+}
+
+// 定义处理重置操作的宏
+macro_rules! handle_reset {
+    ($request:expr, $field:ident, $reset_fn:expr, $field_name:expr) => {
+        if $request.$field.is_some() {
+            if let Err(e) = $reset_fn() {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        status: ApiStatus::Failed,
+                        code: Some(500),
+                        error: Some(format!("重置 {} 失败: {}", $field_name, e)),
+                        message: None,
+                    }),
+                ));
+            }
+        }
+    };
+}
 
 pub async fn handle_config_update(
     State(_state): State<Arc<Mutex<AppState>>>,
@@ -34,7 +72,7 @@ pub async fn handle_config_update(
             }),
         ))?;
 
-    if auth_header != get_auth_token() {
+    if auth_header != AUTH_TOKEN.as_str() {
         return Err((
             StatusCode::UNAUTHORIZED,
             Json(ErrorResponse {
@@ -65,7 +103,6 @@ pub async fn handle_config_update(
             // 处理页面内容更新
             if !request.path.is_empty() && request.content.is_some() {
                 let content = request.content.unwrap();
-
                 if let Err(e) = AppConfig::update_page_content(&request.path, content) {
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -79,95 +116,12 @@ pub async fn handle_config_update(
                 }
             }
 
-            // 处理 enable_stream_check 更新
-            if let Some(enable_stream_check) = request.enable_stream_check {
-                if let Err(e) = AppConfig::update_stream_check(enable_stream_check) {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("更新 enable_stream_check 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
-
-            // 处理 include_stop_stream 更新
-            if let Some(include_stop_stream) = request.include_stop_stream {
-                if let Err(e) = AppConfig::update_stop_stream(include_stop_stream) {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("更新 include_stop_stream 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
-
-            // 处理 vision_ability 更新
-            if let Some(vision_ability) = request.vision_ability {
-                if let Err(e) = AppConfig::update_vision_ability(vision_ability) {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("更新 vision_ability 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
-
-            // 处理 enable_slow_pool 更新
-            if let Some(enable_slow_pool) = request.enable_slow_pool {
-                if let Err(e) = AppConfig::update_slow_pool(enable_slow_pool) {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("更新 enable_slow_pool 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
-
-            // 处理 enable_all_claude 更新
-            if let Some(enable_all_claude) = request.enable_all_claude {
-                if let Err(e) = AppConfig::update_allow_claude(enable_all_claude) {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("更新 enable_all_claude 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
-
-            // 处理 check_usage_models 更新
-            if let Some(check_usage_models) = request.check_usage_models {
-                if let Err(e) = AppConfig::update_usage_check(check_usage_models) {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("更新 check_usage_models 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
+            handle_update!(request, enable_stream_check, AppConfig::update_stream_check, "enable_stream_check");
+            handle_update!(request, include_stop_stream, AppConfig::update_stop_stream, "include_stop_stream");
+            handle_update!(request, vision_ability, AppConfig::update_vision_ability, "vision_ability");
+            handle_update!(request, enable_slow_pool, AppConfig::update_slow_pool, "enable_slow_pool");
+            handle_update!(request, enable_all_claude, AppConfig::update_allow_claude, "enable_all_claude");
+            handle_update!(request, check_usage_models, AppConfig::update_usage_check, "check_usage_models");
 
             Ok(Json(NormalResponse {
                 status: ApiStatus::Success,
@@ -192,95 +146,13 @@ pub async fn handle_config_update(
                 }
             }
 
-            // 重置 enable_stream_check
-            if request.enable_stream_check.is_some() {
-                if let Err(e) = AppConfig::reset_stream_check() {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("重置 enable_stream_check 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
+            handle_reset!(request, enable_stream_check, AppConfig::reset_stream_check, "enable_stream_check");
+            handle_reset!(request, include_stop_stream, AppConfig::reset_stop_stream, "include_stop_stream");
+            handle_reset!(request, vision_ability, AppConfig::reset_vision_ability, "vision_ability");
+            handle_reset!(request, enable_slow_pool, AppConfig::reset_slow_pool, "enable_slow_pool");
+            handle_reset!(request, enable_all_claude, AppConfig::reset_allow_claude, "enable_all_claude");
+            handle_reset!(request, check_usage_models, AppConfig::reset_usage_check, "check_usage_models");
 
-            // 重置 include_stop_stream
-            if request.include_stop_stream.is_some() {
-                if let Err(e) = AppConfig::reset_stop_stream() {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("重置 include_stop_stream 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
-
-            // 重置 vision_ability
-            if request.vision_ability.is_some() {
-                if let Err(e) = AppConfig::reset_vision_ability() {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("重置 vision_ability 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
-
-            // 重置 enable_slow_pool
-            if request.enable_slow_pool.is_some() {
-                if let Err(e) = AppConfig::reset_slow_pool() {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("重置 enable_slow_pool 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
-
-            // 重置 enable_all_claude
-            if request.enable_all_claude.is_some() {
-                if let Err(e) = AppConfig::reset_allow_claude() {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("重置 enable_slow_pool 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
-
-            // 重置 check_usage_models
-            if request.check_usage_models.is_some() {
-                if let Err(e) = AppConfig::reset_usage_check() {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failed,
-                            code: Some(500),
-                            error: Some(format!("重置 check_usage_models 失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
-                }
-            }
             Ok(Json(NormalResponse {
                 status: ApiStatus::Success,
                 data: None,

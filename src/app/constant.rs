@@ -5,10 +5,10 @@ macro_rules! def_pub_const {
 }
 
 def_pub_const!(PKG_VERSION, env!("CARGO_PKG_VERSION"));
-def_pub_const!(PKG_NAME, env!("CARGO_PKG_NAME"));
-def_pub_const!(PKG_DESCRIPTION, env!("CARGO_PKG_DESCRIPTION"));
-def_pub_const!(PKG_AUTHORS, env!("CARGO_PKG_AUTHORS"));
-def_pub_const!(PKG_REPOSITORY, env!("CARGO_PKG_REPOSITORY"));
+// def_pub_const!(PKG_NAME, env!("CARGO_PKG_NAME"));
+// def_pub_const!(PKG_DESCRIPTION, env!("CARGO_PKG_DESCRIPTION"));
+// def_pub_const!(PKG_AUTHORS, env!("CARGO_PKG_AUTHORS"));
+// def_pub_const!(PKG_REPOSITORY, env!("CARGO_PKG_REPOSITORY"));
 
 def_pub_const!(EMPTY_STRING, "");
 
@@ -28,16 +28,8 @@ def_pub_const!(ROUTE_SHARED_JS_PATH, "/static/shared.js");
 def_pub_const!(ROUTE_ABOUT_PATH, "/about");
 def_pub_const!(ROUTE_README_PATH, "/readme");
 
-def_pub_const!(STATUS, "status");
-def_pub_const!(MESSAGE, "message");
-def_pub_const!(ERROR, "error");
-
-def_pub_const!(TOKEN_FILE, "token_file");
 def_pub_const!(DEFAULT_TOKEN_FILE_NAME, ".token");
-def_pub_const!(TOKEN_LIST_FILE, "token_list_file");
 def_pub_const!(DEFAULT_TOKEN_LIST_FILE_NAME, ".token-list");
-def_pub_const!(TOKENS, "tokens");
-def_pub_const!(TOKEN_LIST, "token_list");
 
 def_pub_const!(STATUS_SUCCESS, "success");
 def_pub_const!(STATUS_FAILED, "failed");

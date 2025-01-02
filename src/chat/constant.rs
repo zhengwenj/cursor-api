@@ -1,4 +1,4 @@
-use super::models::Model;
+use super::model::Model;
 
 macro_rules! def_pub_const {
     ($name:ident, $value:expr) => {
@@ -9,7 +9,7 @@ def_pub_const!(ERR_UNSUPPORTED_GIF, "不支持动态 GIF");
 def_pub_const!(ERR_UNSUPPORTED_IMAGE_FORMAT, "不支持的图片格式，仅支持 PNG、JPEG、WEBP 和非动态 GIF");
 
 const MODEL_OBJECT: &str = "model";
-const CREATED: i64 = 1706659200;
+const CREATED: &i64 = &1706659200;
 
 def_pub_const!(ANTHROPIC, "anthropic");
 def_pub_const!(CURSOR, "cursor");
@@ -41,7 +41,7 @@ def_pub_const!(
 );
 def_pub_const!(GEMINI_2_0_FLASH_EXP, "gemini-2.0-flash-exp");
 
-pub const AVAILABLE_MODELS: &[Model] = &[
+pub const AVAILABLE_MODELS: [Model; 21] = [
     Model {
         id: CLAUDE_3_5_SONNET,
         created: CREATED,

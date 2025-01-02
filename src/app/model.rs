@@ -1,5 +1,12 @@
-use super::{constant::*, token::UserUsageInfo};
-use crate::chat::models::Message;
+use crate::{
+    app::constant::{
+        ERR_INVALID_PATH, ERR_RESET_CONFIG, ERR_UPDATE_CONFIG, ROUTE_ABOUT_PATH, ROUTE_CONFIG_PATH,
+        ROUTE_LOGS_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH, ROUTE_SHARED_JS_PATH,
+        ROUTE_SHARED_STYLES_PATH, ROUTE_TOKENINFO_PATH,
+    },
+    common::models::usage::UserUsageInfo,
+};
+use crate::chat::model::Message;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::sync::RwLock;
@@ -113,7 +120,7 @@ macro_rules! config_methods {
                         .map(|config| config.$field.clone())
                         .unwrap_or($default)
                 }
-                
+
                 pub fn [<update_ $field>](value: $type) -> Result<(), &'static str> {
                     if let Ok(mut config) = APP_CONFIG.write() {
                         config.$field = value;
@@ -122,7 +129,7 @@ macro_rules! config_methods {
                         Err(ERR_UPDATE_CONFIG)
                     }
                 }
-                
+
                 pub fn [<reset_ $field>]() -> Result<(), &'static str> {
                     if let Ok(mut config) = APP_CONFIG.write() {
                         config.$field = $default;
@@ -187,7 +194,6 @@ impl AppConfig {
             .map(|config| config.usage_check.clone())
             .unwrap_or_default()
     }
-
 
     pub fn update_vision_ability(new_ability: VisionAbility) -> Result<(), &'static str> {
         if let Ok(mut config) = APP_CONFIG.write() {
@@ -274,10 +280,6 @@ impl AppState {
             request_logs: Vec::new(),
             token_infos,
         }
-    }
-
-    pub fn update_token_infos(&mut self, token_infos: Vec<TokenInfo>) {
-        self.token_infos = token_infos;
     }
 }
 

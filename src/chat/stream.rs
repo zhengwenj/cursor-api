@@ -20,6 +20,8 @@ fn decompress_gzip(data: &[u8]) -> Option<Vec<u8>> {
 }
 
 pub enum StreamMessage {
+    // 未完成
+    Incomplete,
     // 调试
     Debug(String),
     // 流开始标志 b"\0\0\0\0\0"
@@ -65,7 +67,7 @@ pub fn parse_stream_data(data: &[u8]) -> Result<StreamMessage, StreamError> {
 
         // 检查剩余数据长度是否足够
         if offset + 5 + msg_len > data.len() {
-            break;
+            return Ok(StreamMessage::Incomplete);
         }
 
         let msg_data = &data[offset + 5..offset + 5 + msg_len];
@@ -74,12 +76,14 @@ pub fn parse_stream_data(data: &[u8]) -> Result<StreamMessage, StreamError> {
             // 文本消息
             0 => {
                 if let Ok(response) = StreamChatResponse::decode(msg_data) {
+                    // crate::debug_println!("[text] StreamChatResponse: {:?}", response);
                     if !response.text.is_empty() {
                         messages.push(response.text);
                     } else {
                         // println!("[text] StreamChatResponse: {:?}", response);
                         return Ok(StreamMessage::Debug(
                             response.filled_prompt.unwrap_or_default(),
+                            // response.is_using_slow_request,
                         ));
                     }
                 }
@@ -88,12 +92,14 @@ pub fn parse_stream_data(data: &[u8]) -> Result<StreamMessage, StreamError> {
             1 => {
                 if let Some(text) = decompress_gzip(msg_data) {
                     let response = StreamChatResponse::decode(&text[..]).unwrap_or_default();
+                    // crate::debug_println!("[gzip] StreamChatResponse: {:?}", response);
                     if !response.text.is_empty() {
                         messages.push(response.text);
                     } else {
                         // println!("[gzip] StreamChatResponse: {:?}", response);
                         return Ok(StreamMessage::Debug(
                             response.filled_prompt.unwrap_or_default(),
+                            // response.is_using_slow_request,
                         ));
                     }
                 }

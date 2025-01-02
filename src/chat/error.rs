@@ -126,9 +126,9 @@ pub struct Error {
 }
 
 impl ErrorResponse {
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap()
-    }
+    // pub fn to_json(&self) -> serde_json::Value {
+    //     serde_json::to_value(self).unwrap()
+    // }
 
     pub fn status_code(&self) -> StatusCode {
         StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)

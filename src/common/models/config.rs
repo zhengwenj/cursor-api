@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{PageContent, UsageCheck, VisionAbility};
+use crate::app::model::{PageContent, UsageCheck, VisionAbility};
 
 #[derive(Serialize)]
 pub struct ConfigData {

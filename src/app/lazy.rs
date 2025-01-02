@@ -1,6 +1,6 @@
-use super::{
-    constant::{DEFAULT_TOKEN_FILE_NAME, DEFAULT_TOKEN_LIST_FILE_NAME, EMPTY_STRING},
-    utils::parse_string_from_env,
+use crate::{
+    app::constant::{DEFAULT_TOKEN_FILE_NAME, DEFAULT_TOKEN_LIST_FILE_NAME, EMPTY_STRING},
+    common::utils::parse_string_from_env,
 };
 use std::sync::LazyLock;
 
@@ -8,28 +8,24 @@ macro_rules! def_pub_static {
     // 基础版本：直接存储 String
     ($name:ident, $value:expr) => {
         pub static $name: LazyLock<String> = LazyLock::new(|| $value);
-
-        def_pub_static_getter!($name);
     };
 
     // 环境变量版本
     ($name:ident, env: $env_key:expr, default: $default:expr) => {
         pub static $name: LazyLock<String> =
             LazyLock::new(|| parse_string_from_env($env_key, $default).trim().to_string());
-
-        def_pub_static_getter!($name);
     };
 }
 
-macro_rules! def_pub_static_getter {
-    ($name:ident) => {
-        paste::paste! {
-            pub fn [<get_ $name:lower>]() -> String {
-                (*$name).clone()
-            }
-        }
-    };
-}
+// macro_rules! def_pub_static_getter {
+//     ($name:ident) => {
+//         paste::paste! {
+//             pub fn [<get_ $name:lower>]() -> String {
+//                 (*$name).clone()
+//             }
+//         }
+//     };
+// }
 
 def_pub_static!(ROUTE_PREFIX, env: "ROUTE_PREFIX", default: EMPTY_STRING);
 def_pub_static!(AUTH_TOKEN, env: "AUTH_TOKEN", default: EMPTY_STRING);
@@ -50,3 +46,16 @@ pub static START_TIME: LazyLock<chrono::DateTime<chrono::Local>> =
 pub fn get_start_time() -> chrono::DateTime<chrono::Local> {
     *START_TIME
 }
+
+def_pub_static!(DEFAULT_INSTRUCTIONS, env: "DEFAULT_INSTRUCTIONS", default: "Respond in Chinese by default");
+
+// pub static DEBUG: LazyLock<bool> = LazyLock::new(|| parse_bool_from_env("DEBUG", false));
+
+// #[macro_export]
+// macro_rules! debug_println {
+//     ($($arg:tt)*) => {
+//         if *crate::app::statics::DEBUG {
+//             println!($($arg)*);
+//         }
+//     };
+// }
