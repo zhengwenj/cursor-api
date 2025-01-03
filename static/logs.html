@@ -200,6 +200,7 @@
       <table id="logsTable">
         <thead>
           <tr>
+            <th>id</th>
             <th>时间</th>
             <th>模型</th>
             <th>Token信息</th>
@@ -233,6 +234,14 @@
         <tr>
           <td>别名:</td>
           <td id="modalAlias"></td>
+        </tr>
+        <tr>
+          <td>会员类型:</td>
+          <td id="modalMemberType"></td>
+        </tr>
+        <tr>
+          <td>试用剩余天数:</td>
+          <td id="modalTrialDays"></td>
         </tr>
         <tr>
           <td>使用情况:</td>
@@ -272,6 +281,16 @@
       document.getElementById('modalChecksum').textContent = tokenInfo.checksum || '-';
       document.getElementById('modalAlias').textContent = tokenInfo.alias || '-';
 
+      // 添加会员类型和试用天数显示
+      if (tokenInfo.usage) {
+        document.getElementById('modalMemberType').textContent = tokenInfo.usage.mtype || '-';
+        document.getElementById('modalTrialDays').textContent =
+          tokenInfo.usage.trial_days > 0 ? `${tokenInfo.usage.trial_days}天` : '-';
+      } else {
+        document.getElementById('modalMemberType').textContent = '-';
+        document.getElementById('modalTrialDays').textContent = '-';
+      }
+
       // 获取进度条容器
       const progressContainer = document.querySelector('.usage-progress-container');
 
@@ -304,6 +323,7 @@
 
       tbody.innerHTML = data.logs.map(log => `
         <tr>
+          <td>${log.id}</td>
           <td>${new Date(log.timestamp).toLocaleString()}</td>
           <td>${log.model}</td>
           <td>

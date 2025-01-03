@@ -1,7 +1,7 @@
 use super::{
-    constant::{HEADER_NAME_AUTHORIZATION, AUTHORIZATION_BEARER_PREFIX},
-    model::{AppConfig, AppState},
+    constant::AUTHORIZATION_BEARER_PREFIX,
     lazy::AUTH_TOKEN,
+    model::{AppConfig, AppState},
 };
 use crate::common::models::{
     config::{ConfigData, ConfigUpdateRequest},
@@ -9,7 +9,7 @@ use crate::common::models::{
 };
 use axum::{
     extract::State,
-    http::{HeaderMap, StatusCode},
+    http::{header::AUTHORIZATION, HeaderMap, StatusCode},
     Json,
 };
 use std::sync::Arc;
@@ -59,7 +59,7 @@ pub async fn handle_config_update(
     Json(request): Json<ConfigUpdateRequest>,
 ) -> Result<Json<NormalResponse<ConfigData>>, (StatusCode, Json<ErrorResponse>)> {
     let auth_header = headers
-        .get(HEADER_NAME_AUTHORIZATION)
+        .get(AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
         .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX))
         .ok_or((
@@ -116,12 +116,42 @@ pub async fn handle_config_update(
                 }
             }
 
-            handle_update!(request, enable_stream_check, AppConfig::update_stream_check, "enable_stream_check");
-            handle_update!(request, include_stop_stream, AppConfig::update_stop_stream, "include_stop_stream");
-            handle_update!(request, vision_ability, AppConfig::update_vision_ability, "vision_ability");
-            handle_update!(request, enable_slow_pool, AppConfig::update_slow_pool, "enable_slow_pool");
-            handle_update!(request, enable_all_claude, AppConfig::update_allow_claude, "enable_all_claude");
-            handle_update!(request, check_usage_models, AppConfig::update_usage_check, "check_usage_models");
+            handle_update!(
+                request,
+                enable_stream_check,
+                AppConfig::update_stream_check,
+                "enable_stream_check"
+            );
+            handle_update!(
+                request,
+                include_stop_stream,
+                AppConfig::update_stop_stream,
+                "include_stop_stream"
+            );
+            handle_update!(
+                request,
+                vision_ability,
+                AppConfig::update_vision_ability,
+                "vision_ability"
+            );
+            handle_update!(
+                request,
+                enable_slow_pool,
+                AppConfig::update_slow_pool,
+                "enable_slow_pool"
+            );
+            handle_update!(
+                request,
+                enable_all_claude,
+                AppConfig::update_allow_claude,
+                "enable_all_claude"
+            );
+            handle_update!(
+                request,
+                check_usage_models,
+                AppConfig::update_usage_check,
+                "check_usage_models"
+            );
 
             Ok(Json(NormalResponse {
                 status: ApiStatus::Success,
@@ -146,12 +176,42 @@ pub async fn handle_config_update(
                 }
             }
 
-            handle_reset!(request, enable_stream_check, AppConfig::reset_stream_check, "enable_stream_check");
-            handle_reset!(request, include_stop_stream, AppConfig::reset_stop_stream, "include_stop_stream");
-            handle_reset!(request, vision_ability, AppConfig::reset_vision_ability, "vision_ability");
-            handle_reset!(request, enable_slow_pool, AppConfig::reset_slow_pool, "enable_slow_pool");
-            handle_reset!(request, enable_all_claude, AppConfig::reset_allow_claude, "enable_all_claude");
-            handle_reset!(request, check_usage_models, AppConfig::reset_usage_check, "check_usage_models");
+            handle_reset!(
+                request,
+                enable_stream_check,
+                AppConfig::reset_stream_check,
+                "enable_stream_check"
+            );
+            handle_reset!(
+                request,
+                include_stop_stream,
+                AppConfig::reset_stop_stream,
+                "include_stop_stream"
+            );
+            handle_reset!(
+                request,
+                vision_ability,
+                AppConfig::reset_vision_ability,
+                "vision_ability"
+            );
+            handle_reset!(
+                request,
+                enable_slow_pool,
+                AppConfig::reset_slow_pool,
+                "enable_slow_pool"
+            );
+            handle_reset!(
+                request,
+                enable_all_claude,
+                AppConfig::reset_allow_claude,
+                "enable_all_claude"
+            );
+            handle_reset!(
+                request,
+                check_usage_models,
+                AppConfig::reset_usage_check,
+                "check_usage_models"
+            );
 
             Ok(Json(NormalResponse {
                 status: ApiStatus::Success,

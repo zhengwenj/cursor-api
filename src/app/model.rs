@@ -286,6 +286,7 @@ impl AppState {
 // 请求日志
 #[derive(Serialize, Clone)]
 pub struct RequestLog {
+    pub id: u64,
     pub timestamp: chrono::DateTime<chrono::Local>,
     pub model: String,
     pub token_info: TokenInfo,

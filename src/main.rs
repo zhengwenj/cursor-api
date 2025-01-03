@@ -5,13 +5,13 @@ mod common;
 use app::{
     config::handle_config_update,
     constant::{
-        EMPTY_STRING, PKG_VERSION, ROUTE_ABOUT_PATH, ROUTE_CONFIG_PATH, ROUTE_ENV_EXAMPLE_PATH,
-        ROUTE_GET_CHECKSUM, ROUTE_GET_TOKENINFO_PATH, ROUTE_GET_USER_INFO_PATH, ROUTE_HEALTH_PATH,
-        ROUTE_LOGS_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH, ROUTE_STATIC_PATH,
-        ROUTE_TOKENINFO_PATH, ROUTE_UPDATE_TOKENINFO_PATH,
+        EMPTY_STRING, PKG_VERSION, ROUTE_ABOUT_PATH, ROUTE_BASIC_CALIBRATION_PATH,
+        ROUTE_CONFIG_PATH, ROUTE_ENV_EXAMPLE_PATH, ROUTE_GET_CHECKSUM, ROUTE_GET_TOKENINFO_PATH,
+        ROUTE_GET_USER_INFO_PATH, ROUTE_HEALTH_PATH, ROUTE_LOGS_PATH, ROUTE_README_PATH,
+        ROUTE_ROOT_PATH, ROUTE_STATIC_PATH, ROUTE_TOKENINFO_PATH, ROUTE_UPDATE_TOKENINFO_PATH,
     },
-    model::*,
     lazy::{AUTH_TOKEN, ROUTE_CHAT_PATH, ROUTE_MODELS_PATH},
+    model::*,
 };
 use axum::{
     routing::{get, post},
@@ -19,14 +19,14 @@ use axum::{
 };
 use chat::{
     route::{
-        get_user_info, handle_about, handle_config_page, handle_env_example, handle_get_checksum,
-        handle_get_tokeninfo, handle_health, handle_logs, handle_logs_post, handle_readme,
-        handle_root, handle_static, handle_tokeninfo_page, handle_update_tokeninfo,
-        handle_update_tokeninfo_post,
+        get_user_info, handle_about, handle_basic_calibration, handle_config_page,
+        handle_env_example, handle_get_checksum, handle_get_tokeninfo, handle_health, handle_logs,
+        handle_logs_post, handle_readme, handle_root, handle_static, handle_tokeninfo_page,
+        handle_update_tokeninfo, handle_update_tokeninfo_post,
     },
     service::{handle_chat, handle_models},
 };
-use common::utils::{parse_bool_from_env, parse_string_from_env, tokens::load_tokens};
+use common::utils::{load_tokens, parse_bool_from_env, parse_string_from_env};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
@@ -72,7 +72,6 @@ async fn main() {
         .route(ROUTE_TOKENINFO_PATH, get(handle_tokeninfo_page))
         .route(ROUTE_MODELS_PATH.as_str(), get(handle_models))
         .route(ROUTE_GET_CHECKSUM, get(handle_get_checksum))
-        .route(ROUTE_GET_USER_INFO_PATH, get(get_user_info))
         .route(ROUTE_UPDATE_TOKENINFO_PATH, get(handle_update_tokeninfo))
         .route(ROUTE_GET_TOKENINFO_PATH, post(handle_get_tokeninfo))
         .route(
@@ -88,6 +87,8 @@ async fn main() {
         .route(ROUTE_STATIC_PATH, get(handle_static))
         .route(ROUTE_ABOUT_PATH, get(handle_about))
         .route(ROUTE_README_PATH, get(handle_readme))
+        .route(ROUTE_BASIC_CALIBRATION_PATH, get(handle_basic_calibration))
+        .route(ROUTE_GET_USER_INFO_PATH, get(get_user_info))
         .layer(CorsLayer::permissive())
         .with_state(state);
 

@@ -27,6 +27,7 @@ def_pub_const!(ROUTE_SHARED_STYLES_PATH, "/static/shared-styles.css");
 def_pub_const!(ROUTE_SHARED_JS_PATH, "/static/shared.js");
 def_pub_const!(ROUTE_ABOUT_PATH, "/about");
 def_pub_const!(ROUTE_README_PATH, "/readme");
+def_pub_const!(ROUTE_BASIC_CALIBRATION_PATH, "/basic-calibration");
 
 def_pub_const!(DEFAULT_TOKEN_FILE_NAME, ".token");
 def_pub_const!(DEFAULT_TOKEN_LIST_FILE_NAME, ".token-list");
@@ -34,9 +35,10 @@ def_pub_const!(DEFAULT_TOKEN_LIST_FILE_NAME, ".token-list");
 def_pub_const!(STATUS_SUCCESS, "success");
 def_pub_const!(STATUS_FAILED, "failed");
 
-def_pub_const!(HEADER_NAME_CONTENT_TYPE, "content-type");
-def_pub_const!(HEADER_NAME_AUTHORIZATION, "authorization");
-def_pub_const!(HEADER_NAME_LOCATION, "Location");
+def_pub_const!(HEADER_NAME_GHOST_MODE, "x-ghost-mode");
+
+def_pub_const!(TRUE, "true");
+def_pub_const!(FALSE, "false");
 
 def_pub_const!(CONTENT_TYPE_PROTO, "application/proto");
 def_pub_const!(CONTENT_TYPE_CONNECT_PROTO, "application/connect+proto");
@@ -49,9 +51,6 @@ def_pub_const!(AUTHORIZATION_BEARER_PREFIX, "Bearer ");
 
 def_pub_const!(OBJECT_CHAT_COMPLETION, "chat.completion");
 def_pub_const!(OBJECT_CHAT_COMPLETION_CHUNK, "chat.completion.chunk");
-
-def_pub_const!(CURSOR_API2_HOST, "api2.cursor.sh");
-def_pub_const!(CURSOR_API2_BASE_URL, "https://api2.cursor.sh/aiserver.v1.AiService/");
 
 def_pub_const!(CURSOR_API2_STREAM_CHAT, "StreamChat");
 def_pub_const!(CURSOR_API2_GET_USER_INFO, "GetUserInfo");

@@ -3,7 +3,7 @@ pub use logs::{handle_logs, handle_logs_post};
 mod health;
 pub use health::{handle_root, handle_health};
 mod token;
-pub use token::{handle_get_checksum, handle_update_tokeninfo, handle_get_tokeninfo, handle_update_tokeninfo_post, handle_tokeninfo_page};
+pub use token::{handle_get_checksum, handle_update_tokeninfo, handle_get_tokeninfo, handle_update_tokeninfo_post, handle_tokeninfo_page, handle_basic_calibration};
 mod usage;
 pub use usage::get_user_info;
 mod config;
