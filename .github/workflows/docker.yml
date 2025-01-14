@@ -8,6 +8,11 @@ on:
         required: true
         type: boolean
         default: false
+      upload_artifacts:
+        description: '是否上传构建产物'
+        required: true
+        type: boolean
+        default: true
   push:
     tags:
       - 'v*'
@@ -54,7 +59,9 @@ jobs:
             network=host
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v6.10.0
+        uses: docker/build-push-action@v6.11.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           push: true
@@ -63,3 +70,19 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          outputs: type=local,dest=./dist,enable=${{ github.event_name == 'workflow_dispatch' && inputs.upload_artifacts }}
+
+      - name: Prepare artifacts
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_artifacts
+        run: |
+          mkdir -p artifacts/amd64 artifacts/arm64
+          cp dist/linux_amd64/app/cursor-api artifacts/amd64/
+          cp dist/linux_arm64/app/cursor-api artifacts/arm64/
+
+      - name: Upload artifacts
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_artifacts
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: cursor-api-binaries
+          path: artifacts/
+          retention-days: 7

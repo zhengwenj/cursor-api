@@ -5,14 +5,13 @@ use uuid::Uuid;
 
 use crate::app::{
     constant::EMPTY_STRING,
-    model::{AppConfig, VisionAbility},
     lazy::DEFAULT_INSTRUCTIONS,
+    model::{AppConfig, VisionAbility},
 };
 
 use super::{
     aiserver::v1::{
-        conversation_message, image_proto, ConversationMessage, ExplicitContext, GetChatRequest,
-        ImageProto, ModelDetails,
+        conversation_message, image_proto, AzureState, ConversationMessage, ExplicitContext, GetChatRequest, ImageProto, ModelDetails
     },
     constant::{ERR_UNSUPPORTED_GIF, ERR_UNSUPPORTED_IMAGE_FORMAT, LONG_CONTEXT_MODELS},
     model::{Message, MessageContent, Role},
@@ -200,7 +199,7 @@ async fn process_chat_inputs(inputs: Vec<Message>) -> (String, Vec<ConversationM
             relevant_files: vec![],
             tool_results: vec![],
             notepads: vec![],
-            is_capability_iteration: Some(false),
+            is_capability_iteration: None,
             capabilities: vec![],
             edit_trail_contexts: vec![],
             suggested_code_blocks: vec![],
@@ -329,7 +328,7 @@ async fn process_http_image(
 pub async fn encode_chat_message(
     inputs: Vec<Message>,
     model_name: &str,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
     // 在进入异步操作前获取并释放锁
     let enable_slow_pool = {
         if AppConfig::get_slow_pool() {
@@ -361,7 +360,12 @@ pub async fn encode_chat_message(
             model_name: Some(model_name.to_string()),
             api_key: None,
             enable_ghost_mode: None,
-            azure_state: None,
+            azure_state: Some(AzureState {
+                api_key: String::new(),
+                base_url: String::new(),
+                deployment: String::new(),
+                use_azure: false,
+            }),
             enable_slow_pool,
             openai_api_base_url: None,
         }),
@@ -370,27 +374,23 @@ pub async fn encode_chat_message(
         linter_errors: None,
         summary: None,
         summary_up_until_index: None,
-        allow_long_file_scan: None,
-        is_bash: None,
+        allow_long_file_scan: Some(false),
+        is_bash: Some(false),
         conversation_id: Uuid::new_v4().to_string(),
-        can_handle_filenames_after_language_ids: None,
+        can_handle_filenames_after_language_ids: Some(true),
         use_web: None,
         quotes: vec![],
         debug_info: None,
         workspace_id: None,
         external_links: vec![],
         commit_notes: vec![],
-        long_context_mode: if LONG_CONTEXT_MODELS.contains(&model_name) {
-            Some(true)
-        } else {
-            None
-        },
-        is_eval: None,
+        long_context_mode: Some(LONG_CONTEXT_MODELS.contains(&model_name)),
+        is_eval: Some(false),
         desired_max_tokens: None,
         context_ast: None,
         is_composer: None,
-        runnable_code_blocks: None,
-        should_cache: None,
+        runnable_code_blocks: Some(false),
+        should_cache: Some(false),
     };
 
     let mut encoded = Vec::new();

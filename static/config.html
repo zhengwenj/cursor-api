@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/x-icon" href="data:image/x-icon;,">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>配置管理</title>
   <!-- 引入共享样式 -->
@@ -25,6 +26,7 @@
         <option value="/static/shared.js">共享脚本 (/static/shared.js)</option>
         <option value="/about">关于页面 (/about)</option>
         <option value="/readme">ReadMe文档 (/readme)</option>
+        <option value="/api">api调用 (/api)</option>
       </select>
     </div>
 
@@ -89,11 +91,6 @@
     </div>
 
     <div class="form-group">
-      <label>认证令牌:</label>
-      <input type="password" id="authToken">
-    </div>
-
-    <div class="form-group">
       <label>使用量检查模型规则:</label>
       <select id="check_usage_models_type">
         <option value="">保持不变</option>
@@ -103,6 +100,11 @@
         <option value="list">自定义列表</option>
       </select>
       <input type="text" id="check_usage_models_list" placeholder="模型列表，以逗号分隔" style="display: none;">
+    </div>
+
+    <div class="form-group">
+      <label>认证令牌:</label>
+      <input type="password" id="authToken">
     </div>
 
     <div class="button-group">

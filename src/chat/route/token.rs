@@ -10,13 +10,12 @@ use crate::{
     common::{
         models::{ApiStatus, NormalResponseNoData},
         utils::{
-            extract_time, extract_user_id, generate_checksum_with_default, load_tokens,
-            validate_checksum, validate_token,
+            extract_time, extract_time_ks, extract_user_id, generate_checksum_with_default, generate_checksum_with_repair, load_tokens, validate_token_and_checksum
         },
     },
 };
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::{
         header::{AUTHORIZATION, CONTENT_TYPE},
         HeaderMap,
@@ -29,14 +28,24 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+#[derive(Deserialize)]
+pub struct ChecksumQuery {
+    #[serde(default, alias = "checksum")]
+    pub bad_checksum: Option<String>,
+}
+
 #[derive(Serialize)]
 pub struct ChecksumResponse {
     pub checksum: String,
 }
 
-pub async fn handle_get_checksum() -> Json<ChecksumResponse> {
-    let checksum = generate_checksum_with_default();
-    Json(ChecksumResponse { checksum })
+pub async fn handle_get_checksum(
+    Query(query): Query<ChecksumQuery>
+) -> Json<ChecksumResponse> {
+    match query.bad_checksum {
+        None => Json(ChecksumResponse { checksum: generate_checksum_with_default() }),
+        Some(bad_checksum) => Json(ChecksumResponse { checksum: generate_checksum_with_repair(&bad_checksum) })
+    }
 }
 
 // 更新 TokenInfo 处理
@@ -191,6 +200,8 @@ pub struct BasicCalibrationResponse {
     pub user_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub create_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checksum_time: Option<u64>,
 }
 
 pub async fn handle_basic_calibration(
@@ -205,65 +216,36 @@ pub async fn handle_basic_calibration(
                 message: Some("未提供授权令牌".to_string()),
                 user_id: None,
                 create_at: None,
+                checksum_time: None,
             })
         }
     };
 
-    // 解析 token 和 checksum
-    let (token_part, checksum) = if let Some(pos) = auth_token.find("::") {
-        let (_, rest) = auth_token.split_at(pos + 2);
-        if let Some(comma_pos) = rest.find(',') {
-            let (token, checksum) = rest.split_at(comma_pos);
-            (token, &checksum[1..])
-        } else {
-            (rest, "")
-        }
-    } else if let Some(pos) = auth_token.find("%3A%3A") {
-        let (_, rest) = auth_token.split_at(pos + 6);
-        if let Some(comma_pos) = rest.find(',') {
-            let (token, checksum) = rest.split_at(comma_pos);
-            (token, &checksum[1..])
-        } else {
-            (rest, "")
-        }
-    } else {
-        if let Some(comma_pos) = auth_token.find(',') {
-            let (token, checksum) = auth_token.split_at(comma_pos);
-            (token, &checksum[1..])
-        } else {
-            (&auth_token[..], "")
+    // 校验 token 和 checksum
+    let (token, checksum) = match validate_token_and_checksum(&auth_token) {
+        Some(parts) => parts,
+        None => {
+            return Json(BasicCalibrationResponse {
+                status: ApiStatus::Error,
+                message: Some("无效令牌或无效校验和".to_string()),
+                user_id: None,
+                create_at: None,
+                checksum_time: None,
+            })
         }
     };
 
-    // 验证 token 有效性
-    if !validate_token(token_part) {
-        return Json(BasicCalibrationResponse {
-            status: ApiStatus::Error,
-            message: Some("无效的授权令牌".to_string()),
-            user_id: None,
-            create_at: None,
-        });
-    }
-
-    // 验证 checksum
-    if !validate_checksum(checksum) {
-        return Json(BasicCalibrationResponse {
-            status: ApiStatus::Error,
-            message: Some("无效的校验和".to_string()),
-            user_id: None,
-            create_at: None,
-        });
-    }
-
     // 提取用户ID和创建时间
-    let user_id = extract_user_id(token_part);
-    let create_at = extract_time(token_part).map(|dt| dt.to_string());
+    let user_id = extract_user_id(&token);
+    let create_at = extract_time(&token).map(|dt| dt.to_string());
+    let checksum_time = extract_time_ks(&checksum[..8]);
 
-    // 返回校准结果
+    // 返回校验结果
     Json(BasicCalibrationResponse {
         status: ApiStatus::Success,
-        message: Some("校准成功".to_string()),
+        message: Some("校验成功".to_string()),
         user_id,
         create_at,
+        checksum_time,
     })
 }

@@ -18,14 +18,21 @@ fn normalize_and_write(content: &str, file_path: &str) -> String {
     normalized
 }
 
-// 解析token和别名
-fn parse_token_alias(token_part: &str, line: &str) -> Option<(String, Option<String>)> {
-    match token_part.split("::").collect::<Vec<_>>() {
-        parts if parts.len() == 1 => Some((parts[0].to_string(), None)),
-        parts if parts.len() == 2 => Some((parts[1].to_string(), Some(parts[0].to_string()))),
-        _ => {
-            eprintln!("警告: 忽略无效的行: {}", line);
-            None
+// 解析token
+fn parse_token(token_part: &str) -> Option<String> {
+    // 查找最后一个:或%3A的位置
+    let colon_pos = token_part.rfind(':');
+    let encoded_colon_pos = token_part.rfind("%3A");
+    
+    match (colon_pos, encoded_colon_pos) {
+        (None, None) => Some(token_part.to_string()),
+        (Some(pos1), None) => Some(token_part[(pos1 + 1)..].to_string()),
+        (None, Some(pos2)) => Some(token_part[(pos2 + 3)..].to_string()),
+        (Some(pos1), Some(pos2)) => {
+            // 取较大的位置作为分隔点
+            let pos = pos1.max(pos2);
+            let start = if pos == pos2 { pos + 3 } else { pos + 1 };
+            Some(token_part[start..].to_string())
         }
     }
 }
@@ -47,15 +54,15 @@ pub fn load_tokens() -> Vec<TokenInfo> {
     // 读取和规范化 token 文件
     let token_entries = match std::fs::read_to_string(&token_file) {
         Ok(content) => {
-            let normalized = normalize_and_write(&content, &token_file);
+            let normalized = content.replace("\r\n", "\n");
             normalized
                 .lines()
                 .filter_map(|line| {
                     let line = line.trim();
-                    if line.is_empty() || line.starts_with('#') {
+                    if line.is_empty() || line.starts_with('#') || !validate_token(line) {
                         return None;
                     }
-                    parse_token_alias(line, line)
+                    parse_token(line)
                 })
                 .collect::<Vec<_>>()
         }
@@ -66,7 +73,7 @@ pub fn load_tokens() -> Vec<TokenInfo> {
     };
 
     // 读取和规范化 token-list 文件
-    let mut token_map: std::collections::HashMap<String, (String, Option<String>)> =
+    let mut token_map: std::collections::HashMap<String, String> =
         match std::fs::read_to_string(&token_list_file) {
             Ok(content) => {
                 let normalized = normalize_and_write(&content, &token_list_file);
@@ -81,8 +88,8 @@ pub fn load_tokens() -> Vec<TokenInfo> {
                         let parts: Vec<&str> = line.split(',').collect();
                         match parts[..] {
                             [token_part, checksum] => {
-                                let (token, alias) = parse_token_alias(token_part, line)?;
-                                Some((token, (checksum.to_string(), alias)))
+                                let token = parse_token(token_part)?;
+                                Some((token, checksum.to_string()))
                             }
                             _ => {
                                 eprintln!("警告: 忽略无效的token-list行: {}", line);
@@ -99,30 +106,19 @@ pub fn load_tokens() -> Vec<TokenInfo> {
         };
 
     // 更新或添加新token
-    for (token, alias) in token_entries {
-        if let Some((_, existing_alias)) = token_map.get(&token) {
-            // 只在alias不同时更新已存在的token
-            if alias != *existing_alias {
-                if let Some((checksum, _)) = token_map.get(&token) {
-                    token_map.insert(token.clone(), (checksum.clone(), alias));
-                }
-            }
-        } else {
+    for token in token_entries {
+        if !token_map.contains_key(&token) {
             // 为新token生成checksum
             let checksum = generate_checksum_with_default();
-            token_map.insert(token, (checksum, alias));
+            token_map.insert(token, checksum);
         }
     }
 
     // 更新 token-list 文件
     let token_list_content = token_map
         .iter()
-        .map(|(token, (checksum, alias))| {
-            if let Some(alias) = alias {
-                format!("{}::{},{}", alias, token, checksum)
-            } else {
-                format!("{},{}", token, checksum)
-            }
+        .map(|(token, checksum)| {
+            format!("{},{}", token, checksum)
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -134,11 +130,10 @@ pub fn load_tokens() -> Vec<TokenInfo> {
     // 转换为 TokenInfo vector
     token_map
         .into_iter()
-        .map(|(token, (checksum, alias))| TokenInfo {
-            token,
+        .map(|(token, checksum)| TokenInfo {
+            token: token.clone(),
             checksum,
-            alias,
-            usage: None,
+            profile: None,
         })
         .collect()
 }
@@ -151,6 +146,10 @@ pub fn validate_token(token: &str) -> bool {
     // 检查 token 格式
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() != 3 {
+        return false;
+    }
+
+    if parts[0] != "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" {
         return false;
     }
 
@@ -173,20 +172,11 @@ pub fn validate_token(token: &str) -> bool {
     };
 
     // 验证必要字段是否存在且有效
-    let required_fields = ["sub", "exp", "iss", "aud", "randomness", "time"];
+    let required_fields = ["sub", "time", "randomness", "exp", "iss", "scope", "aud"];
     for field in required_fields {
         if !payload_json.get(field).is_some() {
             return false;
         }
-    }
-
-    // 验证 randomness 长度
-    if let Some(randomness) = payload_json["randomness"].as_str() {
-        if randomness.len() != 18 {
-            return false;
-        }
-    } else {
-        return false;
     }
 
     // 验证 time 字段
@@ -198,6 +188,15 @@ pub fn validate_token(token: &str) -> bool {
                 return false;
             }
         } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+    // 验证 randomness 长度
+    if let Some(randomness) = payload_json["randomness"].as_str() {
+        if randomness.len() != 18 {
             return false;
         }
     } else {
@@ -216,6 +215,11 @@ pub fn validate_token(token: &str) -> bool {
 
     // 验证发行者
     if payload_json["iss"].as_str() != Some("https://authentication.cursor.sh") {
+        return false;
+    }
+
+    // 验证授权范围
+    if payload_json["scope"].as_str() != Some("openid profile email offline_access") {
         return false;
     }
 

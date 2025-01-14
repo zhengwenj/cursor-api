@@ -2,14 +2,13 @@ use crate::{
     app::constant::{
         ERR_INVALID_PATH, ERR_RESET_CONFIG, ERR_UPDATE_CONFIG, ROUTE_ABOUT_PATH, ROUTE_CONFIG_PATH,
         ROUTE_LOGS_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH, ROUTE_SHARED_JS_PATH,
-        ROUTE_SHARED_STYLES_PATH, ROUTE_TOKENINFO_PATH,
+        ROUTE_SHARED_STYLES_PATH, ROUTE_TOKENINFO_PATH, ROUTE_API_PATH,
     },
-    common::models::usage::UserUsageInfo,
+    common::models::userinfo::TokenProfile,
 };
 use crate::chat::model::Message;
-use lazy_static::lazy_static;
+use std::sync::{LazyLock, RwLock};
 use serde::{Deserialize, Serialize};
-use std::sync::RwLock;
 
 // 页面内容类型枚举
 #[derive(Clone, Serialize, Deserialize)]
@@ -81,20 +80,22 @@ pub struct Pages {
     pub shared_js_content: PageContent,
     pub about_content: PageContent,
     pub readme_content: PageContent,
+    pub api_content: PageContent,
 }
 
 // 运行时状态
 pub struct AppState {
     pub total_requests: u64,
     pub active_requests: u64,
+    pub error_requests: u64,
     pub request_logs: Vec<RequestLog>,
     pub token_infos: Vec<TokenInfo>,
 }
 
 // 全局配置实例
-lazy_static! {
-    pub static ref APP_CONFIG: RwLock<AppConfig> = RwLock::new(AppConfig::default());
-}
+pub static APP_CONFIG: LazyLock<RwLock<AppConfig>> = LazyLock::new(|| {
+    RwLock::new(AppConfig::default())
+});
 
 impl Default for AppConfig {
     fn default() -> Self {
@@ -105,7 +106,7 @@ impl Default for AppConfig {
             slow_pool: false,
             allow_claude: false,
             pages: Pages::default(),
-            usage_check: UsageCheck::default(),
+            usage_check: UsageCheck::Default,
         }
     }
 }
@@ -184,6 +185,7 @@ impl AppConfig {
             ROUTE_SHARED_JS_PATH => config.pages.shared_js_content.clone(),
             ROUTE_ABOUT_PATH => config.pages.about_content.clone(),
             ROUTE_README_PATH => config.pages.readme_content.clone(),
+            ROUTE_API_PATH => config.pages.api_content.clone(),
             _ => PageContent::default(),
         })
     }
@@ -215,6 +217,7 @@ impl AppConfig {
                 ROUTE_SHARED_JS_PATH => config.pages.shared_js_content = content,
                 ROUTE_ABOUT_PATH => config.pages.about_content = content,
                 ROUTE_README_PATH => config.pages.readme_content = content,
+                ROUTE_API_PATH => config.pages.api_content = content,
                 _ => return Err(ERR_INVALID_PATH),
             }
             Ok(())
@@ -254,6 +257,7 @@ impl AppConfig {
                 ROUTE_SHARED_JS_PATH => config.pages.shared_js_content = PageContent::default(),
                 ROUTE_ABOUT_PATH => config.pages.about_content = PageContent::default(),
                 ROUTE_README_PATH => config.pages.readme_content = PageContent::default(),
+                ROUTE_API_PATH => config.pages.api_content = PageContent::default(),
                 _ => return Err(ERR_INVALID_PATH),
             }
             Ok(())
@@ -277,6 +281,7 @@ impl AppState {
         Self {
             total_requests: 0,
             active_requests: 0,
+            error_requests: 0,
             request_logs: Vec::new(),
             token_infos,
         }
@@ -292,17 +297,19 @@ pub struct RequestLog {
     pub token_info: TokenInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
+    pub timing: TimingInfo,
     pub stream: bool,
     pub status: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
 
-// pub struct PromptList(Option<String>);
-
-// impl PromptList {
-//     pub fn to_vec(&self) -> Vec<>
-// }
+#[derive(Serialize, Clone)]
+pub struct TimingInfo {
+    pub total: f64,    // 总用时(秒)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first: Option<f64>,  // 首字时间(秒)
+}
 
 // 聊天请求
 #[derive(Deserialize)]
@@ -319,9 +326,7 @@ pub struct TokenInfo {
     pub token: String,
     pub checksum: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub alias: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub usage: Option<UserUsageInfo>,
+    pub profile: Option<TokenProfile>,
 }
 
 // TokenUpdateRequest 结构体

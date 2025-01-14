@@ -1,4 +1,4 @@
-use super::aiserver::v1::throw_error_check_request::Error as ErrorType;
+use super::aiserver::v1::error_details::Error as ErrorType;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
@@ -65,7 +65,6 @@ impl ChatError {
             Some(error) => match error {
                 ErrorType::Unspecified => 500,
                 ErrorType::BadApiKey
-                | ErrorType::BadUserApiKey
                 | ErrorType::InvalidAuthId
                 | ErrorType::AuthTokenNotFound
                 | ErrorType::AuthTokenExpired

@@ -5,7 +5,7 @@ mod common;
 use app::{
     config::handle_config_update,
     constant::{
-        EMPTY_STRING, PKG_VERSION, ROUTE_ABOUT_PATH, ROUTE_BASIC_CALIBRATION_PATH,
+        EMPTY_STRING, PKG_VERSION, ROUTE_ABOUT_PATH, ROUTE_API_PATH, ROUTE_BASIC_CALIBRATION_PATH,
         ROUTE_CONFIG_PATH, ROUTE_ENV_EXAMPLE_PATH, ROUTE_GET_CHECKSUM, ROUTE_GET_TOKENINFO_PATH,
         ROUTE_GET_USER_INFO_PATH, ROUTE_HEALTH_PATH, ROUTE_LOGS_PATH, ROUTE_README_PATH,
         ROUTE_ROOT_PATH, ROUTE_STATIC_PATH, ROUTE_TOKENINFO_PATH, ROUTE_UPDATE_TOKENINFO_PATH,
@@ -19,17 +19,19 @@ use axum::{
 };
 use chat::{
     route::{
-        get_user_info, handle_about, handle_basic_calibration, handle_config_page,
+        get_user_info, handle_about, handle_api_page, handle_basic_calibration, handle_config_page,
         handle_env_example, handle_get_checksum, handle_get_tokeninfo, handle_health, handle_logs,
         handle_logs_post, handle_readme, handle_root, handle_static, handle_tokeninfo_page,
         handle_update_tokeninfo, handle_update_tokeninfo_post,
     },
     service::{handle_chat, handle_models},
 };
-use common::utils::{load_tokens, parse_bool_from_env, parse_string_from_env};
+use common::utils::{
+    load_tokens, parse_bool_from_env, parse_string_from_env, parse_usize_from_env,
+};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tower_http::cors::CorsLayer;
+use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer};
 
 #[tokio::main]
 async fn main() {
@@ -87,8 +89,12 @@ async fn main() {
         .route(ROUTE_STATIC_PATH, get(handle_static))
         .route(ROUTE_ABOUT_PATH, get(handle_about))
         .route(ROUTE_README_PATH, get(handle_readme))
-        .route(ROUTE_BASIC_CALIBRATION_PATH, get(handle_basic_calibration))
-        .route(ROUTE_GET_USER_INFO_PATH, get(get_user_info))
+        .route(ROUTE_BASIC_CALIBRATION_PATH, post(handle_basic_calibration))
+        .route(ROUTE_GET_USER_INFO_PATH, post(get_user_info))
+        .route(ROUTE_API_PATH, get(handle_api_page))
+        .layer(RequestBodyLimitLayer::new(
+            1024 * 1024 * parse_usize_from_env("REQUEST_BODY_LIMIT_MB", 2),
+        ))
         .layer(CorsLayer::permissive())
         .with_state(state);
 

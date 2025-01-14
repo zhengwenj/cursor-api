@@ -1,5 +1,8 @@
 use crate::{
-    app::constant::{DEFAULT_TOKEN_FILE_NAME, DEFAULT_TOKEN_LIST_FILE_NAME, EMPTY_STRING},
+    app::constant::{
+        CURSOR_API2_HOST, CURSOR_HOST, DEFAULT_TOKEN_FILE_NAME, DEFAULT_TOKEN_LIST_FILE_NAME,
+        EMPTY_STRING,
+    },
     common::utils::parse_string_from_env,
 };
 use std::sync::LazyLock;
@@ -31,10 +34,7 @@ def_pub_static!(ROUTE_PREFIX, env: "ROUTE_PREFIX", default: EMPTY_STRING);
 def_pub_static!(AUTH_TOKEN, env: "AUTH_TOKEN", default: EMPTY_STRING);
 def_pub_static!(TOKEN_FILE, env: "TOKEN_FILE", default: DEFAULT_TOKEN_FILE_NAME);
 def_pub_static!(TOKEN_LIST_FILE, env: "TOKEN_LIST_FILE", default: DEFAULT_TOKEN_LIST_FILE_NAME);
-def_pub_static!(
-    ROUTE_MODELS_PATH,
-    format!("{}/v1/models", *ROUTE_PREFIX)
-);
+def_pub_static!(ROUTE_MODELS_PATH, format!("{}/v1/models", *ROUTE_PREFIX));
 def_pub_static!(
     ROUTE_CHAT_PATH,
     format!("{}/v1/chat/completions", *ROUTE_PREFIX)
@@ -49,10 +49,44 @@ pub fn get_start_time() -> chrono::DateTime<chrono::Local> {
 
 def_pub_static!(DEFAULT_INSTRUCTIONS, env: "DEFAULT_INSTRUCTIONS", default: "Respond in Chinese by default");
 
-def_pub_static!(CURSOR_API2_HOST, env: "REVERSE_PROXY_HOST", default: "api2.cursor.sh");
+def_pub_static!(REVERSE_PROXY_HOST, env: "REVERSE_PROXY_HOST", default: "");
 
-pub static CURSOR_API2_BASE_URL: LazyLock<String> = LazyLock::new(|| {
-    format!("https://{}/aiserver.v1.AiService/", *CURSOR_API2_HOST)
+pub static USE_PROXY: LazyLock<bool> = LazyLock::new(|| !REVERSE_PROXY_HOST.is_empty());
+
+pub static CURSOR_API2_CHAT_URL: LazyLock<String> = LazyLock::new(|| {
+    let host = if *USE_PROXY {
+        &*REVERSE_PROXY_HOST
+    } else {
+        CURSOR_API2_HOST
+    };
+    format!("https://{}/aiserver.v1.AiService/StreamChat", host)
+});
+
+pub static CURSOR_API2_STRIPE_URL: LazyLock<String> = LazyLock::new(|| {
+    let host = if *USE_PROXY {
+        &*REVERSE_PROXY_HOST
+    } else {
+        CURSOR_API2_HOST
+    };
+    format!("https://{}/auth/full_stripe_profile", host)
+});
+
+pub static CURSOR_USAGE_API_URL: LazyLock<String> = LazyLock::new(|| {
+    let host = if *USE_PROXY {
+        &*REVERSE_PROXY_HOST
+    } else {
+        CURSOR_HOST
+    };
+    format!("https://{}/api/usage", host)
+});
+
+pub static CURSOR_USER_API_URL: LazyLock<String> = LazyLock::new(|| {
+    let host = if *USE_PROXY {
+        &*REVERSE_PROXY_HOST
+    } else {
+        CURSOR_HOST
+    };
+    format!("https://{}/api/auth/me", host)
 });
 
 // pub static DEBUG: LazyLock<bool> = LazyLock::new(|| parse_bool_from_env("DEBUG", false));

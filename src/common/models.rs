@@ -1,7 +1,7 @@
 pub mod error;
 pub mod health;
 pub mod config;
-pub mod usage;
+pub mod userinfo;
 
 use config::ConfigData;
 

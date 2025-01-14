@@ -7,7 +7,7 @@ use crate::{
         lazy::AUTH_TOKEN,
         model::{AppConfig, AppState, PageContent, RequestLog},
     },
-    common::models::ApiStatus,
+    common::{models::ApiStatus, utils::extract_token},
 };
 use axum::{
     body::Body,
@@ -62,37 +62,16 @@ pub async fn handle_logs_post(
     if auth_header == auth_token {
         return Ok(Json(LogsResponse {
             status: ApiStatus::Success,
-            total: state.request_logs.len(),
+            total: state.total_requests,
+            active: Some(state.active_requests),
+            error: Some(state.error_requests),
             logs: state.request_logs.clone(),
             timestamp: Local::now().to_string(),
         }));
     }
 
-    // 解析 token 和 checksum
-    let token_part = if let Some(pos) = auth_header.find("::") {
-        let (_, rest) = auth_header.split_at(pos + 2);
-        if let Some(comma_pos) = rest.find(',') {
-            let (token, _) = rest.split_at(comma_pos);
-            token
-        } else {
-            rest
-        }
-    } else if let Some(pos) = auth_header.find("%3A%3A") {
-        let (_, rest) = auth_header.split_at(pos + 6);
-        if let Some(comma_pos) = rest.find(',') {
-            let (token, _) = rest.split_at(comma_pos);
-            token
-        } else {
-            rest
-        }
-    } else {
-        if let Some(comma_pos) = auth_header.find(',') {
-            let (token, _) = auth_header.split_at(comma_pos);
-            token
-        } else {
-            auth_header
-        }
-    };
+    // 解析 token
+    let token_part = extract_token(auth_header).ok_or(StatusCode::UNAUTHORIZED)?;
 
     // 否则筛选出token匹配的日志
     let filtered_logs: Vec<RequestLog> = state
@@ -109,7 +88,9 @@ pub async fn handle_logs_post(
 
     Ok(Json(LogsResponse {
         status: ApiStatus::Success,
-        total: filtered_logs.len(),
+        total: filtered_logs.len() as u64,
+        active: None,
+        error: None,
         logs: filtered_logs,
         timestamp: Local::now().to_string(),
     }))
@@ -118,7 +99,11 @@ pub async fn handle_logs_post(
 #[derive(serde::Serialize)]
 pub struct LogsResponse {
     pub status: ApiStatus,
-    pub total: usize,
+    pub total: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<u64>,
     pub logs: Vec<RequestLog>,
     pub timestamp: String,
 }

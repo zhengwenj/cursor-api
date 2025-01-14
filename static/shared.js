@@ -31,6 +31,12 @@ function showMessage(elementId, text, isError = false) {
 
 function showGlobalMessage(text, isError = false) {
   showMessage('message', text, isError);
+  // 3秒后自动清除消息
+  setTimeout(() => {
+    const msg = document.getElementById('message');
+    msg.textContent = '';
+    msg.className = 'message';
+  }, 3000);
 }
 
 // Token 输入框自动填充和事件绑定
@@ -94,9 +100,9 @@ function parseBooleanFromString(str, defaultValue = null) {
   if (typeof str !== 'string') {
     return defaultValue;
   }
-  
+
   const lowercaseStr = str.toLowerCase().trim();
-  
+
   if (lowercaseStr === 'true' || lowercaseStr === '1') {
     return true;
   } else if (lowercaseStr === 'false' || lowercaseStr === '0') {
@@ -202,7 +208,7 @@ function formatPromptToTable(messages) {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-    
+
     // 将HTML标签文本用引号包裹，使其更易读
     // return escaped.replace(/&lt;(\/?[^>]+)&gt;/g, '"<$1>"');
     return escaped;

@@ -1,19 +1,16 @@
 use super::{
     constant::AUTHORIZATION_BEARER_PREFIX,
     lazy::AUTH_TOKEN,
-    model::{AppConfig, AppState},
+    model::AppConfig,
 };
 use crate::common::models::{
     config::{ConfigData, ConfigUpdateRequest},
     ApiStatus, ErrorResponse, NormalResponse,
 };
 use axum::{
-    extract::State,
     http::{header::AUTHORIZATION, HeaderMap, StatusCode},
     Json,
 };
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 // 定义处理更新操作的宏
 macro_rules! handle_update {
@@ -54,7 +51,6 @@ macro_rules! handle_reset {
 }
 
 pub async fn handle_config_update(
-    State(_state): State<Arc<Mutex<AppState>>>,
     headers: HeaderMap,
     Json(request): Json<ConfigUpdateRequest>,
 ) -> Result<Json<NormalResponse<ConfigData>>, (StatusCode, Json<ErrorResponse>)> {
