@@ -1,105 +1,64 @@
 # cursor-api
 
+## 说明
+
+*   当前版本已稳定，若发现响应出现缺字漏字，与本程序无关。
+*   若发现首字慢，与本程序无关。
+*   若发现响应出现乱码，也与本程序无关。
+*   属于官方的问题，请不要像作者反馈。
+*   本程序拥有堪比客户端原本的速度，甚至可能更快。
+*   本程序的性能是非常厉害的。
+
 ## 获取key
 
-1. 访问 [www.cursor.com](https://www.cursor.com) 并完成注册登录
-2. 在浏览器中打开开发者工具（F12）
-3. 在 Application-Cookies 中查找名为 `WorkosCursorSessionToken` 的条目，并复制其第三个字段。请注意，%3A%3A 是 :: 的 URL 编码形式，cookie 的值使用冒号 (:) 进行分隔。
-
-## 接口说明
-
-### 基础对话（请求格式和响应格式参考 openai）
-
-- 接口地址：`/v1/chat/completions`
-- 请求方法：POST
-- 认证方式：Bearer Token
-  1. 使用环境变量 `AUTH_TOKEN` 进行认证
-  2. 使用 `.token` 文件中的令牌列表进行轮询认证
-
-### Token管理接口
-
-#### 简易Token信息管理页面
-- 接口地址：`/tokeninfo`
-- 请求方法：GET
-- 响应格式：HTML页面
-- 功能：获取 .token 和 .token-list 文件内容，并允许用户方便地使用 API 修改文件内容
-
-#### 更新Token信息
-- 接口地址：`/update-tokeninfo`
-- 请求方法：GET
-- 认证方式：不需要
-- 功能：请求内容不包括文件内容，直接修改文件，调用重载函数
-
-#### 更新Token信息
-- 接口地址：`/update-tokeninfo`
-- 请求方法：POST
-- 认证方式：Bearer Token
-- 功能：请求内容包括文件内容，间接修改文件，调用重载函数
-
-#### 获取Token信息
-- 接口地址：`/get-tokeninfo`
-- 请求方法：POST
-- 认证方式：Bearer Token
-
-### 其他接口
-
-#### 获取模型列表
-- 接口地址：`/v1/models`
-- 请求方法：GET
-
-#### 获取随机x-cursor-checksum
-- 接口地址：`/checksum`
-- 请求方法：GET
-
-#### 健康检查接口
-- 接口地址：`/`
-- 请求方法：GET
-
-#### 获取日志接口
-- 接口地址：`/logs`
-- 请求方法：GET
+1.  访问 [www.cursor.com](https://www.cursor.com) 并完成注册登录
+2.  在浏览器中打开开发者工具（F12）
+3.  在 Application-Cookies 中查找名为 `WorkosCursorSessionToken` 的条目，并复制其第三个字段。请注意，%3A%3A 是 :: 的 URL 编码形式，cookie 的值使用冒号 (:) 进行分隔。
 
 ## 配置说明
 
 ### 环境变量
 
-- `PORT`: 服务器端口号（默认：3000）
-- `AUTH_TOKEN`: 认证令牌（必须，用于API认证）
-- `ROUTE_PREFIX`: 路由前缀（可选）
-- `TOKEN_FILE`: token文件路径（默认：.token）
-- `TOKEN_LIST_FILE`: token列表文件路径（默认：.token-list）
+*   `PORT`: 服务器端口号（默认：3000）
+*   `AUTH_TOKEN`: 认证令牌（必须，用于API认证）
+*   `ROUTE_PREFIX`: 路由前缀（可选）
+*   `TOKEN_FILE`: token文件路径（默认：.token）
+*   `TOKEN_LIST_FILE`: token列表文件路径（默认：.token-list）
+
+更多请查看 `/env-example`
 
 ### Token文件格式
 
-1. `.token` 文件：每行一个token，支持以下格式：
-
-   ```
-   # 这是注释
-   token1
-   # alias与标签的作用差不多
-   alias::token2
-   ```
-
-   alias 可以是任意值，用于区分不同的 token，更方便管理，WorkosCursorSessionToken 是相同格式
-   该文件将自动向.token-list文件中追加token，同时自动生成checksum
-
-2. `.token-list` 文件：每行为token和checksum的对应关系：
-
-   ```
-   # 这里的#表示这行在下次读取要删除
-   token1,checksum1
-   # 支持像.token一样的alias，冲突时以.token为准
-   alias::token2,checksum2
-   ```
-
-   该文件可以被自动管理，但用户仅可在确认自己拥有修改能力时修改，一般仅有以下情况需要手动修改：
-
-   - 需要删除某个 token
-   - 需要使用已有 checksum 来对应某一个 token
+1.  `.token` 文件：每行一个token，支持以下格式：
+    
+    ```
+    # 这是注释
+    token1
+    # alias与标签的作用差不多
+    alias::token2
+    ```
+    
+    alias 可以是任意值，用于区分不同的 token，更方便管理，WorkosCursorSessionToken 是相同格式  
+    该文件将自动向.token-list文件中追加token，同时自动生成checksum
+    
+2.  `.token-list` 文件：每行为token和checksum的对应关系：
+    
+    ```
+    # 这里的#表示这行在下次读取要删除
+    token1,checksum1
+    # alias被舍弃，会自动删除最后一个:或%3A的后一位前的所有内容
+    token2,checksum2
+    ```
+    
+    该文件可以被自动管理，但用户仅可在确认自己拥有修改能力时修改，一般仅有以下情况需要手动修改：
+    
+    *   需要删除某个 token
+    *   需要使用已有 checksum 来对应某一个 token
 
 ### 模型列表
 
 写死了，后续也不会会支持自定义模型列表
+
 ```
 claude-3.5-sonnet
 gpt-4
@@ -124,91 +83,520 @@ gemini-2.0-flash-thinking-exp
 gemini-2.0-flash-exp
 ```
 
-## 部署
+# 接口说明
 
-### Docker 部署
+## 基础对话
 
-#### Docker 运行示例
+*   接口地址: `/v1/chat/completions`
+*   请求方法: POST
+*   认证方式: Bearer Token
+    1.  使用环境变量 `AUTH_TOKEN` 进行认证
+    2.  使用 `.token` 文件中的令牌列表进行轮询认证
+    3.  在v0.1.3-rc.3支持直接使用 token,checksum 进行认证，但未提供配置关闭
 
-```bash
-docker run -d -e PORT=3000 -e AUTH_TOKEN=your_token -p 3000:3000 wisdgod/cursor-api:latest
+### 请求格式
+
+```json
+{
+  "model": "string",
+  "messages": [
+    {
+      "role": "system" | "user" | "assistant", // 也可以是 "developer" | "human" | "ai"
+      "content": "string" | [
+        {
+          "type": "text" | "image_url",
+          "text": "string",
+          "image_url": {
+            "url": "string"
+          }
+        }
+      ]
+    }
+  ],
+  "stream": boolean
+}
 ```
 
-### huggingface部署
+### 响应格式
 
-前提：一个huggingface账号
+如果 `stream` 为 `false`:
 
-1. 创建一个Space并创建一个Dockerfile文件，内容如下：
+```json
+{
+  "id": "string",
+  "object": "chat.completion",
+  "created": number,
+  "model": "string",
+  "choices": [
+    {
+      "index": number,
+      "message": {
+        "role": "assistant",
+        "content": "string"
+      },
+      "finish_reason": "stop" | "length"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0
+  }
+}
+```
 
-   ```Dockerfile
-   FROM wisdgod/cursor-api:latest
+不进行 tokens 计算主要是担心性能问题。
 
-   # 可能你要覆盖原镜像的环境变量，但都可以在下面的第2步中配置
-   ENV PORT=7860
-   ```
+如果 `stream` 为 `true`:
 
-2. 配置环境变量
+```
+data: {"id":"string","object":"chat.completion.chunk","created":number,"model":"string","choices":[{"index":number,"delta":{"role":"assistant","content":"string"},"finish_reason":null}]}
 
-   在你的 Space 中，点击 Settings，找到 `Variables and secrets`，添加 Variables
+data: {"id":"string","object":"chat.completion.chunk","created":number,"model":"string","choices":[{"index":number,"delta":{"content":"string"},"finish_reason":null}]}
 
-   ```env
-   # 可选，用于配置服务器端口
-   PORT=3000
-   # 必选，用于配置路由前缀，比如/api,/hf,/proxy等等
-   ROUTE_PREFIX=
-   # 必选，用于API认证
-   AUTH_TOKEN=
-   # 可选，用于配置token文件路径
-   TOKEN_FILE=.token
-   # 可选，用于配置token列表文件路径
-   TOKEN_LIST_FILE=.token-list
-   ```
+data: {"id":"string","object":"chat.completion.chunk","created":number,"model":"string","choices":[{"index":number,"delta":{},"finish_reason":"stop"}]}
 
-   更多变量示例可访问 /env-example
+data: [DONE]
+```
 
-3. 重新部署
+## Token管理接口
 
-   点击`Factory rebuild`，等待部署完成
+### 简易Token信息管理页面
 
-4. 接口地址（`Embed this Space`中查看）：
+*   接口地址: `/tokeninfo`
+*   请求方法: GET
+*   响应格式: HTML页面
+*   功能: 获取 .token 和 .token-list 文件内容,并允许用户方便地使用 API 修改文件内容
 
-   ```
-   https://{username}-{space-name}.hf.space/v1/models
-   ```
+### 更新Token信息 (GET)
 
-## 注意事项
+*   接口地址: `/update-tokeninfo`
+*   请求方法: GET
+*   认证方式: 不需要
+*   功能: 重新加载tokens并更新应用状态
+*   响应格式:
 
-1. 请妥善保管您的任何 Token，不要泄露给他人。若发现泄露，请及时更改
-2. 请遵守本项目许可证，你仅拥有使用本项目的权利，不得用于商业用途
-3. 本项目仅供学习研究使用，请遵守 Cursor 的使用条款
+```json
+{
+  "status": "success",
+  "message": "Token list has been reloaded"
+}
+```
 
-## 开发
+### 更新Token信息 (POST)
 
-### 跨平台编译
+*   接口地址: `/update-tokeninfo`
+*   请求方法: POST
+*   认证方式: Bearer Token
+*   请求格式:
 
-自行配置cross编译环境
+```json
+{
+  "tokens": "string",
+  "token_list": "string"
+}
+```
 
-支持的平台：
+*   响应格式:
 
-- linux x86_64
-- windows x86_64
-- macos x86_64
-- freebsd x86_64
-- docker (only for linux x86_64)
+```json
+{
+  "status": "success",
+  "token_file": "string",
+  "token_list_file": "string",
+  "tokens_count": number,
+  "message": "Token files have been updated and reloaded"
+}
+```
 
-### 获取token
+### 获取Token信息
 
-- 使用 [get-token](https://github.com/wisdgod/cursor-api/tree/main/get-token) 获取读取当前设备token，仅支持windows与macos
+*   接口地址: `/get-tokeninfo`
+*   请求方法: POST
+*   认证方式: Bearer Token
+*   响应格式:
 
-## 鸣谢
+```json
+{
+  "status": "success",
+  "token_file": "string",
+  "token_list_file": "string",
+  "tokens": "string",
+  "tokens_count": number,
+  "token_list": "string"
+}
+```
 
-- [cursor-api](https://github.com/wisdgod/cursor-api)
-- [zhx47/cursor-api](https://github.com/zhx47/cursor-api)
-- [luolazyandlazy/cursorToApi](https://github.com/luolazyandlazy/cursorToApi)
+## 配置管理接口
 
-## 许可证
+### 配置页面
 
-版权所有 (c) 2024
+*   接口地址: `/config`
+*   请求方法: GET
+*   响应格式: HTML页面
+*   功能: 提供配置管理界面,可以修改页面内容和系统配置
 
-本软件仅供学习和研究使用。未经授权，不得用于商业用途。
-保留所有权利。
+### 更新配置
+
+*   接口地址: `/config`
+*   请求方法: POST
+*   认证方式: Bearer Token
+*   请求格式:
+
+```json
+{
+  "action": "get" | "update" | "reset",
+  "path": "string",
+  "content": {
+    "type": "default" | "text" | "html",
+    "content": "string"
+  },
+  "enable_stream_check": boolean,
+  "include_stop_stream": boolean,
+  "vision_ability": "none" | "base64" | "all", // "disabled" | "base64-only" | "base64-http"
+  "enable_slow_pool": boolean,
+  "enable_all_claude": boolean,
+  "check_usage_models": {
+    "type": "none" | "default" | "all" | "list",
+    "content": "string"
+  }
+}
+```
+
+*   响应格式:
+
+```json
+{
+  "status": "success",
+  "message": "string",
+  "data": {
+    "page_content": {
+      "type": "default" | "text" | "html", // 对于js和css后两者是一样的
+      "content": "string"
+    },
+    "enable_stream_check": boolean,
+    "include_stop_stream": boolean,
+    "vision_ability": "none" | "base64" | "all",
+    "enable_slow_pool": boolean,
+    "enable_all_claude": boolean,
+    "check_usage_models": {
+      "type": "none" | "default" | "all" | "list",
+      "content": "string"
+    }
+  }
+}
+```
+
+注意：`check_usage_models` 字段的默认值为：
+
+```json
+{
+  "type": "default",
+  "content": "claude-3-5-sonnet-20241022,claude-3.5-sonnet,gemini-exp-1206,gpt-4,gpt-4-turbo-2024-04-09,gpt-4o,claude-3.5-haiku,gpt-4o-128k,gemini-1.5-flash-500k,claude-3-haiku-200k,claude-3-5-sonnet-200k"
+}
+```
+
+这些模型将默认进行使用量检查。您可以通过配置接口修改此设置。
+
+路径修改注意：选择类型再修改文本，否则选择默认时内容的修改无效，在更新配置后自动被覆盖导致内容丢失，自行改进。
+
+## 静态资源接口
+
+### 获取共享样式
+
+*   接口地址: `/static/shared-styles.css`
+*   请求方法: GET
+*   响应格式: CSS文件
+*   功能: 获取共享样式表
+
+### 获取共享脚本
+
+*   接口地址: `/static/shared.js`
+*   请求方法: GET
+*   响应格式: JavaScript文件
+*   功能: 获取共享JavaScript代码
+
+### 环境变量示例
+
+*   接口地址: `/env-example`
+*   请求方法: GET
+*   响应格式: 文本文件
+*   功能: 获取环境变量配置示例
+
+## 其他接口
+
+### 获取模型列表
+
+*   接口地址: `/v1/models`
+*   请求方法: GET
+*   响应格式:
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "string",
+      "object": "model",
+      "created": number,
+      "owned_by": "string"
+    }
+  ]
+}
+```
+
+### 获取一个随机hash
+
+*   接口地址: `/get-hash`
+*   请求方法: GET
+*   响应格式:
+
+```plaintext
+string
+```
+
+### 获取或修复checksum
+
+*   接口地址: `/get-checksum`
+*   请求方法: GET
+*   请求参数:
+    *   `checksum`: 可选，用于修复的旧版本生成的checksum，也可只传入前8个字符；可用来自动刷新时间戳头
+*   响应格式:
+
+```plaintext
+string
+```
+
+说明：
+
+*   如果不提供`checksum`参数，将生成一个新的随机checksum
+*   如果提供`checksum`参数，将尝试修复旧版本的checksum以适配v0.1.3-rc.3之后的版本使用，修复失败会返回新的checksum；若输入的checksum本来就有效，则返回更新tsheader后的checksum
+
+### 获取当前的tsheader
+
+*   接口地址: `/get-tsheader`
+*   请求方法: GET
+*   响应格式:
+
+```plaintext
+string
+```
+
+### 健康检查接口
+
+*   接口地址: `/health` 或 `/`(重定向)
+*   请求方法: GET
+*   认证方式: Bearer Token（可选）
+*   响应格式: 根据配置返回不同的内容类型(默认、文本或HTML)，默认JSON
+
+```json
+{
+  "status": "success",
+  "version": "string",
+  "uptime": number,
+  "stats": {
+    "started": "string",
+    "total_requests": number,
+    "active_requests": number,
+    "system": {
+      "memory": {
+        "rss": number
+      },
+      "cpu": {
+        "usage": number
+      }
+    }
+  },
+  "models": ["string"],
+  "endpoints": ["string"]
+}
+```
+
+注意：`stats` 字段仅在请求头中包含正确的 `AUTH_TOKEN` 时才会返回。否则，该字段将被省略。
+
+### 获取日志接口
+
+*   接口地址: `/logs`
+*   请求方法: GET
+*   响应格式: 根据配置返回不同的内容类型(默认、文本或HTML)
+
+### 获取日志数据
+
+*   接口地址: `/logs`
+*   请求方法: POST
+*   认证方式: Bearer Token
+*   响应格式:
+
+```json
+{
+  "total": number,
+  "logs": [
+    {
+      "id": number,
+      "timestamp": "string",
+      "model": "string",
+      "token_info": {
+        "token": "string",
+        "checksum": "string",
+        "profile": {
+          "usage": {
+            "premium": {
+              "requests": number,
+              "tokens": number,
+              "max_requests": number,
+              "max_tokens": number
+            },
+            "standard": {
+              "requests": number,
+              "tokens": number,
+              "max_requests": number,
+              "max_tokens": number
+            },
+            "unknown": {
+              "requests": number,
+              "tokens": number,
+              "max_requests": number,
+              "max_tokens": number
+            }
+          },
+          "user": {
+            "email": "string",
+            "name": "string",
+            "id": "string",
+            "updated_at": "string"
+          },
+          "stripe": {
+            "membership_type": "free" | "free_trial" | "pro" | "enterprise",
+            "payment_id": "string",
+            "days_remaining_on_trial": number
+          }
+        }
+      },
+      "prompt": "string",
+      "timing": {
+        "total": number,
+        "first": number
+      },
+      "stream": boolean,
+      "status": "string",
+      "error": "string"
+    }
+  ],
+  "timestamp": "string",
+  "status": "success"
+}
+```
+
+### 获取用户信息
+
+*   接口地址: `/userinfo`
+*   请求方法: POST
+*   认证方式: 请求体中包含token
+*   请求格式:
+
+```json
+{
+  "token": "string"
+}
+```
+
+*   响应格式:
+
+```json
+{
+  "usage": {
+    "premium": {
+      "requests": number,
+      "tokens": number,
+      "max_requests": number,
+      "max_tokens": number
+    },
+    "standard": {
+      "requests": number,
+      "tokens": number,
+      "max_requests": number,
+      "max_tokens": number
+    },
+    "unknown": {
+      "requests": number,
+      "tokens": number,
+      "max_requests": number,
+      "max_tokens": number
+    }
+  },
+  "user": {
+    "email": "string",
+    "name": "string",
+    "id": "string",
+    "updated_at": "string"
+  },
+  "stripe": {
+    "membership_type": "free" | "free_trial" | "pro" | "enterprise",
+    "payment_id": "string",
+    "days_remaining_on_trial": number
+  }
+}
+```
+
+如果发生错误，响应格式为:
+
+```json
+{
+  "error": "string"
+}
+```
+
+### 基础校准
+
+*   接口地址: `/basic-calibration`
+*   请求方法: POST
+*   认证方式: 请求体中包含token
+*   请求格式:
+
+```json
+{
+  "token": "string"
+}
+```
+
+*   响应格式:
+
+```json
+{
+  "status": "success" | "error",
+  "message": "string",
+  "user_id": "string",
+  "create_at": "string",
+  "checksum_time": number
+}
+```
+
+注意: `user_id`, `create_at`, 和 `checksum_time` 字段在校验失败时可能不存在。
+
+## 偷偷写在最后的话
+
+虽然作者觉得~骗~收点钱合理，但不强求，要是**主动自愿**发我我肯定收（因为真有人这么做，虽然不是赞助），赞助很合理吧
+
+不是**主动自愿**就算了，不是很缺，给了会很感动罢了。
+
+虽然不是很建议你赞助，但如果你赞助了，大概可以：
+
+*   测试版更新
+*   要求功能
+*   问题更快解决
+
+即使如此，我也保留可以拒绝赞助和拒绝要求的权利。
+
+求赞助还是有点不要脸了，接下来是吐槽：
+
+辛辛苦苦做这个也不知道是为了谁，好累。其实还有很多功能可以做，比如直接传token支持配置（其实这个要专门做一个页面），这个作为rc.4的计划之一吧。
+
+主要没想做用户管理，所以不存在是否接入LinuxDo的问题。虽然那个半成品公益版做好了就是了。
+
+就说这么多，没啥可说的，不管那么多，做就完了。\[doge\] 自己想象吧。
+
+为什么一直说要跑路呢？主要是有时Cursor的Claude太假了，堪比gpt-4o-mini，我对比发现真没啥差别，比以前差远了，无力了，所以不太想做了。我也感觉很奇怪。
+
+查询额度会在一开始检测导致和完成时的额度有些差别，但是懒得改了，反正差别不大，对话也没响应内容，恰好完成了统一。
+
+有人说少个二维码来着，还是算了。如果觉得好用，给点支持。其实没啥大不了的，没兴趣就不做了。不想那么多了。
