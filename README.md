@@ -573,6 +573,18 @@ string
 
 注意: `user_id`, `create_at`, 和 `checksum_time` 字段在校验失败时可能不存在。
 
+### 获取token
+
+- 使用 [get-token](https://github.com/wisdgod/cursor-api/tree/main/get-token) 获取读取当前设备token，仅支持windows与macos
+
+## 鸣谢
+
+感谢以下项目和贡献者:
+
+- [cursor-api](https://github.com/wisdgod/cursor-api) - 本项目本身
+- [zhx47/cursor-api](https://github.com/zhx47/cursor-api) - 提供了本项目起步阶段的主要参考
+- [luolazyandlazy/cursorToApi](https://github.com/luolazyandlazy/cursorToApi)
+
 ## 偷偷写在最后的话
 
 虽然作者觉得~骗~收点钱合理，但不强求，要是**主动自愿**发我我肯定收（因为真有人这么做，虽然不是赞助），赞助很合理吧
@@ -600,3 +612,5 @@ string
 查询额度会在一开始检测导致和完成时的额度有些差别，但是懒得改了，反正差别不大，对话也没响应内容，恰好完成了统一。
 
 有人说少个二维码来着，还是算了。如果觉得好用，给点支持。其实没啥大不了的，没兴趣就不做了。不想那么多了。
+
+要不给我邮箱发口令红包？休息休息
