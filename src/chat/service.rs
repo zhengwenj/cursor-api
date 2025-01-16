@@ -1,11 +1,10 @@
 use crate::{
     app::{
         constant::{
-            AUTHORIZATION_BEARER_PREFIX, FINISH_REASON_STOP,
-            OBJECT_CHAT_COMPLETION, OBJECT_CHAT_COMPLETION_CHUNK, STATUS_FAILED, STATUS_PENDING,
-            STATUS_SUCCESS,
+            AUTHORIZATION_BEARER_PREFIX, FINISH_REASON_STOP, OBJECT_CHAT_COMPLETION,
+            OBJECT_CHAT_COMPLETION_CHUNK, STATUS_FAILED, STATUS_PENDING, STATUS_SUCCESS,
         },
-        lazy::AUTH_TOKEN,
+        lazy::{AUTH_TOKEN, SHARED_AUTH_TOKEN, USE_SHARE},
         model::{AppConfig, AppState, ChatRequest, RequestLog, TimingInfo, TokenInfo},
     },
     chat::{
@@ -19,9 +18,7 @@ use crate::{
     common::{
         client::build_client,
         models::{error::ChatError, userinfo::MembershipType, ErrorResponse},
-        utils::{
-            format_time_ms, get_token_profile, validate_token_and_checksum,
-        },
+        utils::{format_time_ms, get_token_profile, validate_token_and_checksum},
     },
 };
 use axum::{
@@ -95,29 +92,33 @@ pub async fn handle_chat(
             Json(ChatError::Unauthorized.to_json()),
         ))?;
 
-    // 验证 AuthToken 和 获取 token 信息
-    let (auth_token, checksum) = if auth_header == AUTH_TOKEN.as_str() {
-        // 如果是管理员Token,使用原有逻辑
-        static CURRENT_KEY_INDEX: AtomicUsize = AtomicUsize::new(0);
-        let state_guard = state.lock().await;
-        let token_infos = &state_guard.token_infos;
+    // 验证认证token并获取token信息
+    let (auth_token, checksum) = match auth_header {
+        // 管理员Token验证逻辑
+        token if token == AUTH_TOKEN.as_str() || (*USE_SHARE && token == SHARED_AUTH_TOKEN.as_str()) => {
+            static CURRENT_KEY_INDEX: AtomicUsize = AtomicUsize::new(0);
+            let state_guard = state.lock().await;
+            let token_infos = &state_guard.token_infos;
 
-        if token_infos.is_empty() {
-            return Err((
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(ChatError::NoTokens.to_json()),
-            ));
-        }
+            // 检查是否存在可用的token
+            if token_infos.is_empty() {
+                return Err((
+                    StatusCode::SERVICE_UNAVAILABLE, 
+                    Json(ChatError::NoTokens.to_json()),
+                ));
+            }
 
-        let index = CURRENT_KEY_INDEX.fetch_add(1, Ordering::SeqCst) % token_infos.len();
-        let token_info = &token_infos[index];
-        (token_info.token.clone(), token_info.checksum.clone())
-    } else {
-        // 否则尝试解析token
-        validate_token_and_checksum(auth_header).ok_or((
+            // 轮询选择token
+            let index = CURRENT_KEY_INDEX.fetch_add(1, Ordering::SeqCst) % token_infos.len();
+            let token_info = &token_infos[index];
+            (token_info.token.clone(), token_info.checksum.clone())
+        },
+
+        // 普通用户Token验证逻辑
+        token => validate_token_and_checksum(token).ok_or((
             StatusCode::UNAUTHORIZED,
             Json(ChatError::Unauthorized.to_json()),
-        ))?
+        ))?,
     };
 
     let current_id: u64;
@@ -352,7 +353,8 @@ pub async fn handle_chat(
                                     {
                                         log.status = STATUS_FAILED;
                                         log.error = Some(error_respone.native_code());
-                                        log.timing.total = format_time_ms(start_time.elapsed().as_secs_f64());
+                                        log.timing.total =
+                                            format_time_ms(start_time.elapsed().as_secs_f64());
                                         state.error_requests += 1;
                                     }
                                 }
@@ -432,7 +434,8 @@ pub async fn handle_chat(
                             // 记录首字时间(如果还未记录)
                             if let Ok(mut first_time) = first_chunk_time.try_lock() {
                                 if first_time.is_none() {
-                                    *first_time = Some(format_time_ms(start_time.elapsed().as_secs_f64()));
+                                    *first_time =
+                                        Some(format_time_ms(start_time.elapsed().as_secs_f64()));
                                 }
                             }
 

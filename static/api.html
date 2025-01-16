@@ -287,7 +287,7 @@
         }
       }
 
-      const result = await makeTokenRequest('/get-userinfo', token);
+      const result = await makeTokenRequest('/userinfo', token);
       if (result) {
         const container = document.getElementById('userInfoContainer');
         container.style.display = 'block';

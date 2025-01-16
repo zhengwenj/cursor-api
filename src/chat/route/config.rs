@@ -74,8 +74,8 @@ pub async fn handle_static(Path(path): Path<String>) -> impl IntoResponse {
     }
 }
 
-pub async fn handle_about() -> impl IntoResponse {
-    match AppConfig::get_page_content(ROUTE_ABOUT_PATH).unwrap_or_default() {
+pub async fn handle_readme() -> impl IntoResponse {
+    match AppConfig::get_page_content(ROUTE_README_PATH).unwrap_or_default() {
         PageContent::Default => Response::builder()
             .header(CONTENT_TYPE, CONTENT_TYPE_TEXT_HTML_WITH_UTF8)
             .body(include_str!("../../../static/readme.min.html").to_string())
@@ -91,11 +91,11 @@ pub async fn handle_about() -> impl IntoResponse {
     }
 }
 
-pub async fn handle_readme() -> impl IntoResponse {
-    match AppConfig::get_page_content(ROUTE_README_PATH).unwrap_or_default() {
+pub async fn handle_about() -> impl IntoResponse {
+    match AppConfig::get_page_content(ROUTE_ABOUT_PATH).unwrap_or_default() {
         PageContent::Default => Response::builder()
             .status(StatusCode::TEMPORARY_REDIRECT)
-            .header(LOCATION, ROUTE_ABOUT_PATH)
+            .header(LOCATION, ROUTE_README_PATH)
             .body(Body::empty())
             .unwrap(),
         PageContent::Text(content) => Response::builder()

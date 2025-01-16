@@ -14,8 +14,10 @@ def_pub_const!(EMPTY_STRING, "");
 
 def_pub_const!(ROUTE_ROOT_PATH, "/");
 def_pub_const!(ROUTE_HEALTH_PATH, "/health");
+def_pub_const!(ROUTE_GET_HASH, "/get-hash");
 def_pub_const!(ROUTE_GET_CHECKSUM, "/get-checksum");
-def_pub_const!(ROUTE_GET_USER_INFO_PATH, "/get-userinfo");
+def_pub_const!(ROUTE_GET_TIMESTAMP_HEADER, "/get-tsheader");
+def_pub_const!(ROUTE_USER_INFO_PATH, "/userinfo");
 def_pub_const!(ROUTE_API_PATH, "/api");
 def_pub_const!(ROUTE_LOGS_PATH, "/logs");
 def_pub_const!(ROUTE_CONFIG_PATH, "/config");

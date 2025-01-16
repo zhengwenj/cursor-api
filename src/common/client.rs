@@ -15,6 +15,8 @@ use reqwest::header::{
 use reqwest::{Client, RequestBuilder};
 use uuid::Uuid;
 
+use super::utils::generate_hash;
+
 macro_rules! def_const {
     ($name:ident, $value:expr) => {
         const $name: &'static str = $value;
@@ -74,7 +76,7 @@ pub fn build_client(auth_token: &str, checksum: &str) -> RequestBuilder {
         .header("connect-protocol-version", ONE)
         .header(USER_AGENT, "connect-es/1.6.1")
         .header("x-amzn-trace-id", format!("Root={}", trace_id))
-        // .header("x-client-key", client_key)
+        .header("x-client-key", generate_hash())
         .header("x-cursor-checksum", checksum)
         .header("x-cursor-client-version", "0.42.5")
         .header("x-cursor-timezone", "Asia/Shanghai")

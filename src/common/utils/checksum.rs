@@ -2,7 +2,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use rand::Rng;
 use sha2::{Digest, Sha256};
 
-fn generate_hash() -> String {
+pub fn generate_hash() -> String {
     let random_bytes = rand::thread_rng().gen::<[u8; 32]>();
     let mut hasher = Sha256::new();
     hasher.update(random_bytes);
@@ -27,7 +27,7 @@ fn deobfuscate_bytes(bytes: &mut [u8]) {
     }
 }
 
-fn generate_checksum(device_id: &str, mac_addr: Option<&str>) -> String {
+pub fn generate_timestamp_header() -> String {
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -44,8 +44,11 @@ fn generate_checksum(device_id: &str, mac_addr: Option<&str>) -> String {
     ];
 
     obfuscate_bytes(&mut timestamp_bytes);
-    let encoded = BASE64.encode(&timestamp_bytes);
+    BASE64.encode(&timestamp_bytes)
+}
 
+fn generate_checksum(device_id: &str, mac_addr: Option<&str>) -> String {
+    let encoded = generate_timestamp_header();
     match mac_addr {
         Some(mac) => format!("{}{}/{}", encoded, device_id, mac),
         None => format!("{}{}", encoded, device_id),
@@ -56,10 +59,10 @@ pub fn generate_checksum_with_default() -> String {
     generate_checksum(&generate_hash(), Some(&generate_hash()))
 }
 
-pub fn generate_checksum_with_repair(bad_checksum: &str) -> String {
+pub fn generate_checksum_with_repair(checksum: &str) -> String {
     // 预校验：检查字符串是否为空或只包含合法的Base64字符和'/'
-    if bad_checksum.is_empty()
-        || !bad_checksum
+    if checksum.is_empty()
+        || !checksum
             .chars()
             .all(|c| (c.is_ascii_alphanumeric() || c == '/' || c == '+' || c == '='))
     {
@@ -101,14 +104,14 @@ pub fn generate_checksum_with_repair(bad_checksum: &str) -> String {
         None
     }
 
-    if bad_checksum.len() == 8 {
+    if checksum.len() == 8 {
         // 尝试修复时间戳头
-        if let Some(fixed_timestamp) = try_fix_timestamp(bad_checksum) {
+        if let Some(fixed_timestamp) = try_fix_timestamp(checksum) {
             return format!("{}{}/{}", fixed_timestamp, generate_hash(), generate_hash());
         }
 
         // 验证原始时间戳
-        if let Some(timestamp) = extract_time_ks(bad_checksum) {
+        if let Some(timestamp) = extract_time_ks(checksum) {
             let current_timestamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -116,16 +119,16 @@ pub fn generate_checksum_with_repair(bad_checksum: &str) -> String {
                 / 1_000;
 
             if timestamp <= current_timestamp {
-                return format!("{}{}/{}", bad_checksum, generate_hash(), generate_hash());
+                return format!("{}{}/{}", checksum, generate_hash(), generate_hash());
             }
         }
-    } else if bad_checksum.len() > 8 {
+    } else if checksum.len() > 8 {
         // 处理可能包含hash的情况
-        let parts: Vec<&str> = bad_checksum.split('/').collect();
+        let parts: Vec<&str> = checksum.split('/').collect();
         match parts.len() {
             1 => {
-                let timestamp_base64 = &bad_checksum[..8];
-                let device_id = &bad_checksum[8..];
+                let timestamp_base64 = &checksum[..8];
+                let device_id = &checksum[8..];
 
                 if is_valid_hash(device_id) {
                     // 先尝试修复时间戳
@@ -144,7 +147,7 @@ pub fn generate_checksum_with_repair(bad_checksum: &str) -> String {
                         if timestamp <= current_timestamp {
                             return format!(
                                 "{}{}/{}",
-                                timestamp_base64,
+                                generate_timestamp_header(),
                                 device_id,
                                 generate_hash()
                             );
@@ -175,7 +178,12 @@ pub fn generate_checksum_with_repair(bad_checksum: &str) -> String {
                                 / 1_000;
 
                             if timestamp <= current_timestamp {
-                                return bad_checksum.to_string();
+                                return format!(
+                                    "{}{}/{}",
+                                    generate_timestamp_header(),
+                                    device_id,
+                                    mac_hash
+                                );
                             }
                         }
                     }

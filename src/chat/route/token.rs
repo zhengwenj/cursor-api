@@ -10,7 +10,7 @@ use crate::{
     common::{
         models::{ApiStatus, NormalResponseNoData},
         utils::{
-            extract_time, extract_time_ks, extract_user_id, generate_checksum_with_default, generate_checksum_with_repair, load_tokens, validate_token_and_checksum
+            extract_time, extract_time_ks, extract_user_id, generate_checksum_with_default, generate_checksum_with_repair, generate_hash, generate_timestamp_header, load_tokens, validate_token_and_checksum
         },
     },
 };
@@ -28,24 +28,49 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+pub async fn handle_get_hash() -> Response {
+    let hash = generate_hash();
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        CONTENT_TYPE,
+        CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8.parse().unwrap(),
+    );
+
+    (headers, hash).into_response()
+}
+
 #[derive(Deserialize)]
 pub struct ChecksumQuery {
-    #[serde(default, alias = "checksum")]
-    pub bad_checksum: Option<String>,
+    #[serde(default)]
+    pub checksum: Option<String>,
 }
 
-#[derive(Serialize)]
-pub struct ChecksumResponse {
-    pub checksum: String,
+pub async fn handle_get_checksum(Query(query): Query<ChecksumQuery>) -> Response {
+    let checksum = match query.checksum {
+        None => generate_checksum_with_default(),
+        Some(checksum) => generate_checksum_with_repair(&checksum),
+    };
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        CONTENT_TYPE,
+        CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8.parse().unwrap(),
+    );
+
+    (headers, checksum).into_response()
 }
 
-pub async fn handle_get_checksum(
-    Query(query): Query<ChecksumQuery>
-) -> Json<ChecksumResponse> {
-    match query.bad_checksum {
-        None => Json(ChecksumResponse { checksum: generate_checksum_with_default() }),
-        Some(bad_checksum) => Json(ChecksumResponse { checksum: generate_checksum_with_repair(&bad_checksum) })
-    }
+pub async fn handle_get_timestamp_header() -> Response {
+    let timestamp_header = generate_timestamp_header();
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        CONTENT_TYPE,
+        CONTENT_TYPE_TEXT_PLAIN_WITH_UTF8.parse().unwrap(),
+    );
+
+    (headers, timestamp_header).into_response()
 }
 
 // 更新 TokenInfo 处理

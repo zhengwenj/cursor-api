@@ -153,12 +153,14 @@ gemini-2.0-flash-exp
     }
   ],
   "usage": {
-    "prompt_tokens": number, // 0
-    "completion_tokens": number, // 0
-    "total_tokens": number // 0
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0
   }
 }
 </code></pre>
+
+<p>不进行 tokens 计算主要是担心性能问题。</p>
 
 <p>如果 <code>stream</code> 为 <code>true</code>:</p>
 
@@ -372,6 +374,16 @@ data: [DONE]
 }
 </code></pre>
 
+<h3>获取一个随机hash</h3>
+
+<ul>
+  <li>接口地址: <code>/get-hash</code></li>
+  <li>请求方法: GET</li>
+  <li>响应格式:</li>
+</ul>
+
+<pre><code class="language-plaintext">string</code></pre>
+
 <h3>获取或修复checksum</h3>
 
 <ul>
@@ -379,22 +391,29 @@ data: [DONE]
   <li>请求方法: GET</li>
   <li>请求参数:
     <ul>
-      <li><code>bad_checksum</code>: 可选，用于修复的旧版本生成的checksum，也可只传入前8个字符，可用别名checksum</li>
+      <li><code>checksum</code>: 可选，用于修复的旧版本生成的checksum，也可只传入前8个字符；可用来自动刷新时间戳头</li>
     </ul>
   </li>
   <li>响应格式:</li>
 </ul>
 
-<pre><code class="language-json">{
-  "checksum": "string"
-}
-</code></pre>
+<pre><code class="language-plaintext">string</code></pre>
 
 <p>说明：</p>
 <ul>
-  <li>如果不提供<code>bad_checksum</code>参数，将生成一个新的随机checksum</li>
-  <li>如果提供<code>bad_checksum</code>参数，将尝试修复旧版本的checksum以适配当前版本(v0.1.3-rc.3)使用，修复失败会返回新的checksum</li>
+  <li>如果不提供<code>checksum</code>参数，将生成一个新的随机checksum</li>
+  <li>如果提供<code>checksum</code>参数，将尝试修复旧版本的checksum以适配v0.1.3-rc.3之后的版本使用，修复失败会返回新的checksum；若输入的checksum本来就有效，则返回更新tsheader后的checksum</li>
 </ul>
+
+<h3>获取当前的tsheader</h3>
+
+<ul>
+  <li>接口地址: <code>/get-tsheader</code></li>
+  <li>请求方法: GET</li>
+  <li>响应格式:</li>
+</ul>
+
+<pre><code class="language-plaintext">string</code></pre>
 
 <h3>健康检查接口</h3>
 
@@ -508,7 +527,7 @@ data: [DONE]
 <h3>获取用户信息</h3>
 
 <ul>
-  <li>接口地址: <code>/get-userinfo</code></li>
+  <li>接口地址: <code>/userinfo</code></li>
   <li>请求方法: POST</li>
   <li>认证方式: 请求体中包含token</li>
   <li>请求格式:</li>
@@ -612,7 +631,7 @@ data: [DONE]
 
 <p>求赞助还是有点不要脸了，接下来是吐槽：</p>
 
-<p>辛辛苦苦做这个也不知道是为了谁，好累。其实还有很多功能可以做，比如直接传token支持配置（其实这个要专门做一个页面）。</p>
+<p>辛辛苦苦做这个也不知道是为了谁，好累。其实还有很多功能可以做，比如直接传token支持配置（其实这个要专门做一个页面），这个作为rc.4的计划之一吧。</p>
 
 <p>主要没想做用户管理，所以不存在是否接入LinuxDo的问题。虽然那个半成品公益版做好了就是了。</p>
 
@@ -621,3 +640,5 @@ data: [DONE]
 <p>为什么一直说要跑路呢？主要是有时Cursor的Claude太假了，堪比gpt-4o-mini，我对比发现真没啥差别，比以前差远了，无力了，所以不太想做了。我也感觉很奇怪。</p>
 
 <p>查询额度会在一开始检测导致和完成时的额度有些差别，但是懒得改了，反正差别不大，对话也没响应内容，恰好完成了统一。</p>
+
+<p>有人说少个二维码来着，还是算了。如果觉得好用，给点支持。其实没啥大不了的，没兴趣就不做了。不想那么多了。</p>

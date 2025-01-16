@@ -59,10 +59,14 @@ pub fn load_tokens() -> Vec<TokenInfo> {
                 .lines()
                 .filter_map(|line| {
                     let line = line.trim();
-                    if line.is_empty() || line.starts_with('#') || !validate_token(line) {
+                    if line.is_empty() || line.starts_with('#') {
                         return None;
                     }
-                    parse_token(line)
+                    let parsed = parse_token(line);
+                    if parsed.is_none() || !validate_token(&parsed.as_ref().unwrap()) {
+                        return None;
+                    }
+                    parsed
                 })
                 .collect::<Vec<_>>()
         }

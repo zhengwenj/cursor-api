@@ -6,7 +6,7 @@ use axum::Json;
 
 use super::token::TokenRequest;
 
-pub async fn get_user_info(Json(request): Json<TokenRequest>) -> Json<GetUserInfo> {
+pub async fn handle_user_info(Json(request): Json<TokenRequest>) -> Json<GetUserInfo> {
     let auth_token = match request.token {
         Some(token) => token,
         None => {

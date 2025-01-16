@@ -51,6 +51,10 @@ def_pub_static!(DEFAULT_INSTRUCTIONS, env: "DEFAULT_INSTRUCTIONS", default: "Res
 
 def_pub_static!(REVERSE_PROXY_HOST, env: "REVERSE_PROXY_HOST", default: "");
 
+def_pub_static!(SHARED_AUTH_TOKEN, env: "SHARED_AUTH_TOKEN", default: EMPTY_STRING);
+
+pub static USE_SHARE: LazyLock<bool> = LazyLock::new(|| !SHARED_AUTH_TOKEN.is_empty());
+
 pub static USE_PROXY: LazyLock<bool> = LazyLock::new(|| !REVERSE_PROXY_HOST.is_empty());
 
 pub static CURSOR_API2_CHAT_URL: LazyLock<String> = LazyLock::new(|| {

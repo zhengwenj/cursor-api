@@ -131,3 +131,79 @@ pub fn parse_stream_data(data: &[u8]) -> Result<StreamMessage, StreamError> {
         Ok(StreamMessage::Content(messages))
     }
 }
+
+#[test]
+fn test_parse_stream_data() {
+    // 使用include_str!加载测试数据文件
+    let stream_data = include_str!("../../tests/data/stream_data.txt");
+
+    // 将整个字符串按每两个字符分割成字节
+    let bytes: Vec<u8> = stream_data
+        .as_bytes()
+        .chunks(2)
+        .map(|chunk| {
+            let hex_str = std::str::from_utf8(chunk).unwrap();
+            u8::from_str_radix(hex_str, 16).unwrap()
+        })
+        .collect();
+
+    // 辅助函数：找到下一个消息边界
+    fn find_next_message_boundary(bytes: &[u8]) -> usize {
+        if bytes.len() < 5 {
+            return bytes.len();
+        }
+        let msg_len = u32::from_be_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]) as usize;
+        5 + msg_len
+    }
+
+    // 辅助函数：将字节转换为hex字符串
+    fn bytes_to_hex(bytes: &[u8]) -> String {
+        bytes.iter()
+            .map(|b| format!("{:02X}", b))
+            .collect::<Vec<String>>()
+            .join("")
+    }
+
+    // 多次解析数据
+    let mut offset = 0;
+    while offset < bytes.len() {
+        let remaining_bytes = &bytes[offset..];
+        let msg_boundary = find_next_message_boundary(remaining_bytes);
+        let current_msg_bytes = &remaining_bytes[..msg_boundary];
+        let hex_str = bytes_to_hex(current_msg_bytes);
+        
+        match parse_stream_data(current_msg_bytes) {
+            Ok(message) => {
+                match message {
+                    StreamMessage::Content(messages) => {
+                        print!("消息内容 [hex: {}]:", hex_str);
+                        for msg in messages {
+                            println!(" {}", msg);
+                        }
+                        offset += msg_boundary;
+                    }
+                    StreamMessage::Debug(_) => {
+                        // println!("调试信息 [hex: {}]: {}", hex_str, prompt);
+                        offset += msg_boundary;
+                    }
+                    StreamMessage::StreamEnd => {
+                        println!("流结束 [hex: {}]", hex_str);
+                        break;
+                    }
+                    StreamMessage::StreamStart => {
+                        println!("流开始 [hex: {}]", hex_str);
+                        offset += msg_boundary;
+                    }
+                    StreamMessage::Incomplete => {
+                        println!("数据不完整 [hex: {}]", hex_str);
+                        break;
+                    }
+                }
+            }
+            Err(e) => {
+                println!("解析错误 [hex: {}]: {}", hex_str, e);
+                break;
+            }
+        }
+    }
+}
