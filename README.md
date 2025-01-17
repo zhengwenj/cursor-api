@@ -8,6 +8,7 @@
 *   属于官方的问题，请不要像作者反馈。
 *   本程序拥有堪比客户端原本的速度，甚至可能更快。
 *   本程序的性能是非常厉害的。
+*   根据本项目开源协议，Fork的项目不能以作者的名义进行任何形式的宣传、推广或声明。
 
 ## 获取key
 
@@ -442,18 +443,21 @@ string
           "usage": {
             "premium": {
               "requests": number,
+              "requests_total": number,
               "tokens": number,
               "max_requests": number,
               "max_tokens": number
             },
             "standard": {
               "requests": number,
+              "requests_total": number,
               "tokens": number,
               "max_requests": number,
               "max_tokens": number
             },
             "unknown": {
               "requests": number,
+              "requests_total": number,
               "tokens": number,
               "max_requests": number,
               "max_tokens": number
@@ -507,18 +511,21 @@ string
   "usage": {
     "premium": {
       "requests": number,
+      "requests_total": number,
       "tokens": number,
       "max_requests": number,
       "max_tokens": number
     },
     "standard": {
       "requests": number,
+      "requests_total": number,
       "tokens": number,
       "max_requests": number,
       "max_tokens": number
     },
     "unknown": {
       "requests": number,
+      "requests_total": number,
       "tokens": number,
       "max_requests": number,
       "max_tokens": number

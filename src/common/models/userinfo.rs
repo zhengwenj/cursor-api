@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[serde(untagged)]
 pub enum GetUserInfo {
     Usage(TokenProfile),
-    Error{ error: String },
+    Error { error: String },
 }
 
 #[derive(Serialize, Clone)]
@@ -31,7 +31,11 @@ pub enum MembershipType {
 pub struct StripeProfile {
     #[serde(rename(deserialize = "membershipType"))]
     pub membership_type: MembershipType,
-    #[serde(rename(deserialize = "paymentId"), default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename(deserialize = "paymentId"),
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub payment_id: Option<String>,
     #[serde(rename(deserialize = "daysRemainingOnTrial"))]
     pub days_remaining_on_trial: u32,
@@ -41,6 +45,12 @@ pub struct StripeProfile {
 pub struct ModelUsage {
     #[serde(rename(deserialize = "numRequests", serialize = "requests"))]
     pub num_requests: u32,
+    #[serde(
+        rename(deserialize = "numRequestsTotal"),
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub requests_total: Option<u32>,
     #[serde(rename(deserialize = "numTokens", serialize = "tokens"))]
     pub num_tokens: u32,
     #[serde(
@@ -73,5 +83,6 @@ pub struct UserProfile {
     #[serde(rename(serialize = "id"))]
     pub sub: String,
     pub updated_at: DateTime<Local>,
+    // Image link, rendered in /logs?
     // pub picture: Option<String>,
 }
