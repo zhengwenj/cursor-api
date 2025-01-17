@@ -584,9 +584,7 @@
               const progressDiv = document.createElement('div');
               progressDiv.className = 'usage-progress-container';
               const colorClass = getProgressBarClass(parseFloat(percentage));
-              progressDiv.innerHTML = `
-                <div class="usage-progress-bar ${colorClass}" style="width: ${percentage}%"></div>
-              `;
+              progressDiv.innerHTML = `<div class="usage-progress-bar ${colorClass}" style="width: ${percentage}%"></div>`;
               container.appendChild(progressDiv);
             } else {
               element.textContent = `${requests} requests, ${tokens} tokens`;
@@ -629,54 +627,14 @@
         ['Premium', premiumUsage]
       ];
 
-      return rows.map(([label, value]) => `
-        <div class="tooltip-info-row">
-          <span class="label">${label}:</span>
-          <span class="value">${value}</span>
-        </div>
-      `).join('');
+      return rows.map(([label, value]) => `<div class="tooltip-info-row"><span class="label">${label}:</span><span class="value">${value}</span></div>`).join('');
     }
 
     function updateTable(data) {
       const tbody = document.getElementById('logsBody');
       updateStats(data);
 
-      tbody.innerHTML = data.logs.map(log => `
-        <tr>
-          <td>${log.id}</td>
-          <td>${new Date(log.timestamp).toLocaleString()}</td>
-          <td>${log.model}</td>
-          <td>
-            <div class="token-info-tooltip">
-              <button class="info-button" onclick='showTokenModal(${JSON.stringify(log.token_info)})'>
-                查看详情
-                <div class="tooltip-content">
-                  ${formatSimpleTokenInfo(log.token_info)}
-                </div>
-              </button>
-            </div>
-          </td>
-          <td>
-            ${log.prompt ?
-          `<div class="token-info-tooltip prompt-preview">
-                    <button class="info-button" onclick="showPromptModal(decodeURIComponent('${encodeURIComponent(log.prompt).replace(/'/g, "\\'")}'))">
-                      查看对话
-                      <div class="tooltip-content">
-                        ${formatPromptPreview(log.prompt)}
-                      </div>
-                    </button>
-                  </div>` :
-          '-'
-        }
-          </td>
-          <td>
-            ${formatTiming(log.timing.total, log.timing.first)}
-          </td>
-          <td>${log.stream ? '是' : '否'}</td>
-          <td>${log.status}</td>
-          <td>${log.error || '-'}</td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = data.logs.map(log => `<tr><td>${log.id}</td><td>${new Date(log.timestamp).toLocaleString()}</td><td>${log.model}</td><td><div class="token-info-tooltip"><button class="info-button" onclick='showTokenModal(${JSON.stringify(log.token_info)})'>查看详情<div class="tooltip-content">${formatSimpleTokenInfo(log.token_info)}</div></button></div></td><td>${log.prompt ?`<div class="token-info-tooltip prompt-preview"><button class="info-button" onclick="showPromptModal(decodeURIComponent('${encodeURIComponent(log.prompt).replace(/'/g, "\\'")}'))">查看对话<div class="tooltip-content">${formatPromptPreview(log.prompt)}</div></button></div>` :'-'}</td><td>${formatTiming(log.timing.total, log.timing.first)}</td><td>${log.stream ? '是' : '否'}</td><td>${log.status}</td><td>${log.error || '-'}</td></tr>`).join('');
     }
 
     function formatTiming(total, first) {
@@ -700,15 +658,7 @@
           'assistant': '助手'
         };
 
-        return `
-          <div class="message-meta">最后一条消息 (${roleLabels[lastMessage.role] || lastMessage.role}):</div>
-          <div class="last-message">${lastMessage.content
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\n/g, '<br>')
-          }</div>
-        `;
+        return `<div class="message-meta">最后一条消息 (${roleLabels[lastMessage.role] || lastMessage.role}):</div><div class="last-message">${lastMessage.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>`;
       } catch (e) {
         console.error('预览对话内容失败:', e);
         return '无法解析对话内容';

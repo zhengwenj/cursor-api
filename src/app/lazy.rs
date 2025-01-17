@@ -3,7 +3,7 @@ use crate::{
         CURSOR_API2_HOST, CURSOR_HOST, DEFAULT_TOKEN_FILE_NAME, DEFAULT_TOKEN_LIST_FILE_NAME,
         EMPTY_STRING,
     },
-    common::utils::{parse_char_from_env, parse_string_from_env},
+    common::utils::{parse_ascii_char_from_env, parse_string_from_env},
 };
 use std::sync::LazyLock;
 
@@ -55,8 +55,18 @@ def_pub_static!(SHARED_AUTH_TOKEN, env: "SHARED_AUTH_TOKEN", default: EMPTY_STRI
 
 pub static USE_SHARE: LazyLock<bool> = LazyLock::new(|| !SHARED_AUTH_TOKEN.is_empty());
 
-pub static TOKEN_DELIMITER: LazyLock<char> =
-    LazyLock::new(|| parse_char_from_env("TOKEN_DELIMITER", ','));
+pub static TOKEN_DELIMITER: LazyLock<char> = LazyLock::new(|| {
+    let delimiter = parse_ascii_char_from_env("TOKEN_DELIMITER", ',');
+    if delimiter.is_ascii_alphabetic()
+        || delimiter.is_ascii_digit()
+        || delimiter == '+'
+        || delimiter == '/'
+    {
+        ','
+    } else {
+        delimiter
+    }
+});
 
 pub static TOKEN_DELIMITER_LEN: LazyLock<usize> = LazyLock::new(|| TOKEN_DELIMITER.len_utf8());
 

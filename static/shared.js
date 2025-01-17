@@ -214,24 +214,7 @@ function formatPromptToTable(messages) {
     return escaped;
   }
 
-  return `
-    <table class="message-table">
-      <thead>
-        <tr>
-          <th>角色</th>
-          <th>内容</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${messages.map(msg => `
-          <tr>
-            <td>${roleLabels[msg.role] || msg.role}</td>
-            <td>${escapeHtml(msg.content).replace(/\n/g, '<br>')}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  `;
+  return `<table class="message-table"><thead><tr><th>角色</th><th>内容</th></tr></thead><tbody>${messages.map(msg => `<tr><td>${roleLabels[msg.role] || msg.role}</td><td>${escapeHtml(msg.content).replace(/\n/g, '<br>')}</td></tr>`).join('')}</tbody></table>`;
 }
 
 /**

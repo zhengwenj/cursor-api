@@ -1,5 +1,5 @@
 # AMD64 构建阶段
-FROM --platform=linux/amd64 rust:1.83.0-slim-bookworm as builder-amd64
+FROM --platform=linux/amd64 rust:1.84.0-slim-bookworm as builder-amd64
 WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -11,7 +11,7 @@ RUN cargo build --release && \
     cp target/release/cursor-api /app/cursor-api
 
 # ARM64 构建阶段
-FROM --platform=linux/arm64 rust:1.83.0-slim-bookworm as builder-arm64
+FROM --platform=linux/arm64 rust:1.84.0-slim-bookworm as builder-arm64
 WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

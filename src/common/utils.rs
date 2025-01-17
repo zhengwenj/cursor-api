@@ -24,12 +24,12 @@ pub fn parse_string_from_env(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
 
-pub fn parse_char_from_env(key: &str, default: char) -> char {
+pub fn parse_ascii_char_from_env(key: &str, default: char) -> char {
     std::env::var(key)
         .ok()
         .and_then(|v| {
             let chars: Vec<char> = v.chars().collect();
-            if chars.len() == 1 {
+            if chars.len() == 1 && chars[0].is_ascii() {
                 Some(chars[0])
             } else {
                 None
