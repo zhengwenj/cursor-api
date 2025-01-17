@@ -3,7 +3,7 @@ use crate::{
         CURSOR_API2_HOST, CURSOR_HOST, DEFAULT_TOKEN_FILE_NAME, DEFAULT_TOKEN_LIST_FILE_NAME,
         EMPTY_STRING,
     },
-    common::utils::parse_string_from_env,
+    common::utils::{parse_char_from_env, parse_string_from_env},
 };
 use std::sync::LazyLock;
 
@@ -49,11 +49,16 @@ pub fn get_start_time() -> chrono::DateTime<chrono::Local> {
 
 def_pub_static!(DEFAULT_INSTRUCTIONS, env: "DEFAULT_INSTRUCTIONS", default: "Respond in Chinese by default");
 
-def_pub_static!(REVERSE_PROXY_HOST, env: "REVERSE_PROXY_HOST", default: "");
+def_pub_static!(REVERSE_PROXY_HOST, env: "REVERSE_PROXY_HOST", default: EMPTY_STRING);
 
 def_pub_static!(SHARED_AUTH_TOKEN, env: "SHARED_AUTH_TOKEN", default: EMPTY_STRING);
 
 pub static USE_SHARE: LazyLock<bool> = LazyLock::new(|| !SHARED_AUTH_TOKEN.is_empty());
+
+pub static TOKEN_DELIMITER: LazyLock<char> =
+    LazyLock::new(|| parse_char_from_env("TOKEN_DELIMITER", ','));
+
+pub static TOKEN_DELIMITER_LEN: LazyLock<usize> = LazyLock::new(|| TOKEN_DELIMITER.len_utf8());
 
 pub static USE_PROXY: LazyLock<bool> = LazyLock::new(|| !REVERSE_PROXY_HOST.is_empty());
 

@@ -4,7 +4,10 @@ mod tokens;
 pub use tokens::*;
 
 use super::models::userinfo::{StripeProfile, TokenProfile, UsageProfile, UserProfile};
-use crate::app::constant::{FALSE, TRUE};
+use crate::app::{
+    constant::{FALSE, TRUE},
+    lazy::{TOKEN_DELIMITER, TOKEN_DELIMITER_LEN},
+};
 
 pub fn parse_bool_from_env(key: &str, default: bool) -> bool {
     std::env::var(key)
@@ -19,6 +22,20 @@ pub fn parse_bool_from_env(key: &str, default: bool) -> bool {
 
 pub fn parse_string_from_env(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+pub fn parse_char_from_env(key: &str, default: char) -> char {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| {
+            let chars: Vec<char> = v.chars().collect();
+            if chars.len() == 1 {
+                Some(chars[0])
+            } else {
+                None
+            }
+        })
+        .unwrap_or(default)
 }
 
 pub fn parse_usize_from_env(key: &str, default: usize) -> usize {
@@ -86,9 +103,9 @@ pub async fn get_user_profile(auth_token: &str) -> Option<UserProfile> {
 
 pub fn validate_token_and_checksum(auth_token: &str) -> Option<(String, String)> {
     // 找最后一个逗号
-    let comma_pos = auth_token.rfind(',')?;
+    let comma_pos = auth_token.rfind(*TOKEN_DELIMITER)?;
     let (token_part, checksum) = auth_token.split_at(comma_pos);
-    let checksum = &checksum[1..]; // 跳过逗号
+    let checksum = &checksum[*TOKEN_DELIMITER_LEN..]; // 跳过逗号
 
     // 解析 token - 为了向前兼容,忽略最后一个:或%3A前的内容
     let colon_pos = token_part.rfind(':');
@@ -115,11 +132,12 @@ pub fn validate_token_and_checksum(auth_token: &str) -> Option<(String, String)>
 
 pub fn extract_token(auth_token: &str) -> Option<String> {
     // 解析 token
-    let token_part = match auth_token.rfind(',') {
+    let token_part = match auth_token.rfind(*TOKEN_DELIMITER) {
         Some(pos) => &auth_token[..pos],
-        None => auth_token
+        None => auth_token,
     };
 
+    // 向前兼容
     let colon_pos = token_part.rfind(':');
     let encoded_colon_pos = token_part.rfind("%3A");
 

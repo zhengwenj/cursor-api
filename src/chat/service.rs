@@ -243,27 +243,6 @@ pub async fn handle_chat(
     };
 
     // 构建请求客户端
-    // let client_key = match generate_client_key(&checksum) {
-    //     Some(key) => key,
-    //     None => {
-    //         let mut state = state.lock().await;
-    //         if let Some(log) = state
-    //             .request_logs
-    //             .iter_mut()
-    //             .rev()
-    //             .find(|log| log.id == current_id)
-    //         {
-    //             log.status = STATUS_FAILED;
-    //             log.error = Some(ERR_CHECKSUM_NO_GOOD.to_string());
-    //         }
-    //         state.active_requests -= 1;
-    //         state.error_requests += 1;
-    //         return Err((
-    //             StatusCode::BAD_REQUEST,
-    //             Json(ChatError::RequestFailed(ERR_CHECKSUM_NO_GOOD.to_string()).to_json()),
-    //         ));
-    //     }
-    // };
     let client = build_client(&auth_token, &checksum);
     let response = client.body(hex_data).send().await;
 
