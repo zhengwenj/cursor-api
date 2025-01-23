@@ -83,8 +83,8 @@ jobs:
         if: github.event_name == 'push'
         run: |
           mkdir -p artifacts
-          cp dist/linux_amd64/app/cursor-api artifacts/cursor-api-x86_64-${{ github.event_name }}
-          cp dist/linux_arm64/app/cursor-api artifacts/cursor-api-aarch64-${{ github.event_name }}
+          cp dist/linux_amd64/app/cursor-api artifacts/cursor-api-x86_64-${{ github.ref_name }}
+          cp dist/linux_arm64/app/cursor-api artifacts/cursor-api-aarch64-${{ github.ref_name }}
 
       - name: Upload artifacts
         if: (github.event_name == 'workflow_dispatch' && inputs.upload_artifacts) || github.event_name == 'push'
