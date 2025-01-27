@@ -39,14 +39,14 @@ use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer};
 #[tokio::main]
 async fn main() {
     // 设置自定义 panic hook
-    std::panic::set_hook(Box::new(|info| {
-        // std::env::set_var("RUST_BACKTRACE", "1");
-        if let Some(msg) = info.payload().downcast_ref::<String>() {
-            eprintln!("{}", msg);
-        } else if let Some(msg) = info.payload().downcast_ref::<&str>() {
-            eprintln!("{}", msg);
-        }
-    }));
+    // std::panic::set_hook(Box::new(|info| {
+    //     // std::env::set_var("RUST_BACKTRACE", "1");
+    //     if let Some(msg) = info.payload().downcast_ref::<String>() {
+    //         eprintln!("{}", msg);
+    //     } else if let Some(msg) = info.payload().downcast_ref::<&str>() {
+    //         eprintln!("{}", msg);
+    //     }
+    // }));
 
     // 加载环境变量
     dotenvy::dotenv().ok();

@@ -79,7 +79,7 @@ impl StreamDecoder {
 
     // 获取第一个结果的引用
     pub fn take_first_result(&mut self) -> Option<Vec<StreamMessage>> {
-        if self.is_incomplete() {
+        if !self.buffer.is_empty() {
             return None;
         }
         if self.first_result.is_some() {
@@ -88,12 +88,13 @@ impl StreamDecoder {
         self.first_result.take()
     }
 
+    #[cfg(test)]
     fn is_incomplete(&self) -> bool {
         !self.buffer.is_empty()
     }
 
-    pub fn has_no_first_result(&self) -> bool {
-        self.first_result.is_none()
+    pub fn is_first_result_ready(&self) -> bool {
+        self.first_result.is_some() && self.buffer.is_empty() && !self.first_result_taken
     }
 
     pub fn decode(&mut self, data: &[u8], convert_web_ref: bool) -> Result<Vec<StreamMessage>, StreamError> {

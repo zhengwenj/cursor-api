@@ -6,7 +6,7 @@ RUN apt-get update && \
     build-essential protobuf-compiler pkg-config libssl-dev nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 COPY . .
-ENV RUSTFLAGS="-C link-arg=-s -C target-cpu=native"
+ENV RUSTFLAGS="-C link-arg=-s -C target-cpu=x86-64-v3"
 RUN cargo build --release && \
     cp target/release/cursor-api /app/cursor-api
 
@@ -18,7 +18,7 @@ RUN apt-get update && \
     build-essential protobuf-compiler pkg-config libssl-dev nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 COPY . .
-ENV RUSTFLAGS="-C link-arg=-s -C target-cpu=native"
+ENV RUSTFLAGS="-C link-arg=-s -C target-cpu=apple-m1"
 RUN cargo build --release && \
     cp target/release/cursor-api /app/cursor-api
 
