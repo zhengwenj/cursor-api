@@ -21,3 +21,5 @@ node_modules
 /logs
 /dev*
 /build*
+/*.bin
+/result.txt
