@@ -77,16 +77,15 @@ impl StreamDecoder {
         }
     }
 
-    // 获取第一个结果的引用
-    pub fn take_first_result(&mut self) -> Option<Vec<StreamMessage>> {
-        if !self.buffer.is_empty() {
-            return None;
-        }
-        if self.first_result.is_some() {
-            self.first_result_taken = true;
-        }
-        self.first_result.take()
-    }
+    // pub fn take_first_result(&mut self) -> Option<Vec<StreamMessage>> {
+    //     if !self.buffer.is_empty() {
+    //         return None;
+    //     }
+    //     if self.first_result.is_some() {
+    //         self.first_result_taken = true;
+    //     }
+    //     self.first_result.take()
+    // }
 
     #[cfg(test)]
     fn is_incomplete(&self) -> bool {
@@ -101,6 +100,9 @@ impl StreamDecoder {
         self.buffer.extend_from_slice(data);
 
         if self.buffer.len() < 5 {
+            if self.buffer.len() == 0 {
+                return Err(StreamError::EmptyStream);
+            }
             crate::debug_println!("数据长度小于5字节，当前数据: {}", hex::encode(&self.buffer));
             return Err(StreamError::DataLengthLessThan5);
         }

@@ -575,7 +575,6 @@ pub async fn handle_chat(
                 }
             }
 
-            // 处理后续的stream
             stream.then({
                 let decoder = decoder.clone();
                 let response_id = response_id.clone();
@@ -605,7 +604,6 @@ pub async fn handle_chat(
                             current_id,
                         };
 
-                        // 使用decoder处理chunk
                         let messages = match decoder.lock().await.decode(&chunk, convert_web_ref) {
                             Ok(msgs) => msgs,
                             Err(e) => {
@@ -614,19 +612,19 @@ pub async fn handle_chat(
                             }
                         };
 
-                        let mut response_data = String::new();
+                        // let mut response_data = String::new();
 
-                        if let Some(first_msg) = decoder.lock().await.take_first_result() {
-                            let first_response = process_messages(first_msg, &ctx).await;
-                            if !first_response.is_empty() {
-                                response_data.push_str(&first_response);
-                            }
-                        }
+                        // if let Some(first_msg) = decoder.lock().await.take_first_result() {
+                        //     let first_response = process_messages(first_msg, &ctx).await;
+                        //     if !first_response.is_empty() {
+                        //         response_data.push_str(&first_response);
+                        //     }
+                        // }
 
-                        let current_response = process_messages(messages, &ctx).await;
-                        if !current_response.is_empty() {
-                            response_data.push_str(&current_response);
-                        }
+                        let response_data = process_messages(messages, &ctx).await;
+                        // if !current_response.is_empty() {
+                        //     response_data.push_str(&current_response);
+                        // }
 
                         Ok(Bytes::from(response_data))
                     }
