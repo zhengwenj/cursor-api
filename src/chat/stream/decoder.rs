@@ -77,15 +77,15 @@ impl StreamDecoder {
         }
     }
 
-    // pub fn take_first_result(&mut self) -> Option<Vec<StreamMessage>> {
-    //     if !self.buffer.is_empty() {
-    //         return None;
-    //     }
-    //     if self.first_result.is_some() {
-    //         self.first_result_taken = true;
-    //     }
-    //     self.first_result.take()
-    // }
+    pub fn take_first_result(&mut self) -> Option<Vec<StreamMessage>> {
+        if !self.buffer.is_empty() {
+            return None;
+        }
+        if self.first_result.is_some() {
+            self.first_result_taken = true;
+        }
+        self.first_result.take()
+    }
 
     #[cfg(test)]
     fn is_incomplete(&self) -> bool {
