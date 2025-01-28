@@ -3,7 +3,7 @@ FROM --platform=linux/amd64 rust:1.84.0-slim-bookworm as builder-amd64
 WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential protobuf-compiler pkg-config libssl-dev nodejs npm \
+    build-essential protobuf-compiler pkg-config libssl-dev nodejs npm openssl \
     && rm -rf /var/lib/apt/lists/*
 COPY . .
 ENV RUSTFLAGS="-C link-arg=-s -C target-cpu=x86-64-v3"
@@ -15,7 +15,7 @@ FROM --platform=linux/arm64 rust:1.84.0-slim-bookworm as builder-arm64
 WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential protobuf-compiler pkg-config libssl-dev nodejs npm \
+    build-essential protobuf-compiler pkg-config libssl-dev nodejs npm openssl \
     && rm -rf /var/lib/apt/lists/*
 COPY . .
 ENV RUSTFLAGS="-C link-arg=-s -C target-cpu=apple-m1"
@@ -28,7 +28,7 @@ WORKDIR /app
 ENV TZ=Asia/Shanghai
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    ca-certificates tzdata \
+    ca-certificates tzdata openssl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder-amd64 /app/cursor-api .
 
@@ -38,7 +38,7 @@ WORKDIR /app
 ENV TZ=Asia/Shanghai
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    ca-certificates tzdata \
+    ca-certificates tzdata openssl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder-arm64 /app/cursor-api .
 
