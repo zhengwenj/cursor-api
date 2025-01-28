@@ -39,7 +39,7 @@ impl ToMarkdown for BTreeMap<String, String> {
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum StreamMessage {
     // 调试
     Debug(String),
@@ -65,6 +65,7 @@ impl StreamMessage {
 pub struct StreamDecoder {
     buffer: Vec<u8>,
     first_result: Option<Vec<StreamMessage>>,
+    first_result_ready: bool,
     first_result_taken: bool,
 }
 
@@ -73,6 +74,7 @@ impl StreamDecoder {
         Self {
             buffer: Vec::new(),
             first_result: None,
+            first_result_ready: false,
             first_result_taken: false,
         }
     }
@@ -93,7 +95,7 @@ impl StreamDecoder {
     }
 
     pub fn is_first_result_ready(&self) -> bool {
-        self.first_result.is_some() && self.buffer.is_empty() && !self.first_result_taken
+        self.first_result_ready
     }
 
     pub fn decode(&mut self, data: &[u8], convert_web_ref: bool) -> Result<Vec<StreamMessage>, StreamError> {
@@ -150,9 +152,12 @@ impl StreamDecoder {
         if !self.first_result_taken && !messages.is_empty() {
             if self.first_result.is_none() {
                 self.first_result = Some(messages.clone());
-            } else {
+            } else if !self.first_result_ready {
                 self.first_result.as_mut().unwrap().extend(messages.clone());
             }
+        }
+        if !self.first_result_ready {
+            self.first_result_ready = self.first_result.is_some() && self.buffer.is_empty() && !self.first_result_taken;
         }
         Ok(messages)
     }

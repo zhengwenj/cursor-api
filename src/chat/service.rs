@@ -24,7 +24,7 @@ use crate::{
         model::{error::ChatError, userinfo::MembershipType, ApiStatus, ErrorResponse},
         utils::{
             format_time_ms, from_base64, get_token_profile, tokeninfo_to_token,
-            validate_token_and_checksum,
+            validate_token_and_checksum, TrimNewlines as _,
         },
     },
 };
@@ -410,14 +410,12 @@ pub async fn handle_chat(
             for message in messages {
                 match message {
                     StreamMessage::Content(text) => {
-                        // 记录首字时间(如果还未记录)
-                        if let Ok(mut first_time) = ctx.first_chunk_time.try_lock() {
-                            if first_time.is_none() {
+                        let is_first = ctx.is_start.load(Ordering::SeqCst);
+                        if is_first {
+                            if let Ok(mut first_time) = ctx.first_chunk_time.try_lock() {
                                 *first_time = Some(ctx.start_time.elapsed().as_secs_f64());
                             }
                         }
-
-                        let is_first = ctx.is_start.load(Ordering::SeqCst);
 
                         let response = ChatResponse {
                             id: ctx.response_id.to_string(),
@@ -433,12 +431,16 @@ pub async fn handle_chat(
                                 message: None,
                                 delta: Some(Delta {
                                     role: if is_first {
-                                        ctx.is_start.store(false, Ordering::SeqCst);
                                         Some(Role::Assistant)
                                     } else {
                                         None
                                     },
-                                    content: Some(text),
+                                    content: if is_first {
+                                        ctx.is_start.store(false, Ordering::SeqCst);
+                                        Some(text.trim_leading_newlines())
+                                    } else {
+                                        Some(text)
+                                    },
                                 }),
                                 finish_reason: None,
                             }],
@@ -528,7 +530,8 @@ pub async fn handle_chat(
                             {
                                 log.status = LogStatus::Failed;
                                 log.error = Some(error_response.native_code());
-                                log.timing.total = format_time_ms(start_time.elapsed().as_secs_f64());
+                                log.timing.total =
+                                    format_time_ms(start_time.elapsed().as_secs_f64());
                                 state.error_requests += 1;
                             }
                         }
@@ -562,7 +565,9 @@ pub async fn handle_chat(
                     }
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ChatError::RequestFailed("Empty stream response".to_string()).to_json()),
+                        Json(
+                            ChatError::RequestFailed("Empty stream response".to_string()).to_json(),
+                        ),
                     ));
                 }
             }

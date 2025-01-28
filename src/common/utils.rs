@@ -48,6 +48,24 @@ pub fn parse_usize_from_env(key: &str, default: usize) -> usize {
         .unwrap_or(default)
 }
 
+pub trait TrimNewlines {
+    fn trim_leading_newlines(self) -> Self;
+}
+
+impl TrimNewlines for String {
+    #[inline(always)]
+    fn trim_leading_newlines(mut self) -> Self {
+        if self.as_bytes().get(..2) == Some(b"\n\n".as_slice()) {
+            unsafe {
+                let vec = self.as_mut_vec();
+                vec.copy_within(2.., 0);
+                vec.truncate(vec.len() - 2);
+            }
+        }
+        self
+    }
+}
+
 pub async fn get_token_profile(auth_token: &str) -> Option<TokenProfile> {
     let user_id = extract_user_id(auth_token)?;
 

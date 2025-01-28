@@ -1,6 +1,6 @@
 [package]
 name = "cursor-api"
-version = "0.1.3-rc.4.1"
+version = "0.1.3-rc.4.2"
 edition = "2021"
 authors = ["wisdgod <nav@wisdgod.com>"]
 description = "OpenAI format compatibility layer for the Cursor API"
