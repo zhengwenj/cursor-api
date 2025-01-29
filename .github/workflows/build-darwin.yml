@@ -25,33 +25,26 @@ jobs:
         run: |
           RUSTFLAGS="-C link-arg=-s -C target-cpu=x86-64-v3" \
           cargo build --release --target x86_64-apple-darwin
+          mv target/x86_64-apple-darwin/release/cursor-api cursor-api-x86_64-apple-darwin
 
       - name: Build arm64 binary
         run: |
           RUSTFLAGS="-C link-arg=-s -C target-cpu=apple-m1" \
           cargo build --release --target aarch64-apple-darwin
+          mv target/aarch64-apple-darwin/release/cursor-api cursor-api-aarch64-apple-darwin
 
       - name: Create universal binary
         run: |
           lipo -create \
-            target/x86_64-apple-darwin/release/cursor-api \
-            target/aarch64-apple-darwin/release/cursor-api \
-            -output target/cursor-api-universal
+            cursor-api-x86_64-apple-darwin \
+            cursor-api-aarch64-apple-darwin \
+            -output cursor-api-universal-apple-darwin
 
-      - name: Upload x86_64 artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: cursor-api-x86_64-apple-darwin
-          path: target/x86_64-apple-darwin/release/cursor-api
-
-      - name: Upload arm64 artifact
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: cursor-api-aarch64-apple-darwin
-          path: target/aarch64-apple-darwin/release/cursor-api
-
-      - name: Upload universal artifact
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: cursor-api-universal-apple-darwin
-          path: target/cursor-api-universal
+          name: cursor-api-darwin
+          path: |
+            cursor-api-x86_64-apple-darwin
+            cursor-api-aarch64-apple-darwin
+            cursor-api-universal-apple-darwin

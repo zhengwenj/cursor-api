@@ -730,7 +730,7 @@ pub async fn handle_chat(
                 index: 0,
                 message: Some(Message {
                     role: Role::Assistant,
-                    content: MessageContent::Text(full_text),
+                    content: MessageContent::Text(full_text.trim_leading_newlines()),
                 }),
                 delta: None,
                 finish_reason: Some(FINISH_REASON_STOP.to_string()),

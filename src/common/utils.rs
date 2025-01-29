@@ -55,11 +55,13 @@ pub trait TrimNewlines {
 impl TrimNewlines for String {
     #[inline(always)]
     fn trim_leading_newlines(mut self) -> Self {
-        if self.as_bytes().get(..2) == Some(b"\n\n".as_slice()) {
+        let bytes = self.as_bytes();
+        if bytes.len() >= 2 && bytes[0] == b'\n' && bytes[1] == b'\n' {
             unsafe {
-                let vec = self.as_mut_vec();
-                vec.copy_within(2.., 0);
-                vec.truncate(vec.len() - 2);
+                let start_ptr = self.as_mut_ptr();
+                let new_len = self.len() - 2;
+                std::ptr::copy(start_ptr.add(2), start_ptr, new_len);
+                self.as_mut_vec().set_len(new_len);
             }
         }
         self

@@ -91,7 +91,8 @@
 
     /* 操作按钮样式 */
     .action-cell {
-      width: 100px;
+      width: 160px;
+      /* 增加宽度以容纳两个按钮 */
       text-align: center !important;
     }
 
@@ -99,6 +100,8 @@
       padding: 2px 8px;
       font-size: 12px;
       white-space: nowrap;
+      margin: 0 2px;
+      /* 添加按钮间距 */
     }
 
     /* 提示框样式 */
@@ -256,6 +259,21 @@
     .model-item input[type="checkbox"] {
       margin-right: 8px;
     }
+
+    /* 确认对话框的额外样式 */
+    #confirmModal {
+      max-width: 400px;
+    }
+
+    #confirmModal .modal-content {
+      margin: 20px 0;
+      text-align: center;
+    }
+
+    #confirmModal .modal-footer button {
+      min-width: 80px;
+      margin-left: 10px;
+    }
   </style>
 </head>
 
@@ -368,6 +386,21 @@
     </div>
   </div>
 
+  <!-- 添加确认对话框 -->
+  <div class="modal-backdrop" id="confirmModal-backdrop"></div>
+  <div class="modal" id="confirmModal">
+    <div class="modal-header">
+      <h3>确认删除</h3>
+    </div>
+    <div class="modal-content">
+      <p>确定要删除这个token吗？</p>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeConfirmModal()" class="secondary">取消</button>
+      <button onclick="confirmDelete()" class="danger">删除</button>
+    </div>
+  </div>
+
   <script>
     async function getTokenInfo() {
       const data = await makeAuthenticatedRequest('/tokens/get');
@@ -380,7 +413,7 @@
           const usage = profile.usage || {};
           const premium = usage.premium || {};
 
-          return `<tr><td title="${t.token}">${t.token}</td><td title="${t.checksum}">${t.checksum}</td><td>${user.email || '-'}</td><td>${formatMembershipType(stripe.membership_type)}</td><td>${premium.requests || 0}/${premium.max_requests || '∞'}</td><td>${stripe.days_remaining_on_trial > 0 ? `${stripe.days_remaining_on_trial}天` : '-'}</td><td class="action-cell"><button onclick="showKeyModal('${t.token}','${t.checksum}')" class="secondary">生成Key</button></td></tr>`;
+          return `<tr><td title="${t.token}">${t.token}</td><td title="${t.checksum}">${t.checksum}</td><td>${user.email || '-'}</td><td>${formatMembershipType(stripe.membership_type)}</td><td>${premium.requests || 0}/${premium.max_requests || '∞'}</td><td>${stripe.days_remaining_on_trial > 0 ? `${stripe.days_remaining_on_trial}天` : '-'}</td><td class="action-cell"><button onclick="showKeyModal('${t.token}','${t.checksum}')" class="secondary">生成Key</button><button onclick="deleteToken('${t.token}')" class="danger">删除</button></td></tr>`;
         }).join('');
         showGlobalMessage('配置获取成功');
       }
@@ -475,6 +508,48 @@
         document.getElementById('tokenInput').value = '';
         getTokenInfo();
       }
+    }
+
+    // 添加删除单个token的函数
+    let tokenToDelete = null;
+
+    function showConfirmModal(token) {
+      tokenToDelete = token;
+      const modal = document.getElementById('confirmModal');
+      const backdrop = document.getElementById('confirmModal-backdrop');
+      modal.style.display = 'block';
+      backdrop.style.display = 'block';
+    }
+
+    function closeConfirmModal() {
+      const modal = document.getElementById('confirmModal');
+      const backdrop = document.getElementById('confirmModal-backdrop');
+      modal.style.display = 'none';
+      backdrop.style.display = 'none';
+      tokenToDelete = null;
+    }
+
+    async function confirmDelete() {
+      if (!tokenToDelete) return;
+
+      const data = await makeAuthenticatedRequest('/tokens/delete', {
+        body: JSON.stringify({
+          tokens: [tokenToDelete],
+          expectation: 'detailed'
+        })
+      });
+
+      if (data) {
+        showGlobalMessage('Token删除成功');
+        getTokenInfo();
+      }
+
+      closeConfirmModal();
+    }
+
+    // 修改deleteToken函数
+    function deleteToken(token) {
+      showConfirmModal(token);
     }
 
     // 动态key相关函数
