@@ -1,9 +1,8 @@
 use crate::{
-    chat::constant::ERR_NODATA,
-    common::{
+    app::model::proxy_pool::ProxyPool, chat::constant::ERR_NODATA, common::{
         model::userinfo::GetUserInfo,
         utils::{extract_token, get_token_profile},
-    },
+    }
 };
 use axum::Json;
 
@@ -28,7 +27,7 @@ pub async fn handle_user_info(Json(request): Json<TokenRequest>) -> Json<GetUser
         }
     };
 
-    match get_token_profile(&token).await {
+    match get_token_profile(ProxyPool::get_general_client(), &token).await {
         Some(usage) => Json(GetUserInfo::Usage(Box::new(usage))),
         None => Json(GetUserInfo::Error {
             error: ERR_NODATA.to_string(),

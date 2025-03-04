@@ -7,18 +7,15 @@ use crate::{
     app::{
         constant::{
             EMPTY_STRING, ERR_INVALID_PATH, ROUTE_ABOUT_PATH, ROUTE_API_PATH, ROUTE_BUILD_KEY_PATH,
-            ROUTE_CONFIG_PATH, ROUTE_LOGS_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH,
-            ROUTE_SHARED_JS_PATH, ROUTE_SHARED_STYLES_PATH, ROUTE_TOKENS_PATH,
+            ROUTE_CONFIG_PATH, ROUTE_LOGS_PATH, ROUTE_PROXIES_PATH, ROUTE_README_PATH,
+            ROUTE_ROOT_PATH, ROUTE_SHARED_JS_PATH, ROUTE_SHARED_STYLES_PATH, ROUTE_TOKENS_PATH,
         },
         lazy::CONFIG_FILE_PATH,
     },
-    common::{
-        client::rebuild_http_client,
-        utils::{parse_bool_from_env, parse_string_from_env},
-    },
+    common::utils::{parse_bool_from_env, parse_string_from_env},
 };
 
-use super::{PageContent, Pages, Proxies, UsageCheck, VisionAbility};
+use super::{PageContent, Pages, UsageCheck, VisionAbility};
 
 // 静态配置
 #[derive(Default, Clone)]
@@ -31,7 +28,6 @@ pub struct AppConfig {
     dynamic_key: bool,
     share_token: String,
     is_share: bool,
-    proxies: Proxies,
     web_refs: bool,
 }
 
@@ -123,10 +119,6 @@ impl AppConfig {
         config.dynamic_key = parse_bool_from_env("DYNAMIC_KEY", false);
         config.share_token = parse_string_from_env("SHARED_TOKEN", EMPTY_STRING);
         config.is_share = !config.share_token.is_empty();
-        config.proxies = match std::env::var("PROXIES") {
-            Ok(proxies) => Proxies::from_str(proxies.as_str()),
-            Err(_) => Proxies::default(),
-        };
         config.web_refs = parse_bool_from_env("INCLUDE_WEB_REFERENCES", false)
     }
 
@@ -164,35 +156,13 @@ impl AppConfig {
         }
     }
 
-    pub fn get_proxies() -> Proxies {
-        APP_CONFIG.read().proxies.clone()
-    }
-
-    pub fn update_proxies(value: Proxies) {
-        let current = Self::get_proxies();
-        if current != value {
-            let mut config = APP_CONFIG.write();
-            config.proxies = value;
-            rebuild_http_client();
-        }
-    }
-
-    pub fn reset_proxies() {
-        let default_value = Proxies::default();
-        let current = Self::get_proxies();
-        if current != default_value {
-            let mut config = APP_CONFIG.write();
-            config.proxies = default_value;
-            rebuild_http_client();
-        }
-    }
-
     pub fn get_page_content(path: &str) -> Option<PageContent> {
         match path {
             ROUTE_ROOT_PATH => Some(APP_CONFIG.read().pages.root_content.clone()),
             ROUTE_LOGS_PATH => Some(APP_CONFIG.read().pages.logs_content.clone()),
             ROUTE_CONFIG_PATH => Some(APP_CONFIG.read().pages.config_content.clone()),
-            ROUTE_TOKENS_PATH => Some(APP_CONFIG.read().pages.tokeninfo_content.clone()),
+            ROUTE_TOKENS_PATH => Some(APP_CONFIG.read().pages.tokens_content.clone()),
+            ROUTE_PROXIES_PATH => Some(APP_CONFIG.read().pages.proxies_content.clone()),
             ROUTE_SHARED_STYLES_PATH => Some(APP_CONFIG.read().pages.shared_styles_content.clone()),
             ROUTE_SHARED_JS_PATH => Some(APP_CONFIG.read().pages.shared_js_content.clone()),
             ROUTE_ABOUT_PATH => Some(APP_CONFIG.read().pages.about_content.clone()),
@@ -209,7 +179,8 @@ impl AppConfig {
             ROUTE_ROOT_PATH => config.pages.root_content = content,
             ROUTE_LOGS_PATH => config.pages.logs_content = content,
             ROUTE_CONFIG_PATH => config.pages.config_content = content,
-            ROUTE_TOKENS_PATH => config.pages.tokeninfo_content = content,
+            ROUTE_TOKENS_PATH => config.pages.tokens_content = content,
+            ROUTE_PROXIES_PATH => config.pages.proxies_content = content,
             ROUTE_SHARED_STYLES_PATH => config.pages.shared_styles_content = content,
             ROUTE_SHARED_JS_PATH => config.pages.shared_js_content = content,
             ROUTE_ABOUT_PATH => config.pages.about_content = content,
@@ -227,7 +198,8 @@ impl AppConfig {
             ROUTE_ROOT_PATH => config.pages.root_content = PageContent::default(),
             ROUTE_LOGS_PATH => config.pages.logs_content = PageContent::default(),
             ROUTE_CONFIG_PATH => config.pages.config_content = PageContent::default(),
-            ROUTE_TOKENS_PATH => config.pages.tokeninfo_content = PageContent::default(),
+            ROUTE_TOKENS_PATH => config.pages.tokens_content = PageContent::default(),
+            ROUTE_PROXIES_PATH => config.pages.proxies_content = PageContent::default(),
             ROUTE_SHARED_STYLES_PATH => config.pages.shared_styles_content = PageContent::default(),
             ROUTE_SHARED_JS_PATH => config.pages.shared_js_content = PageContent::default(),
             ROUTE_ABOUT_PATH => config.pages.about_content = PageContent::default(),

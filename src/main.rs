@@ -8,25 +8,31 @@ use app::{
         PKG_VERSION, ROUTE_ABOUT_PATH, ROUTE_API_PATH, ROUTE_BASIC_CALIBRATION_PATH,
         ROUTE_BUILD_KEY_PATH, ROUTE_CONFIG_PATH, ROUTE_ENV_EXAMPLE_PATH, ROUTE_GET_CHECKSUM,
         ROUTE_GET_HASH, ROUTE_GET_TIMESTAMP_HEADER, ROUTE_HEALTH_PATH, ROUTE_LOGS_PATH,
-        ROUTE_README_PATH, ROUTE_ROOT_PATH, ROUTE_STATIC_PATH, ROUTE_TOKEN_TAGS_UPDATE_PATH,
-        ROUTE_TOKENS_ADD_PATH, ROUTE_TOKENS_DELETE_PATH, ROUTE_TOKENS_GET_PATH, ROUTE_TOKENS_PATH,
-        ROUTE_TOKENS_UPDATE_PATH, ROUTE_USER_INFO_PATH,
+        ROUTE_PROXIES_ADD_PATH, ROUTE_PROXIES_DELETE_PATH, ROUTE_PROXIES_GET_PATH,
+        ROUTE_PROXIES_PATH, ROUTE_PROXIES_SET_GENERAL_PATH, ROUTE_PROXIES_UPDATE_PATH,
+        ROUTE_README_PATH, ROUTE_ROOT_PATH, ROUTE_STATIC_PATH, ROUTE_TOKENS_ADD_PATH,
+        ROUTE_TOKENS_DELETE_PATH, ROUTE_TOKENS_GET_PATH, ROUTE_TOKENS_PATH,
+        ROUTE_TOKENS_PROFILE_UPDATE_PATH, ROUTE_TOKENS_TAGS_UPDATE_PATH, ROUTE_TOKENS_UPDATE_PATH,
+        ROUTE_USER_INFO_PATH,
     },
     lazy::{AUTH_TOKEN, ROUTE_CHAT_PATH, ROUTE_MODELS_PATH},
     model::*,
 };
 use axum::{
-    Router,
+    Router, middleware,
     routing::{get, post},
 };
 use chat::{
+    middleware::admin_auth_middleware,
     route::{
-        handle_about, handle_add_tokens, handle_api_page, handle_basic_calibration,
-        handle_build_key, handle_build_key_page, handle_config_page, handle_delete_tokens,
-        handle_env_example, handle_get_checksum, handle_get_hash, handle_get_timestamp_header,
-        handle_get_tokens, handle_health, handle_logs, handle_logs_post, handle_readme,
-        handle_root, handle_static, handle_tokens_page, handle_update_token_tags,
-        handle_update_tokens, handle_user_info,
+        handle_about, handle_add_proxy, handle_add_tokens, handle_api_page,
+        handle_basic_calibration, handle_build_key, handle_build_key_page, handle_config_page,
+        handle_delete_proxies, handle_delete_tokens, handle_env_example, handle_get_checksum,
+        handle_get_hash, handle_get_proxies, handle_get_timestamp_header, handle_get_tokens,
+        handle_health, handle_logs, handle_logs_post, handle_proxies_page, handle_readme,
+        handle_root, handle_set_general_proxy, handle_static, handle_tokens_page,
+        handle_update_proxies, handle_update_token_tags, handle_update_tokens,
+        handle_update_tokens_profile, handle_user_info,
     },
     service::{handle_chat, handle_models},
 };
@@ -141,11 +147,32 @@ async fn main() {
         .route(ROUTE_ROOT_PATH, get(handle_root))
         .route(ROUTE_HEALTH_PATH, get(handle_health))
         .route(ROUTE_TOKENS_PATH, get(handle_tokens_page))
+        .route(ROUTE_PROXIES_PATH, get(handle_proxies_page))
+        .merge(
+            Router::new()
+                .route(ROUTE_TOKENS_GET_PATH, post(handle_get_tokens))
+                .route(ROUTE_TOKENS_UPDATE_PATH, post(handle_update_tokens))
+                .route(ROUTE_TOKENS_ADD_PATH, post(handle_add_tokens))
+                .route(ROUTE_TOKENS_DELETE_PATH, post(handle_delete_tokens))
+                .route(
+                    ROUTE_TOKENS_TAGS_UPDATE_PATH,
+                    post(handle_update_token_tags),
+                )
+                .route(
+                    ROUTE_TOKENS_PROFILE_UPDATE_PATH,
+                    post(handle_update_tokens_profile),
+                )
+                .route(ROUTE_PROXIES_GET_PATH, post(handle_get_proxies))
+                .route(ROUTE_PROXIES_UPDATE_PATH, post(handle_update_proxies))
+                .route(ROUTE_PROXIES_ADD_PATH, post(handle_add_proxy))
+                .route(ROUTE_PROXIES_DELETE_PATH, post(handle_delete_proxies))
+                .route(
+                    ROUTE_PROXIES_SET_GENERAL_PATH,
+                    post(handle_set_general_proxy),
+                )
+                .layer(middleware::from_fn(admin_auth_middleware)),
+        )
         .route(ROUTE_MODELS_PATH.as_str(), get(handle_models))
-        .route(ROUTE_TOKENS_GET_PATH, post(handle_get_tokens))
-        .route(ROUTE_TOKENS_UPDATE_PATH, post(handle_update_tokens))
-        .route(ROUTE_TOKENS_ADD_PATH, post(handle_add_tokens))
-        .route(ROUTE_TOKENS_DELETE_PATH, post(handle_delete_tokens))
         .route(ROUTE_CHAT_PATH.as_str(), post(handle_chat))
         .route(ROUTE_LOGS_PATH, get(handle_logs))
         .route(ROUTE_LOGS_PATH, post(handle_logs_post))
@@ -163,7 +190,6 @@ async fn main() {
         .route(ROUTE_USER_INFO_PATH, post(handle_user_info))
         .route(ROUTE_BUILD_KEY_PATH, get(handle_build_key_page))
         .route(ROUTE_BUILD_KEY_PATH, post(handle_build_key))
-        .route(ROUTE_TOKEN_TAGS_UPDATE_PATH, post(handle_update_token_tags))
         .layer(RequestBodyLimitLayer::new(
             1024 * 1024 * parse_usize_from_env("REQUEST_BODY_LIMIT_MB", 2),
         ))
@@ -172,14 +198,24 @@ async fn main() {
 
     // 启动服务器
     let port = parse_string_from_env("PORT", "3000");
-    let addr = format!("0.0.0.0:{}", port);
-    println!("服务器运行在端口 {}", port);
-    println!("当前版本: v{}", PKG_VERSION);
-    // if PKG_VERSION.contains("pre") {
-    // println!("当前是测试版，有问题及时反馈哦~");
-    // }
+    let addr = format!("0.0.0.0:{port}");
+    println!("服务器运行在端口 {port}");
+    #[cfg(not(feature = "__preview"))]
+    println!("当前版本: v{PKG_VERSION}");
+    #[cfg(feature = "__preview")]
+    {
+        const BUILD_VERSION: &str = include_str!("../VERSION");
+        println!("当前版本: v{PKG_VERSION}+build.{BUILD_VERSION}");
+    }
+    #[cfg(feature = "__preview")]
+    println!("当前是测试版，有问题及时反馈哦~");
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("无法绑定到地址 {}: {}", addr, e);
+            std::process::exit(1);
+        });
     let server = axum::serve(listener, app);
     tokio::select! {
         result = server => {

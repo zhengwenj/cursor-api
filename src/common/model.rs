@@ -3,6 +3,7 @@ pub mod error;
 pub mod health;
 pub mod token;
 pub mod userinfo;
+pub mod tri;
 
 use config::ConfigData;
 

@@ -4,7 +4,11 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 #[cfg(not(any(feature = "use-minified")))]
 use std::fs;
+#[cfg(not(debug_assertions))]
+use std::fs::File;
 use std::io::Result;
+#[cfg(not(debug_assertions))]
+use std::io::{Read, Write};
 #[cfg(not(any(feature = "use-minified")))]
 use std::path::Path;
 use std::path::PathBuf;
@@ -164,7 +168,62 @@ fn minify_assets() -> Result<()> {
     Ok(())
 }
 
+/**
+ * 更新版本号函数
+ * 此函数会读取 VERSION 文件中的数字，将其加1，然后保存回文件
+ * 如果 VERSION 文件不存在或为空，将从1开始计数
+ * 只在 release 模式下执行，debug/dev 模式下完全跳过
+ */
+#[cfg(not(debug_assertions))]
+fn update_version() -> Result<()> {
+    let version_path = "VERSION";
+    // VERSION文件的监控已经在main函数中添加，此处无需重复
+
+    // 读取当前版本号
+    let mut version = String::new();
+    let mut file = match File::open(version_path) {
+        Ok(file) => file,
+        Err(_) => {
+            // 如果文件不存在或无法打开，从1开始
+            println!("cargo:warning=VERSION file not found, creating with initial value 1");
+            let mut new_file = File::create(version_path)?;
+            new_file.write_all(b"1")?;
+            return Ok(());
+        }
+    };
+
+    file.read_to_string(&mut version)?;
+
+    // 确保版本号是有效数字
+    let version_num = match version.trim().parse::<u64>() {
+        Ok(num) => num,
+        Err(_) => {
+            println!("cargo:warning=Invalid version number in VERSION file. Setting to 1.");
+            let mut file = File::create(version_path)?;
+            file.write_all(b"1")?;
+            return Ok(());
+        }
+    };
+
+    // 版本号加1
+    let new_version = version_num + 1;
+    println!(
+        "cargo:warning=Release build - bumping version from {} to {}",
+        version_num, new_version
+    );
+
+    // 写回文件
+    let mut file = File::create(version_path)?;
+    file.write_all(new_version.to_string().as_bytes())?;
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
+    // 更新版本号 - 只在 release 构建时执行
+    #[cfg(not(debug_assertions))]
+    update_version()?;
+
     // Proto 文件处理
     // println!("cargo:rerun-if-changed=src/chat/aiserver/v1/lite.proto");
     println!("cargo:rerun-if-changed=src/chat/config/key.proto");
@@ -205,6 +264,10 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=static/shared.js");
     println!("cargo:rerun-if-changed=static/tokens.html");
     println!("cargo:rerun-if-changed=README.md");
+    
+    // 只在release模式下监控VERSION文件变化
+    #[cfg(not(debug_assertions))]
+    println!("cargo:rerun-if-changed=VERSION");
 
     #[cfg(not(any(feature = "use-minified")))]
     {

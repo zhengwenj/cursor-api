@@ -11,6 +11,7 @@ message AvailableModelsResponse { // aiserver.v1.AvailableModelsResponse
 		bool default_on = 2;
 		optional bool is_long_context_only = 3;
 		optional bool is_chat_only = 4;
+		optional bool supports_agent = 5;
 	}
 	repeated AvailableModel models = 2;
 	repeated string model_names = 1;

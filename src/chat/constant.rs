@@ -1,13 +1,16 @@
 use parking_lot::RwLock;
-use std::{sync::Arc, time::{Duration, Instant}};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use super::model::Model;
 
 macro_rules! def_pub_const {
     // 单个常量定义分支
-    ($name:ident, $value:expr) => {
-        pub const $name: &'static str = $value;
-    };
+    // ($name:ident, $value:expr) => {
+    //     pub const $name: &'static str = $value;
+    // };
 
     // 批量定义分支
     ($($name:ident => $value:expr),+ $(,)?) => {
@@ -46,8 +49,9 @@ def_pub_const!(
     CLAUDE_3_5_SONNET => "claude-3.5-sonnet",
     CLAUDE_3_HAIKU_200K => "claude-3-haiku-200k",
     CLAUDE_3_5_SONNET_200K => "claude-3-5-sonnet-200k",
-    CLAUDE_3_5_SONNET_20241022 => "claude-3-5-sonnet-20241022",
     CLAUDE_3_5_HAIKU => "claude-3.5-haiku",
+    CLAUDE_3_7_SONNET => "claude-3.7-sonnet",
+    CLAUDE_3_7_SONNET_THINKING => "claude-3.7-sonnet-thinking",
 
     // OpenAI 模型
     GPT_4 => "gpt-4",
@@ -60,6 +64,7 @@ def_pub_const!(
     O1_PREVIEW => "o1-preview",
     O1 => "o1",
     O3_MINI => "o3-mini",
+    GPT_4_5_PREVIEW => "gpt-4.5-preview",
 
     // Cursor 模型
     CURSOR_FAST => "cursor-fast",
@@ -78,6 +83,9 @@ def_pub_const!(
 
     // XAI 模型
     GROK_2 => "grok-2",
+
+    // 未知模型
+    DEFAULT => "default",
 );
 
 macro_rules! create_models {
@@ -137,11 +145,7 @@ impl Models {
 
     // 返回所有模型 ID 的列表
     pub fn ids() -> Vec<String> {
-        Self::read()
-            .models
-            .iter()
-            .map(|m| m.id.clone())
-            .collect()
+        Self::read().models.iter().map(|m| m.id.clone()).collect()
     }
 
     // 写入方法
@@ -154,12 +158,12 @@ impl Models {
 
         // 检查时间间隔（30分钟）
         if data.last_update.elapsed() < Duration::from_secs(30 * 60) {
-            return Err("Cannot update models more frequently than every 30 minutes");
+            return Ok(());
         }
 
         // 检查内容是否有变化
         if *data.models == new_models {
-            return Err("No changes in models");
+            return Ok(());
         }
 
         // 更新数据和时间戳
@@ -177,8 +181,11 @@ impl Models {
 
 create_models!(
     CLAUDE_3_5_SONNET => ANTHROPIC,
+    CLAUDE_3_7_SONNET => ANTHROPIC,
+    CLAUDE_3_7_SONNET_THINKING => ANTHROPIC,
     GPT_4 => OPENAI,
     GPT_4O => OPENAI,
+    GPT_4_5_PREVIEW => OPENAI,
     CLAUDE_3_OPUS => ANTHROPIC,
     CURSOR_FAST => CURSOR,
     CURSOR_SMALL => CURSOR,
@@ -200,11 +207,13 @@ create_models!(
     DEEPSEEK_R1 => DEEPSEEK,
     O3_MINI => OPENAI,
     GROK_2 => XAI,
+    DEFAULT => UNKNOWN,
 );
 
-pub const USAGE_CHECK_MODELS: [&str; 11] = [
-    CLAUDE_3_5_SONNET_20241022,
+pub const USAGE_CHECK_MODELS: [&str; 13] = [
     CLAUDE_3_5_SONNET,
+    CLAUDE_3_7_SONNET,
+    CLAUDE_3_7_SONNET_THINKING,
     GEMINI_EXP_1206,
     GPT_4,
     GPT_4_TURBO_2024_04_09,
@@ -214,6 +223,7 @@ pub const USAGE_CHECK_MODELS: [&str; 11] = [
     GEMINI_1_5_FLASH_500K,
     CLAUDE_3_HAIKU_200K,
     CLAUDE_3_5_SONNET_200K,
+    DEEPSEEK_R1,
 ];
 
 pub const LONG_CONTEXT_MODELS: [&str; 4] = [
@@ -221,4 +231,16 @@ pub const LONG_CONTEXT_MODELS: [&str; 4] = [
     GEMINI_1_5_FLASH_500K,
     CLAUDE_3_HAIKU_200K,
     CLAUDE_3_5_SONNET_200K,
+];
+
+pub const SUPPORTED_IMAGE_MODELS: [&str; 9] = [
+    CLAUDE_3_5_SONNET,
+    CLAUDE_3_7_SONNET,
+    CLAUDE_3_7_SONNET_THINKING,
+    GPT_4O,
+    GPT_4O_MINI,
+    DEFAULT,
+    CLAUDE_3_OPUS,
+    CLAUDE_3_5_HAIKU,
+    GPT_4,
 ];

@@ -50,8 +50,8 @@ pub struct ChatResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     pub choices: Vec<Choice>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub usage: Option<Usage>,
+    #[serde(skip_serializing_if = "TriState::is_none")]
+    pub usage: TriState<Usage>,
 }
 
 #[derive(Serialize)]
@@ -61,6 +61,7 @@ pub struct Choice {
     pub message: Option<Message>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delta: Option<Delta>,
+    pub logprobs: Option<bool>,
     pub finish_reason: Option<String>,
 }
 
@@ -79,6 +80,22 @@ pub struct Usage {
     pub total_tokens: u32,
 }
 
+// 聊天请求
+#[derive(Deserialize)]
+pub struct ChatRequest {
+    pub model: String,
+    pub messages: Vec<Message>,
+    #[serde(default)]
+    pub stream: bool,
+    #[serde(default)]
+    pub stream_options: Option<StreamOptions>,
+}
+
+#[derive(Deserialize)]
+pub struct StreamOptions {
+    pub include_usage: bool,
+}
+
 // 模型定义
 #[derive(Serialize, Clone)]
 pub struct Model {
@@ -95,7 +112,7 @@ impl PartialEq for Model {
 }
 
 use super::constant::{Models, USAGE_CHECK_MODELS};
-use crate::app::model::{AppConfig, UsageCheck};
+use crate::{app::model::{AppConfig, UsageCheck}, common::model::tri::TriState};
 
 impl Model {
     pub fn is_usage_check(model_id: &String, usage_check: Option<UsageCheck>) -> bool {

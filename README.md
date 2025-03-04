@@ -23,13 +23,12 @@
 * `PORT`: 服务器端口号（默认：3000）
 * `AUTH_TOKEN`: 认证令牌（必须，用于API认证）
 * `ROUTE_PREFIX`: 路由前缀（可选）
-* `TOKEN_LIST_FILE`: token列表文件路径（默认：.tokens）
 
 更多请查看 `/env-example`
 
 ### Token文件格式
 
-`.tokens` 文件：每行为token和checksum的对应关系：
+`.tokens` 文件(已弃用)：每行为token和checksum的对应关系：
     
 ```
 # 这里的#表示这行在下次读取要删除
@@ -48,8 +47,11 @@ token2,checksum2
 
 ```
 claude-3.5-sonnet
+claude-3.7-sonnet
+claude-3.7-sonnet-thinking
 gpt-4
 gpt-4o
+gpt-4.5-preview
 claude-3-opus
 cursor-fast
 cursor-small
@@ -82,7 +84,7 @@ grok-2
 * 认证方式: Bearer Token
   1. 使用环境变量 `AUTH_TOKEN` 进行认证
   2. 使用 `.token` 文件中的令牌列表进行轮询认证
-  3. 在v0.1.3-rc.3支持直接使用 token,checksum 进行认证，但未提供配置关闭
+  3. 自v0.1.3-rc.3起支持直接使用 token,checksum 进行认证，但未提供配置关闭
 
 #### 请求格式
 
@@ -103,7 +105,10 @@ grok-2
       ]
     }
   ],
-  "stream": boolean
+  "stream": boolean,
+  "stream_options": {
+    "include_usage": boolean
+  }
 }
 ```
 
@@ -184,7 +189,6 @@ data: [DONE]
 * 响应格式: HTML页面
 * 功能: 调用下面的各种相关API的示例页面
 
-
 #### 获取Token信息
 
 * 接口地址: `/tokens/get`
@@ -239,21 +243,6 @@ data: [DONE]
     }
   ],
   "tokens_count": number
-}
-```
-
-#### 重载Token信息
-
-* 接口地址: `/tokens/reload`
-* 请求方法: POST
-* 认证方式: Bearer Token
-* 响应格式:
-
-```json
-{
-  "status": "success",
-  "tokens_count": number,
-  "message": "Token list has been reloaded"
 }
 ```
 
@@ -372,6 +361,7 @@ data: [DONE]
 ```json
 {
   "auth_token": "string",  // 格式: {token},{checksum}
+  "proxy_name": "string",          // 可选，指定代理
   "disable_vision": boolean,       // 可选，禁用图片处理能力
   "enable_slow_pool": boolean,     // 可选，启用慢速池
   "usage_check_models": {          // 可选，使用量检查模型配置
@@ -422,6 +412,165 @@ data: [DONE]
    - all: 检查所有可用模型
    - custom: 使用自定义模型列表(需在model_ids中指定)
 
+### 代理管理接口
+
+#### 简易代理信息管理页面
+
+* 接口地址: `/proxies`
+* 请求方法: GET
+* 响应格式: HTML页面
+* 功能: 调用下面的各种相关API的示例页面
+
+#### 获取代理配置信息
+
+* 接口地址: `/proxies/get`
+* 请求方法: POST
+* 响应格式:
+
+```json
+{
+  "status": "success",
+  "proxies": {
+    "proxies": {
+      "proxy_name": "non" | "sys" | "http://proxy-url",
+    },
+    "general": "string"  // 当前使用的通用代理名称
+  },
+  "proxies_count": number,
+  "general_proxy": "string",
+  "message": "string"  // 可选
+}
+```
+
+#### 更新代理配置
+
+* 接口地址: `/proxies/update`
+* 请求方法: POST
+* 请求格式:
+
+```json
+{
+  "proxies": {
+    "proxies": {
+      "proxy_name": "non" | "sys" | "http://proxy-url"
+    },
+    "general": "string"  // 要设置的通用代理名称
+  }
+}
+```
+
+* 响应格式:
+
+```json
+{
+  "status": "success",
+  "proxies_count": number,
+  "message": "代理配置已更新"
+}
+```
+
+#### 添加代理
+
+* 接口地址: `/proxies/add`
+* 请求方法: POST
+* 请求格式:
+
+```json
+{
+  "proxies": {
+    "proxy_name": "non" | "sys" | "http://proxy-url"
+  }
+}
+```
+
+* 响应格式:
+
+```json
+{
+  "status": "success",
+  "proxies_count": number,
+  "message": "string"  // "已添加 X 个新代理" 或 "没有添加新代理"
+}
+```
+
+#### 删除代理
+
+* 接口地址: `/proxies/delete`
+* 请求方法: POST
+* 请求格式:
+
+```json
+{
+  "names": ["string"],  // 要删除的代理名称列表
+  "expectation": "simple" | "updated_proxies" | "failed_names" | "detailed"  // 默认为simple
+}
+```
+
+* 响应格式:
+
+```json
+{
+  "status": "success",
+  "updated_proxies": {  // 可选，根据expectation返回
+    "proxies": {
+      "proxy_name": "non" | "sys" | "http://proxy-url"
+    },
+    "general": "string"
+  },
+  "failed_names": ["string"]  // 可选，根据expectation返回，表示未找到的代理名称列表
+}
+```
+
+#### 设置通用代理
+
+* 接口地址: `/proxies/set-general`
+* 请求方法: POST
+* 请求格式:
+
+```json
+{
+  "name": "string"  // 要设置为通用代理的代理名称
+}
+```
+
+* 响应格式:
+
+```json
+{
+  "status": "success",
+  "message": "通用代理已设置"
+}
+```
+
+#### 代理类型说明
+
+* `non`: 表示不使用代理
+* `sys`: 表示使用系统代理
+* 其他: 表示具体的代理URL地址（如 `http://proxy-url`）
+
+#### 注意事项
+
+1. 代理名称必须是唯一的，添加重复名称的代理会被忽略
+2. 设置通用代理时，指定的代理名称必须存在于当前的代理配置中
+3. 删除代理时的 expectation 参数说明：
+   - simple: 只返回基本状态
+   - updated_proxies: 返回更新后的代理配置
+   - failed_names: 返回未找到的代理名称列表
+   - detailed: 返回完整信息（包括updated_proxies和failed_names）
+
+### 错误格式
+
+所有接口在发生错误时会返回统一的错误格式：
+
+```json
+{
+  "status": "error",
+  "code": number,  // 可选
+  "error": "string",  // 可选，错误详细信息
+  "message": "string"  // 错误提示信息
+}
+```
+
 ### 配置管理接口
 
 #### 配置页面
@@ -455,7 +604,7 @@ data: [DONE]
   },
   "enable_dynamic_key": boolean,
   "share_token": "string",
-  "proxies": "" | "system" | "proxy1,proxy2,...",
+  // "proxies": "" | "system" | "proxy1,proxy2,...",
   "include_web_references": boolean
 }
 ```
@@ -480,7 +629,7 @@ data: [DONE]
     },
     "enable_dynamic_key": boolean,
     "share_token": "string",
-    "proxies": "" | "system" | "proxy1,proxy2,...",
+    // "proxies": "" | "system" | "proxy1,proxy2,...",
     "include_web_references": boolean
   }
 }
@@ -491,7 +640,7 @@ data: [DONE]
 ```json
 {
   "type": "default",
-  "content": "claude-3-5-sonnet-20241022,claude-3.5-sonnet,gemini-exp-1206,gpt-4,gpt-4-turbo-2024-04-09,gpt-4o,claude-3.5-haiku,gpt-4o-128k,gemini-1.5-flash-500k,claude-3-haiku-200k,claude-3-5-sonnet-200k"
+  "content": "claude-3-5-sonnet-20241022,claude-3.5-sonnet,gemini-exp-1206,gpt-4,gpt-4-turbo-2024-04-09,gpt-4o,claude-3.5-haiku,gpt-4o-128k,gemini-1.5-flash-500k,claude-3-haiku-200k,claude-3-5-sonnet-200k,deepseek-r1,claude-3.7-sonnet,claude-3.7-sonnet-thinking"
 }
 ```
 
@@ -655,10 +804,17 @@ string
           }
         }
       },
-      "prompt": "string",
+      "chain": {
+        "prompt": "string",
+        "delays": [
+          [
+            "string",
+            number
+          ]
+        ]
+      },
       "timing": {
-        "total": number,
-        "first": number
+        "total": number
       },
       "stream": boolean,
       "status": "string",

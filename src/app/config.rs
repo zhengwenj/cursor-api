@@ -71,7 +71,6 @@ pub async fn handle_config_update(
                 usage_check_models: AppConfig::get_usage_check(),
                 enable_dynamic_key: AppConfig::get_dynamic_key(),
                 share_token: AppConfig::get_share_token(),
-                proxies: AppConfig::get_proxies(),
                 include_web_references: AppConfig::get_web_refs(),
             }),
             message: None,
@@ -79,18 +78,19 @@ pub async fn handle_config_update(
 
         "update" => {
             // 处理页面内容更新
-            if !request.path.is_empty() && request.content.is_some() {
-                let content = request.content.unwrap();
-                if let Err(e) = AppConfig::update_page_content(&request.path, content) {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failure,
-                            code: Some(500),
-                            error: Some(format!("更新页面内容失败: {}", e)),
-                            message: None,
-                        }),
-                    ));
+            if !request.path.is_empty() {
+                if let Some(content) = request.content {
+                    if let Err(e) = AppConfig::update_page_content(&request.path, content) {
+                        return Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(ErrorResponse {
+                                status: ApiStatus::Failure,
+                                code: Some(500),
+                                error: Some(format!("更新页面内容失败: {}", e)),
+                                message: None,
+                            }),
+                        ));
+                    }
                 }
             }
 
@@ -101,7 +101,6 @@ pub async fn handle_config_update(
                 usage_check_models => AppConfig::update_usage_check,
                 enable_dynamic_key => AppConfig::update_dynamic_key,
                 share_token => AppConfig::update_share_token,
-                proxies => AppConfig::update_proxies,
                 include_web_references => AppConfig::update_web_refs,
             );
 
@@ -135,7 +134,6 @@ pub async fn handle_config_update(
                 usage_check_models => AppConfig::reset_usage_check,
                 enable_dynamic_key => AppConfig::reset_dynamic_key,
                 share_token => AppConfig::reset_share_token,
-                proxies => AppConfig::reset_proxies,
                 include_web_references => AppConfig::reset_web_refs,
             );
 

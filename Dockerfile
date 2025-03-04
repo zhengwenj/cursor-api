@@ -21,10 +21,14 @@ ENV TZ=Asia/Shanghai
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ca-certificates tzdata openssl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* && \
+    groupadd -r cursorapi && useradd -r -g cursorapi cursorapi
 
 COPY --from=builder /app/cursor-api .
+RUN chown -R cursorapi:cursorapi /app
 
 ENV PORT=3000
 EXPOSE ${PORT}
+
+USER cursorapi
 CMD ["./cursor-api"]

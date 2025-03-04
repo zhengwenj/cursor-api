@@ -6,6 +6,8 @@ use crate::{app::constant::COMMA, chat::constant::Models};
 pub struct BuildKeyRequest {
     pub auth_token: String,
     #[serde(default)]
+    pub proxy_name: Option<String>,
+    #[serde(default)]
     pub disable_vision: Option<bool>,
     #[serde(default)]
     pub enable_slow_pool: Option<bool>,
@@ -14,6 +16,7 @@ pub struct BuildKeyRequest {
     #[serde(default)]
     pub include_web_references: Option<bool>,
 }
+
 pub struct UsageCheckModelConfig {
     pub model_type: UsageCheckModelType,
     pub model_ids: Vec<String>,

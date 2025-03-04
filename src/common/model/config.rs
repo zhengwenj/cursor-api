@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::app::model::{PageContent, Proxies, UsageCheck, VisionAbility};
+use crate::app::model::{PageContent, UsageCheck, VisionAbility};
 
 #[derive(Serialize)]
 pub struct ConfigData {
@@ -12,7 +12,6 @@ pub struct ConfigData {
     pub enable_dynamic_key: bool,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub share_token: String,
-    pub proxies: Proxies,
     pub include_web_references: bool,
 }
 
@@ -28,6 +27,5 @@ pub struct ConfigUpdateRequest {
     pub usage_check_models: Option<UsageCheck>,
     pub enable_dynamic_key: Option<bool>,
     pub share_token: Option<String>,
-    pub proxies: Option<Proxies>,
     pub include_web_references: Option<bool>,
 }

@@ -1,4 +1,4 @@
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD as BASE64};
 use rand::Rng as _;
 use sha2::{Digest, Sha256};
 
@@ -72,7 +72,7 @@ pub fn generate_checksum_with_repair(checksum: &str) -> String {
     for (i, &b) in bytes.iter().enumerate() {
         let valid = match (len, i) {
             // 通用字符校验（排除非法字符）
-            (_, _) if !b.is_ascii_alphanumeric() && b != b'/' && b != b'+' && b != b'=' => false,
+            (_, _) if !b.is_ascii_alphanumeric() && b != b'/' && b != b'-' && b != b'_' => false,
 
             // 72字节格式：时间戳(8) + 设备哈希(64)
             (72, 8..=71) => b.is_ascii_hexdigit(),
@@ -157,7 +157,7 @@ pub fn validate_checksum(checksum: &str) -> bool {
     for (i, &b) in bytes.iter().enumerate() {
         let valid = match (len, i) {
             // 通用字符校验（排除非法字符）
-            (_, _) if !b.is_ascii_alphanumeric() && b != b'/' && b != b'+' && b != b'=' => false,
+            (_, _) if !b.is_ascii_alphanumeric() && b != b'/' && b != b'-' && b != b'_' => false,
 
             // 格式校验
             (72, 0..=7) => true, // 时间戳部分（由extract_time_ks验证）

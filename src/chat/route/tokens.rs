@@ -1,44 +1,23 @@
 use crate::{
-    app::{
-        constant::AUTHORIZATION_BEARER_PREFIX,
-        lazy::AUTH_TOKEN,
-        model::{
-            AppState, TokenAddRequest, TokenInfo, TokenInfoResponse, TokenManager,
-            TokenTagsResponse, TokenTagsUpdateRequest, TokenUpdateRequest, TokensDeleteRequest,
-            TokensDeleteResponse,
-        },
+    app::model::{
+        AppState, CommonResponse, TokenAddRequest, TokenInfo, TokenInfoResponse, TokenManager,
+        TokenTagsUpdateRequest, TokenUpdateRequest, TokensDeleteRequest, TokensDeleteResponse,
     },
     common::{
-        model::{ApiStatus, ErrorResponse, error::ChatError, userinfo::TokenProfile},
+        model::{ApiStatus, ErrorResponse, userinfo::TokenProfile},
         utils::{
             generate_checksum_with_default, generate_checksum_with_repair,
             load_tokens_from_content, parse_token, validate_token,
         },
     },
 };
-use axum::{
-    Json,
-    extract::State,
-    http::{HeaderMap, StatusCode, header::AUTHORIZATION},
-};
+use axum::{Json, extract::State, http::StatusCode};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 
 pub async fn handle_get_tokens(
     State(state): State<Arc<Mutex<AppState>>>,
-    headers: HeaderMap,
 ) -> Result<Json<TokenInfoResponse>, StatusCode> {
-    // 验证 AUTH_TOKEN
-    let auth_header = headers
-        .get(AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX))
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    if auth_header != AUTH_TOKEN.as_str() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
     let state = state.lock().await;
     let tokens = state.token_manager.tokens.clone();
     let tokens_count = tokens.len();
@@ -53,20 +32,8 @@ pub async fn handle_get_tokens(
 
 pub async fn handle_update_tokens(
     State(state): State<Arc<Mutex<AppState>>>,
-    headers: HeaderMap,
     Json(request): Json<TokenUpdateRequest>,
 ) -> Result<Json<TokenInfoResponse>, StatusCode> {
-    // 验证 AUTH_TOKEN
-    let auth_header = headers
-        .get(AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX))
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    if auth_header != AUTH_TOKEN.as_str() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
     // 获取当前的 token_manager 以保留现有 token 的 profile 和 tags
     let current_token_manager = {
         let state = state.lock().await;
@@ -123,26 +90,8 @@ pub async fn handle_update_tokens(
 
 pub async fn handle_add_tokens(
     State(state): State<Arc<Mutex<AppState>>>,
-    headers: HeaderMap,
     Json(request): Json<TokenAddRequest>,
 ) -> Result<Json<TokenInfoResponse>, (StatusCode, Json<ErrorResponse>)> {
-    // 验证 AUTH_TOKEN
-    let auth_header = headers
-        .get(AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX))
-        .ok_or((
-            StatusCode::UNAUTHORIZED,
-            Json(ChatError::Unauthorized.to_json()),
-        ))?;
-
-    if auth_header != AUTH_TOKEN.as_str() {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            Json(ChatError::Unauthorized.to_json()),
-        ));
-    }
-
     // 获取当前的 token_manager
     let mut token_manager = {
         let state = state.lock().await;
@@ -212,12 +161,11 @@ pub async fn handle_add_tokens(
         }))
     } else {
         // 如果没有新tokens，返回当前状态
-        let tokens = token_manager.tokens.clone();
-        let tokens_count = tokens.len();
+        let tokens_count = token_manager.tokens.len();
 
         Ok(Json(TokenInfoResponse {
             status: ApiStatus::Success,
-            tokens: Some(tokens),
+            tokens: Some(token_manager.tokens),
             tokens_count,
             message: Some("No new tokens were added".to_string()),
         }))
@@ -226,26 +174,8 @@ pub async fn handle_add_tokens(
 
 pub async fn handle_delete_tokens(
     State(state): State<Arc<Mutex<AppState>>>,
-    headers: HeaderMap,
     Json(request): Json<TokensDeleteRequest>,
 ) -> Result<Json<TokensDeleteResponse>, (StatusCode, Json<ErrorResponse>)> {
-    // 验证 AUTH_TOKEN
-    let auth_header = headers
-        .get(AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX))
-        .ok_or((
-            StatusCode::UNAUTHORIZED,
-            Json(ChatError::Unauthorized.to_json()),
-        ))?;
-
-    if auth_header != AUTH_TOKEN.as_str() {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            Json(ChatError::Unauthorized.to_json()),
-        ));
-    }
-
     // 获取当前的 token_manager
     let mut token_manager = {
         let state = state.lock().await;
@@ -344,26 +274,8 @@ pub async fn handle_delete_tokens(
 
 pub async fn handle_update_token_tags(
     State(state): State<Arc<Mutex<AppState>>>,
-    headers: HeaderMap,
     Json(request): Json<TokenTagsUpdateRequest>,
-) -> Result<Json<TokenTagsResponse>, (StatusCode, Json<ErrorResponse>)> {
-    // 验证 AUTH_TOKEN
-    let auth_header = headers
-        .get(AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX))
-        .ok_or((
-            StatusCode::UNAUTHORIZED,
-            Json(ChatError::Unauthorized.to_json()),
-        ))?;
-
-    if auth_header != AUTH_TOKEN.as_str() {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            Json(ChatError::Unauthorized.to_json()),
-        ));
-    }
-
+) -> Result<Json<CommonResponse>, (StatusCode, Json<ErrorResponse>)> {
     // 获取并更新 token_manager
     {
         let mut state = state.lock().await;
@@ -396,8 +308,84 @@ pub async fn handle_update_token_tags(
         }
     }
 
-    Ok(Json(TokenTagsResponse {
+    Ok(Json(CommonResponse {
         status: ApiStatus::Success,
         message: Some("标签更新成功".to_string()),
+    }))
+}
+
+pub async fn handle_update_tokens_profile(
+    State(state): State<Arc<Mutex<AppState>>>,
+    Json(tokens): Json<Vec<String>>,
+) -> Result<Json<CommonResponse>, (StatusCode, Json<ErrorResponse>)> {
+    // 验证请求
+    if tokens.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                status: ApiStatus::Error,
+                code: None,
+                error: Some("No tokens provided".to_string()),
+                message: Some("未提供任何令牌".to_string()),
+            }),
+        ));
+    }
+
+    // 获取当前的 token_manager
+    let mut state_guard = state.lock().await;
+    let token_manager = &mut state_guard.token_manager;
+
+    // 批量更新tokens的profile
+    let mut updated_count = 0;
+    let mut failed_count = 0;
+
+    for token in &tokens {
+        // 验证token是否在token_manager中存在
+        if let Some(token_idx) = token_manager
+            .tokens
+            .iter()
+            .position(|info| info.token == *token)
+        {
+            // 获取profile
+            if let Some(profile) = crate::common::utils::get_token_profile(
+                token_manager.tokens[token_idx].get_client(),
+                token,
+            )
+            .await
+            {
+                // 更新profile
+                token_manager.tokens[token_idx].profile = Some(profile);
+                updated_count += 1;
+            } else {
+                failed_count += 1;
+            }
+        } else {
+            failed_count += 1;
+        }
+    }
+
+    // 保存更改
+    if updated_count > 0 {
+        if token_manager.save_tokens().await.is_err() {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    status: ApiStatus::Error,
+                    code: None,
+                    error: Some("Failed to save token profiles".to_string()),
+                    message: Some("无法保存令牌配置数据".to_string()),
+                }),
+            ));
+        }
+    }
+
+    let message = format!(
+        "已更新{}个令牌配置, {}个令牌更新失败",
+        updated_count, failed_count
+    );
+
+    Ok(Json(CommonResponse {
+        status: ApiStatus::Success,
+        message: Some(message),
     }))
 }

@@ -53,22 +53,39 @@ async function minifyFile(inputPath, outputPath) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>README</title>
     <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #24292e;
+            --code-bg: #f6f8fa;
+            --border-color: #dfe2e5;
+            --blockquote-color: #6a737d;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0d1117;
+                --text-color: #c9d1d9;
+                --code-bg: #161b22;
+                --border-color: #30363d;
+                --blockquote-color: #8b949e;
+            }
+        }
         body {
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
             line-height: 1.6;
+            background-color: var(--bg-color);
+            color: var(--text-color);
         }
         pre {
-            background-color: #f6f8fa;
+            background-color: var(--code-bg);
             padding: 16px;
             border-radius: 6px;
             overflow: auto;
         }
         code {
-            background-color: #f6f8fa;
-            padding: 0.2em 0.4em;
+            background-color: var(--code-bg);
             border-radius: 3px;
         }
         img {
@@ -79,14 +96,17 @@ async function minifyFile(inputPath, outputPath) {
             width: 100%;
         }
         table td, table th {
-            border: 1px solid #dfe2e5;
+            border: 1px solid var(--border-color);
             padding: 6px 13px;
         }
         blockquote {
-            border-left: 4px solid #dfe2e5;
+            border-left: 4px solid var(--border-color);
             margin: 0;
             padding: 0 1em;
-            color: #6a737d;
+            color: var(--blockquote-color);
+        }
+        a {
+            color: #58a6ff;
         }
     </style>
 </head>
@@ -101,10 +121,16 @@ async function minifyFile(inputPath, outputPath) {
     switch (ext) {
       case '.html':
         minified = await minifyHtml(content, options);
+        minified = minified.replace(/`([\s\S]*?)`/g, (_match, p1) => {
+          return '`' + p1.replace(/\\n\s+/g, '') + '`';
+        });
         break;
       case '.js':
         const result = await minifyJs(content);
         minified = result.code;
+        minified = minified.replace(/`([\s\S]*?)`/g, (_match, p1) => {
+          return '`' + p1.replace(/\\n\s+/g, '') + '`';
+        });
         break;
       case '.css':
         minified = new CleanCSS(cssOptions).minify(content).styles;

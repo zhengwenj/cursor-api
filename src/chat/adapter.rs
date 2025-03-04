@@ -7,10 +7,10 @@ use uuid::Uuid;
 use crate::{
     app::{
         constant::EMPTY_STRING,
-        lazy::DEFAULT_INSTRUCTIONS,
-        model::{AppConfig, VisionAbility},
+        lazy::get_default_instructions,
+        model::{AppConfig, VisionAbility, proxy_pool::ProxyPool},
     },
-    common::{client::HTTP_CLIENT, utils::encode_message},
+    common::utils::encode_message,
 };
 
 use super::{
@@ -18,7 +18,10 @@ use super::{
         AzureState, ChatExternalLink, ConversationMessage, ExplicitContext, GetChatRequest,
         ImageProto, ModelDetails, WebReference, conversation_message, image_proto,
     },
-    constant::{ERR_UNSUPPORTED_GIF, ERR_UNSUPPORTED_IMAGE_FORMAT, LONG_CONTEXT_MODELS},
+    constant::{
+        ERR_UNSUPPORTED_GIF, ERR_UNSUPPORTED_IMAGE_FORMAT, LONG_CONTEXT_MODELS,
+        SUPPORTED_IMAGE_MODELS,
+    },
     model::{Message, MessageContent, Role},
 };
 
@@ -86,6 +89,7 @@ fn parse_web_references(text: &str) -> Vec<WebReference> {
 async fn process_chat_inputs(
     inputs: Vec<Message>,
     disable_vision: bool,
+    model_name: &str,
 ) -> (String, Vec<ConversationMessage>, Vec<String>) {
     // 收集 system 指令
     let instructions = inputs
@@ -110,7 +114,7 @@ async fn process_chat_inputs(
 
     // 使用默认指令或收集到的指令
     let instructions = if instructions.is_empty() {
-        DEFAULT_INSTRUCTIONS.clone()
+        get_default_instructions()
     } else {
         instructions
     };
@@ -203,26 +207,6 @@ async fn process_chat_inputs(
         );
     }
 
-    // 处理连续相同角色的情况
-    let mut i = 1;
-    while i < chat_inputs.len() {
-        if chat_inputs[i].role == chat_inputs[i - 1].role {
-            let insert_role = if chat_inputs[i].role == Role::User {
-                Role::Assistant
-            } else {
-                Role::User
-            };
-            chat_inputs.insert(
-                i,
-                Message {
-                    role: insert_role,
-                    content: MessageContent::Text(EMPTY_STRING.into()),
-                },
-            );
-        }
-        i += 1;
-    }
-
     // 确保最后一条是 user
     if chat_inputs
         .last()
@@ -236,6 +220,7 @@ async fn process_chat_inputs(
 
     // 转换为 proto messages
     let mut messages = Vec::new();
+    let mut is_supported_model = None;
     for input in chat_inputs {
         let (text, images) = match input.content {
             MessageContent::Text(text) => (text, vec![]),
@@ -251,10 +236,14 @@ async fn process_chat_inputs(
                             }
                         }
                         "image_url" => {
-                            if !disable_vision {
+                            if is_supported_model.is_none() {
+                                is_supported_model =
+                                    Some(SUPPORTED_IMAGE_MODELS.contains(&model_name));
+                            }
+                            if !disable_vision && unsafe { is_supported_model.unwrap_unchecked() } {
                                 if let Some(image_url) = &content.image_url {
                                     let url = image_url.url.clone();
-                                    let client = HTTP_CLIENT.read().clone();
+                                    let client = ProxyPool::get_general_client();
                                     let result = tokio::spawn(async move {
                                         fetch_image_data(&url, client).await
                                     });
@@ -349,15 +338,23 @@ async fn process_chat_inputs(
             while let Some(c) = chars.next() {
                 if c == '@' {
                     let mut url = String::new();
-                    while let Some(&next_char) = chars.peek() {
+                    while let Some(next_char) = chars.peek() {
                         if next_char.is_whitespace() {
                             break;
                         }
-                        url.push(chars.next().unwrap());
+                        // 安全地获取下一个字符，避免使用unwrap()
+                        if let Some(ch) = chars.next() {
+                            url.push(ch);
+                        } else {
+                            break;
+                        }
                     }
-                    if let Ok(parsed_url) = url::Url::parse(&url) {
-                        if parsed_url.scheme() == "http" || parsed_url.scheme() == "https" {
-                            urls.push(url);
+                    // 只有当URL不为空时才尝试解析
+                    if !url.is_empty() {
+                        if let Ok(parsed_url) = url::Url::parse(&url) {
+                            if parsed_url.scheme() == "http" || parsed_url.scheme() == "https" {
+                                urls.push(url);
+                            }
                         }
                     }
                 }
@@ -488,7 +485,8 @@ pub async fn encode_chat_message(
     // 在进入异步操作前获取并释放锁
     let enable_slow_pool = { if enable_slow_pool { Some(true) } else { None } };
 
-    let (instructions, messages, urls) = process_chat_inputs(inputs, disable_vision).await;
+    let (instructions, messages, urls) =
+        process_chat_inputs(inputs, disable_vision, model_name).await;
 
     let explicit_context = if !instructions.trim().is_empty() {
         Some(ExplicitContext {
@@ -523,7 +521,7 @@ pub async fn encode_chat_message(
         model_details: Some(ModelDetails {
             model_name: Some(model_name.to_string()),
             api_key: None,
-            enable_ghost_mode: None,
+            enable_ghost_mode: Some(true),
             azure_state: Some(AzureState {
                 api_key: String::new(),
                 base_url: String::new(),
@@ -541,7 +539,7 @@ pub async fn encode_chat_message(
         allow_long_file_scan: Some(false),
         is_bash: Some(false),
         conversation_id: Uuid::new_v4().to_string(),
-        can_handle_filenames_after_language_ids: Some(true),
+        can_handle_filenames_after_language_ids: Some(false),
         use_web: if is_search {
             Some("full_search".to_string())
         } else {
@@ -559,7 +557,7 @@ pub async fn encode_chat_message(
         is_composer: None,
         runnable_code_blocks: Some(false),
         should_cache: Some(false),
-        allow_model_fallbacks: None,
+        allow_model_fallbacks: Some(false),
         number_of_times_shown_fallback_model_warning: None,
     };
 

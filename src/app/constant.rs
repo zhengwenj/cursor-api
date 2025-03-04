@@ -1,3 +1,4 @@
+#[macro_export]
 macro_rules! def_pub_const {
     // 单个常量定义
     // ($name:ident, $value:expr) => {
@@ -45,7 +46,14 @@ def_pub_const!(
     ROUTE_TOKENS_UPDATE_PATH => "/tokens/update",
     ROUTE_TOKENS_ADD_PATH => "/tokens/add",
     ROUTE_TOKENS_DELETE_PATH => "/tokens/delete",
-    ROUTE_TOKEN_TAGS_UPDATE_PATH => "/tokens/tags/update",
+    ROUTE_TOKENS_TAGS_UPDATE_PATH => "/tokens/tags/update",
+    ROUTE_TOKENS_PROFILE_UPDATE_PATH => "/tokens/profile/update",
+    ROUTE_PROXIES_PATH => "/proxies",
+    ROUTE_PROXIES_GET_PATH => "/proxies/get",
+    ROUTE_PROXIES_UPDATE_PATH => "/proxies/update",
+    ROUTE_PROXIES_ADD_PATH => "/proxies/add",
+    ROUTE_PROXIES_DELETE_PATH => "/proxies/delete",
+    ROUTE_PROXIES_SET_GENERAL_PATH => "/proxies/set-general",
     ROUTE_ENV_EXAMPLE_PATH => "/env-example",
     ROUTE_STATIC_PATH => "/static/{path}",
     ROUTE_SHARED_STYLES_PATH => "/static/shared-styles.css",
@@ -62,7 +70,7 @@ def_pub_const!(
 def_pub_const!(
     STATUS_PENDING => "pending",
     STATUS_SUCCESS => "success",
-    STATUS_FAILED => "failed"
+    STATUS_FAILURE => "failure"
 );
 
 // Header constants

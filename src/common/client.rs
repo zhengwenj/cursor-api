@@ -1,23 +1,21 @@
 use super::utils::generate_hash;
-use crate::{
-    AppConfig,
-    app::{
-        constant::{
-            CONTENT_TYPE_CONNECT_PROTO, CONTENT_TYPE_PROTO, CURSOR_API2_HOST, CURSOR_HOST,
-            CURSOR_SETTINGS_URL, HEADER_NAME_GHOST_MODE, TRUE,
-        },
-        lazy::{
-            CURSOR_API2_STRIPE_URL, CURSOR_USAGE_API_URL, CURSOR_USER_API_URL, REVERSE_PROXY_HOST,
-            USE_REVERSE_PROXY,
-        },
+use crate::app::{
+    constant::{
+        CONTENT_TYPE_CONNECT_PROTO, CONTENT_TYPE_PROTO, CURSOR_API2_HOST, CURSOR_HOST,
+        CURSOR_SETTINGS_URL, HEADER_NAME_GHOST_MODE, TRUE,
+    },
+    lazy::{
+        CURSOR_API2_STRIPE_URL, CURSOR_TIMEZONE, CURSOR_USAGE_API_URL, CURSOR_USER_API_URL,
+        REVERSE_PROXY_HOST, USE_REVERSE_PROXY,
     },
 };
-use reqwest::header::{
-    ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, CACHE_CONTROL, CONNECTION, CONTENT_TYPE, COOKIE, DNT,
-    HOST, ORIGIN, PRAGMA, REFERER, TE, TRANSFER_ENCODING, USER_AGENT,
+use reqwest::{
+    Client, RequestBuilder,
+    header::{
+        ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, CACHE_CONTROL, CONNECTION, CONTENT_TYPE, COOKIE,
+        DNT, HOST, ORIGIN, PRAGMA, REFERER, TE, TRANSFER_ENCODING, USER_AGENT,
+    },
 };
-use reqwest::{Client, RequestBuilder};
-use std::sync::LazyLock;
 use uuid::Uuid;
 
 macro_rules! def_const {
@@ -50,18 +48,6 @@ def_const!(U_EQ_4, "u=4");
 
 def_const!(PROXY_HOST, "x-co");
 
-pub(crate) static HTTP_CLIENT: LazyLock<parking_lot::RwLock<Client>> =
-    LazyLock::new(|| parking_lot::RwLock::new(AppConfig::get_proxies().get_client()));
-
-/// 重新构建 HTTP 客户端
-///
-/// 当需要更新代理设置时，可以调用此方法重新创建客户端
-pub fn rebuild_http_client() {
-    let new_client = AppConfig::get_proxies().get_client();
-    let mut client = HTTP_CLIENT.write();
-    *client = new_client;
-}
-
 /// 返回预构建的 Cursor API 客户端
 ///
 /// # 参数
@@ -73,7 +59,8 @@ pub fn rebuild_http_client() {
 /// # 返回
 ///
 /// * `reqwest::RequestBuilder` - 配置好的请求构建器
-pub fn build_client(
+pub fn build_request(
+    client: Client,
     auth_token: &str,
     checksum: &str,
     url: &str,
@@ -82,13 +69,12 @@ pub fn build_client(
     let trace_id = Uuid::new_v4().to_string();
 
     let client = if *USE_REVERSE_PROXY {
-        HTTP_CLIENT
-            .read()
+        client
             .post(url)
             .header(HOST, &*REVERSE_PROXY_HOST)
             .header(PROXY_HOST, CURSOR_API2_HOST)
     } else {
-        HTTP_CLIENT.read().post(url).header(HOST, CURSOR_API2_HOST)
+        client.post(url).header(HOST, CURSOR_API2_HOST)
     };
 
     client
@@ -108,7 +94,7 @@ pub fn build_client(
         .header("x-client-key", generate_hash())
         .header("x-cursor-checksum", checksum)
         .header("x-cursor-client-version", "0.42.5")
-        .header("x-cursor-timezone", "Asia/Shanghai")
+        .header("x-cursor-timezone", &*CURSOR_TIMEZONE)
         .header(HEADER_NAME_GHOST_MODE, TRUE)
         .header("x-request-id", trace_id)
         .header(CONNECTION, KEEP_ALIVE)
@@ -124,16 +110,14 @@ pub fn build_client(
 /// # 返回
 ///
 /// * `reqwest::RequestBuilder` - 配置好的请求构建器
-pub fn build_profile_client(auth_token: &str) -> RequestBuilder {
+pub fn build_profile_request(client: &Client, auth_token: &str) -> RequestBuilder {
     let client = if *USE_REVERSE_PROXY {
-        HTTP_CLIENT
-            .read()
+        client
             .get(&*CURSOR_API2_STRIPE_URL)
             .header(HOST, &*REVERSE_PROXY_HOST)
             .header(PROXY_HOST, CURSOR_API2_HOST)
     } else {
-        HTTP_CLIENT
-            .read()
+        client
             .get(&*CURSOR_API2_STRIPE_URL)
             .header(HOST, CURSOR_API2_HOST)
     };
@@ -168,20 +152,16 @@ pub fn build_profile_client(auth_token: &str) -> RequestBuilder {
 /// # 返回
 ///
 /// * `reqwest::RequestBuilder` - 配置好的请求构建器
-pub fn build_usage_client(user_id: &str, auth_token: &str) -> RequestBuilder {
+pub fn build_usage_request(client: &Client, user_id: &str, auth_token: &str) -> RequestBuilder {
     let session_token = format!("{}%3A%3A{}", user_id, auth_token);
 
     let client = if *USE_REVERSE_PROXY {
-        HTTP_CLIENT
-            .read()
+        client
             .get(&*CURSOR_USAGE_API_URL)
             .header(HOST, &*REVERSE_PROXY_HOST)
             .header(PROXY_HOST, CURSOR_HOST)
     } else {
-        HTTP_CLIENT
-            .read()
-            .get(&*CURSOR_USAGE_API_URL)
-            .header(HOST, CURSOR_HOST)
+        client.get(&*CURSOR_USAGE_API_URL).header(HOST, CURSOR_HOST)
     };
 
     client
@@ -217,20 +197,16 @@ pub fn build_usage_client(user_id: &str, auth_token: &str) -> RequestBuilder {
 /// # 返回
 ///
 /// * `reqwest::RequestBuilder` - 配置好的请求构建器
-pub fn build_userinfo_client(user_id: &str, auth_token: &str) -> RequestBuilder {
+pub fn build_userinfo_request(client: &Client, user_id: &str, auth_token: &str) -> RequestBuilder {
     let session_token = format!("{}%3A%3A{}", user_id, auth_token);
 
     let client = if *USE_REVERSE_PROXY {
-        HTTP_CLIENT
-            .read()
+        client
             .get(&*CURSOR_USER_API_URL)
             .header(HOST, &*REVERSE_PROXY_HOST)
             .header(PROXY_HOST, CURSOR_HOST)
     } else {
-        HTTP_CLIENT
-            .read()
-            .get(&*CURSOR_USER_API_URL)
-            .header(HOST, CURSOR_HOST)
+        client.get(&*CURSOR_USER_API_URL).header(HOST, CURSOR_HOST)
     };
 
     client
