@@ -2,9 +2,11 @@ use crate::chat::{
     aiserver::v1::{StreamChatResponse, WebReference},
     error::{ChatError, StreamError},
 };
+use crate::common::utils::InstantExt as _;
 use flate2::read::GzDecoder;
 use prost::Message;
 use std::io::Read;
+use std::time::Instant;
 
 // 解压gzip数据
 fn decompress_gzip(data: &[u8]) -> Option<Vec<u8>> {
@@ -25,6 +27,7 @@ pub trait ToMarkdown {
 }
 
 impl ToMarkdown for Vec<WebReference> {
+    #[inline]
     fn to_markdown(&self) -> String {
         if self.is_empty() {
             return String::new();
@@ -45,7 +48,7 @@ impl ToMarkdown for Vec<WebReference> {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone)]
 pub enum StreamMessage {
     // 调试
     Debug(String),
@@ -60,6 +63,7 @@ pub enum StreamMessage {
 }
 
 impl StreamMessage {
+    #[inline]
     fn convert_web_ref_to_content(self) -> Self {
         match self {
             StreamMessage::WebReference(refs) => StreamMessage::Content(refs.to_markdown()),
@@ -69,10 +73,18 @@ impl StreamMessage {
 }
 
 pub struct StreamDecoder {
+    // 主要数据缓冲区 (24字节)
     buffer: Vec<u8>,
+    // 结果相关 (24字节 + 24字节)
     first_result: Option<Vec<StreamMessage>>,
+    content_delays: Vec<(String, f64)>,
+    // 计数器和时间 (8字节 + 8字节)
+    empty_stream_count: usize,
+    last_content_time: Instant,
+    // 状态标志 (1字节 + 1字节 + 1字节)
     first_result_ready: bool,
     first_result_taken: bool,
+    has_seen_content: bool,
 }
 
 impl StreamDecoder {
@@ -80,9 +92,31 @@ impl StreamDecoder {
         Self {
             buffer: Vec::new(),
             first_result: None,
+            content_delays: Vec::new(),
+            empty_stream_count: 0,
+            last_content_time: Instant::now(),
             first_result_ready: false,
             first_result_taken: false,
+            has_seen_content: false,
         }
+    }
+
+    pub fn get_empty_stream_count(&self) -> usize {
+        self.empty_stream_count
+    }
+
+    pub fn reset_empty_stream_count(&mut self) {
+        if self.empty_stream_count > 0 {
+            crate::debug_println!(
+                "重置连续空流计数，之前的计数为: {}",
+                self.empty_stream_count
+            );
+            self.empty_stream_count = 0;
+        }
+    }
+
+    pub fn increment_empty_stream_count(&mut self) {
+        self.empty_stream_count += 1;
     }
 
     pub fn take_first_result(&mut self) -> Option<Vec<StreamMessage>> {
@@ -104,20 +138,32 @@ impl StreamDecoder {
         self.first_result_ready
     }
 
+    pub fn take_content_delays(&mut self) -> Vec<(String, f64)> {
+        std::mem::take(&mut self.content_delays)
+    }
+
     pub fn decode(
         &mut self,
         data: &[u8],
         convert_web_ref: bool,
     ) -> Result<Vec<StreamMessage>, StreamError> {
+        if !data.is_empty() {
+            self.reset_empty_stream_count();
+        }
+
         self.buffer.extend_from_slice(data);
 
         if self.buffer.len() < 5 {
             if self.buffer.is_empty() {
+                self.increment_empty_stream_count();
+
                 return Err(StreamError::EmptyStream);
             }
             crate::debug_println!("数据长度小于5字节，当前数据: {}", hex::encode(&self.buffer));
             return Err(StreamError::DataLengthLessThan5);
         }
+
+        self.reset_empty_stream_count();
 
         let mut messages = Vec::new();
         let mut offset = 0;
@@ -144,6 +190,11 @@ impl StreamDecoder {
             let msg_data = &self.buffer[offset + 5..offset + 5 + msg_len];
 
             if let Some(msg) = self.process_message(msg_type, msg_data)? {
+                if let StreamMessage::Content(content) = &msg {
+                    self.has_seen_content = true;
+                    let delay = self.last_content_time.duration_as_secs_f64();
+                    self.content_delays.push((content.clone(), delay));
+                }
                 if convert_web_ref {
                     messages.push(msg.convert_web_ref_to_content());
                 } else {
@@ -158,14 +209,18 @@ impl StreamDecoder {
 
         if !self.first_result_taken && !messages.is_empty() {
             if self.first_result.is_none() {
-                self.first_result = Some(messages.clone());
+                self.first_result = Some(std::mem::take(&mut messages));
             } else if !self.first_result_ready {
-                self.first_result.as_mut().unwrap().extend(messages.clone());
+                if let Some(first_result) = &mut self.first_result {
+                    first_result.append(&mut messages);
+                }
             }
         }
         if !self.first_result_ready {
-            self.first_result_ready =
-                self.first_result.is_some() && self.buffer.is_empty() && !self.first_result_taken;
+            self.first_result_ready = self.first_result.is_some()
+                && self.buffer.is_empty()
+                && !self.first_result_taken
+                && self.has_seen_content;
         }
         Ok(messages)
     }

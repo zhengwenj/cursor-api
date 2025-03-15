@@ -45,7 +45,7 @@ pub enum Role {
 #[derive(Serialize)]
 pub struct ChatResponse {
     pub id: String,
-    pub object: String,
+    pub object: &'static str,
     pub created: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,

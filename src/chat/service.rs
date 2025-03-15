@@ -5,8 +5,9 @@ use crate::{
             OBJECT_CHAT_COMPLETION_CHUNK,
         },
         lazy::{
-            AUTH_TOKEN, CURSOR_API2_CHAT_URL, CURSOR_API2_CHAT_WEB_URL, IS_UNLIMITED_REQUEST_LOGS,
-            KEY_PREFIX, KEY_PREFIX_LEN, REQUEST_LOGS_LIMIT, SERVICE_TIMEOUT,
+            AUTH_TOKEN, GENERAL_TIMEZONE, IS_NO_REQUEST_LOGS, IS_UNLIMITED_REQUEST_LOGS,
+            KEY_PREFIX, KEY_PREFIX_LEN, REQUEST_LOGS_LIMIT, cursor_api2_chat_url,
+            cursor_api2_chat_web_url,
         },
         model::{
             AppConfig, AppState, Chain, LogStatus, RequestLog, TimingInfo, TokenInfo, UsageCheck,
@@ -23,12 +24,12 @@ use crate::{
         stream::{StreamDecoder, StreamMessage},
     },
     common::{
-        client::build_request,
+        client::{AiServiceRequest, build_request},
         model::{
             ApiStatus, ErrorResponse, error::ChatError, tri::TriState, userinfo::MembershipType,
         },
         utils::{
-            InstantExt as _, TrimNewlines as _, format_time_ms, from_base64, get_available_models,
+            TrimNewlines as _, format_time_ms, from_base64, generate_hash, get_available_models,
             get_token_profile, tokeninfo_to_token, validate_token_and_checksum,
         },
     },
@@ -39,126 +40,111 @@ use axum::{
     extract::State,
     http::{
         HeaderMap, StatusCode,
-        header::{AUTHORIZATION, CONTENT_TYPE},
+        header::{
+            AUTHORIZATION, CACHE_CONTROL, CONNECTION, CONTENT_LENGTH, CONTENT_TYPE,
+            TRANSFER_ENCODING,
+        },
     },
     response::Response,
 };
 use bytes::Bytes;
 use futures::StreamExt;
 use prost::Message as _;
-use reqwest::Client;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{
     convert::Infallible,
     sync::{Arc, atomic::AtomicBool},
 };
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 use super::model::{ChatRequest, Model};
 
-// 辅助函数：提取认证token
-fn extract_auth_token(headers: &HeaderMap) -> Result<&str, (StatusCode, Json<ErrorResponse>)> {
-    headers
-        .get(AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX))
-        .ok_or((
-            StatusCode::UNAUTHORIZED,
-            Json(ChatError::Unauthorized.to_json()),
-        ))
-}
+const NO_CACHE: &str = "no-cache, must-revalidate";
+const KEEP_ALIVE: &str = "keep-alive";
 
-// 辅助函数：解析token信息
-async fn resolve_token_info(
-    auth_header: &str,
-    state: &Arc<Mutex<AppState>>,
-) -> Result<(String, String, Client), (StatusCode, Json<ErrorResponse>)> {
-    match auth_header {
-        // 管理员Token处理
-        token if is_admin_token(token) => resolve_admin_token(state).await,
-
-        // 动态密钥处理
-        token if is_dynamic_key(token) => resolve_dynamic_key(token),
-
-        // 普通用户Token处理
-        token => {
-            let (token, checksum) = validate_token_and_checksum(token).ok_or((
-                StatusCode::UNAUTHORIZED,
-                Json(ChatError::Unauthorized.to_json()),
-            ))?;
-            Ok((token, checksum, ProxyPool::get_general_client()))
-        }
-    }
-}
-
-// 辅助函数：检查是否为管理员token
-fn is_admin_token(token: &str) -> bool {
-    token == AUTH_TOKEN.as_str()
-        || (AppConfig::is_share() && token == AppConfig::get_share_token().as_str())
-}
-
-// 辅助函数：检查是否为动态密钥
-fn is_dynamic_key(token: &str) -> bool {
-    AppConfig::get_dynamic_key() && token.starts_with(&*KEY_PREFIX)
-}
-
-// 辅助函数：处理管理员token
-async fn resolve_admin_token(
-    state: &Arc<Mutex<AppState>>,
-) -> Result<(String, String, Client), (StatusCode, Json<ErrorResponse>)> {
-    static CURRENT_KEY_INDEX: AtomicUsize = AtomicUsize::new(0);
-
-    let state_guard = state.lock().await;
-    let token_infos = &state_guard.token_manager.tokens;
-
-    if token_infos.is_empty() {
-        return Err((
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(ChatError::NoTokens.to_json()),
-        ));
-    }
-
-    let index = CURRENT_KEY_INDEX.fetch_add(1, Ordering::SeqCst) % token_infos.len();
-    let token_info = &token_infos[index];
-
-    Ok((
-        token_info.token.clone(),
-        token_info.checksum.clone(),
-        token_info.get_client(),
-    ))
-}
-
-// 辅助函数：处理动态密钥
-fn resolve_dynamic_key(
-    token: &str,
-) -> Result<(String, String, Client), (StatusCode, Json<ErrorResponse>)> {
-    from_base64(&token[*KEY_PREFIX_LEN..])
-        .and_then(|decoded_bytes| KeyConfig::decode(&decoded_bytes[..]).ok())
-        .and_then(|key_config| key_config.auth_token)
-        .and_then(|token_info| tokeninfo_to_token(&token_info))
-        .ok_or((
-            StatusCode::UNAUTHORIZED,
-            Json(ChatError::Unauthorized.to_json()),
-        ))
-}
-
-// 模型列表处理
 pub async fn handle_models(
     State(state): State<Arc<Mutex<AppState>>>,
     headers: HeaderMap,
 ) -> Result<Json<ModelsResponse>, (StatusCode, Json<ErrorResponse>)> {
     // 如果没有认证头，返回默认可用模型
-    if headers.get(AUTHORIZATION).is_none() {
-        return Ok(Json(ModelsResponse::with_default_models()));
-    }
+    let auth_token = match headers.get(AUTHORIZATION) {
+        None => return Ok(Json(ModelsResponse::with_default_models())),
+        Some(h) => h
+            .to_str()
+            .ok()
+            .and_then(|h| h.strip_prefix("Bearer "))
+            .ok_or((
+                StatusCode::UNAUTHORIZED,
+                Json(ChatError::Unauthorized.to_json()),
+            ))?,
+    };
 
-    // 提取和验证认证token
-    let auth_token = extract_auth_token(&headers)?;
-    let (token, checksum, client) = resolve_token_info(auth_token, &state).await?;
+    let mut is_pri = false;
+
+    // 获取token信息
+    let (token, checksum, client_key, client, timezone) = match auth_token {
+        // 管理员Token
+        token
+            if token == AUTH_TOKEN.as_str()
+                || (AppConfig::is_share() && token == AppConfig::get_share_token().as_str()) =>
+        {
+            let state_guard = state.lock().await;
+            let token_infos = &state_guard.token_manager.tokens;
+
+            if token_infos.is_empty() {
+                return Err((
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(ChatError::NoTokens.to_json()),
+                ));
+            }
+
+            static CURRENT_KEY_INDEX: AtomicUsize = AtomicUsize::new(0);
+            let index = CURRENT_KEY_INDEX.fetch_add(1, Ordering::SeqCst) % token_infos.len();
+            let token_info = &token_infos[index];
+            is_pri = true;
+            (
+                token_info.token.clone(),
+                token_info.checksum.clone(),
+                token_info.client_key.clone(),
+                token_info.get_client(),
+                token_info.timezone_name(),
+            )
+        }
+
+        // 动态密钥
+        token if AppConfig::get_dynamic_key() && token.starts_with(&*KEY_PREFIX) => {
+            from_base64(&token[*KEY_PREFIX_LEN..])
+                .and_then(|decoded_bytes| KeyConfig::decode(&decoded_bytes[..]).ok())
+                .and_then(|key_config| key_config.auth_token)
+                .and_then(|info| tokeninfo_to_token(info))
+                .map(|(token, checksum, client)| {
+                    (token, checksum, None, client, GENERAL_TIMEZONE.name())
+                })
+                .ok_or((
+                    StatusCode::UNAUTHORIZED,
+                    Json(ChatError::Unauthorized.to_json()),
+                ))?
+        }
+
+        // 普通用户Token
+        token => {
+            let (token, checksum) = validate_token_and_checksum(token).ok_or((
+                StatusCode::UNAUTHORIZED,
+                Json(ChatError::Unauthorized.to_json()),
+            ))?;
+            (
+                token,
+                checksum,
+                None,
+                ProxyPool::get_general_client(),
+                GENERAL_TIMEZONE.name(),
+            )
+        }
+    };
+    let client_key = client_key.unwrap_or_else(generate_hash);
 
     // 获取可用模型列表
-    let models = get_available_models(client, &token, &checksum)
+    let models = get_available_models(client, &token, &checksum, &client_key, timezone, is_pri)
         .await
         .ok_or((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -171,8 +157,8 @@ pub async fn handle_models(
         ))?;
 
     // 更新模型列表
-    if let Err(e) = Models::update(models) {
-        return Err((
+    Models::update(models).map_err(|e| {
+        (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
                 status: ApiStatus::Failure,
@@ -180,8 +166,8 @@ pub async fn handle_models(
                 error: Some("Failed to update models".to_string()),
                 message: Some(e.to_string()),
             }),
-        ));
-    }
+        )
+    })?;
 
     Ok(Json(ModelsResponse::new(Models::to_arc())))
 }
@@ -203,7 +189,7 @@ pub async fn handle_chat(
 
     // 验证模型是否支持并获取模型信息
     let model =
-        if Models::exists(&model_name) || (allow_claude && request.model.starts_with("claude")) {
+        if Models::exists(&model_name) || (allow_claude && request.model.starts_with("claude-")) {
             Some(&model_name)
         } else {
             return Err((
@@ -233,9 +219,10 @@ pub async fn handle_chat(
         ))?;
 
     let mut current_config = KeyConfig::new_with_global();
+    let mut is_pri = false;
 
     // 验证认证token并获取token信息
-    let (auth_token, checksum, client) = match auth_header {
+    let (auth_token, checksum, client_key, client, timezone) = match auth_header {
         // 管理员Token验证逻辑
         token
             if token == AUTH_TOKEN.as_str()
@@ -256,10 +243,13 @@ pub async fn handle_chat(
             // 轮询选择token
             let index = CURRENT_KEY_INDEX.fetch_add(1, Ordering::SeqCst) % token_infos.len();
             let token_info = &token_infos[index];
+            is_pri = true;
             (
                 token_info.token.clone(),
                 token_info.checksum.clone(),
+                token_info.client_key.clone(),
                 token_info.get_client(),
+                token_info.timezone_name(),
             )
         }
 
@@ -270,7 +260,10 @@ pub async fn handle_chat(
                     key_config.copy_without_auth_token(&mut current_config);
                     key_config.auth_token
                 })
-                .and_then(|token_info| tokeninfo_to_token(&token_info))
+                .and_then(|info| {
+                    tokeninfo_to_token(info)
+                        .map(|(e1, e2, e3)| (e1, e2, None, e3, GENERAL_TIMEZONE.name()))
+                })
                 .ok_or((
                     StatusCode::UNAUTHORIZED,
                     Json(ChatError::Unauthorized.to_json()),
@@ -283,16 +276,23 @@ pub async fn handle_chat(
                 StatusCode::UNAUTHORIZED,
                 Json(ChatError::Unauthorized.to_json()),
             ))?;
-            (token, checksum, ProxyPool::get_general_client())
+            (
+                token,
+                checksum,
+                None,
+                ProxyPool::get_general_client(),
+                GENERAL_TIMEZONE.name(),
+            )
         }
     };
+    let client_key = client_key.unwrap_or_else(generate_hash);
 
     let current_config = current_config;
 
     let current_id: u64;
 
     // 更新请求日志
-    {
+    if !*IS_NO_REQUEST_LOGS {
         let state_clone = state.clone();
         let mut state = state.lock().await;
         state.request_manager.total_requests += 1;
@@ -357,7 +357,7 @@ pub async fn handle_chat(
             let client = client.clone();
 
             tokio::spawn(async move {
-                let profile = get_token_profile(client, &auth_token_clone).await;
+                let profile = get_token_profile(client, &auth_token_clone, is_pri).await;
                 let mut state = state_clone.lock().await;
 
                 // 先找到所有需要更新的位置的索引
@@ -397,6 +397,7 @@ pub async fn handle_chat(
             token_info: TokenInfo {
                 token: auth_token.clone(),
                 checksum: checksum.clone(),
+                client_key: None,
                 profile: None,
                 tags: None,
             },
@@ -412,6 +413,8 @@ pub async fn handle_chat(
         {
             state.request_manager.request_logs.remove(0);
         }
+    } else {
+        current_id = 0;
     }
 
     // 将消息转换为hex格式
@@ -449,69 +452,47 @@ pub async fn handle_chat(
     };
 
     // 构建请求客户端
-    let client = build_request(
+    let trace_id = uuid::Uuid::new_v4();
+    let client = build_request(AiServiceRequest {
         client,
-        &auth_token,
-        &checksum,
-        if is_search {
-            &CURSOR_API2_CHAT_WEB_URL
+        auth_token: auth_token.as_str(),
+        checksum: checksum.as_str(),
+        client_key: client_key.as_str(),
+        url: if is_search {
+            cursor_api2_chat_web_url(is_pri)
         } else {
-            &CURSOR_API2_CHAT_URL
+            cursor_api2_chat_url(is_pri)
         },
-        true,
-    );
-    // 添加超时设置
-    let response = tokio::time::timeout(
-        std::time::Duration::from_secs(*SERVICE_TIMEOUT),
-        client.body(hex_data).send(),
-    )
-    .await;
+        is_stream: true,
+        timezone,
+        trace_id: &trace_id.to_string(),
+        is_pri,
+    });
+    let trace_id = trace_id.simple();
+    // 发送请求
+    let response = client.body(hex_data).send().await;
 
     // 处理请求结果
     let response = match response {
-        Ok(inner_response) => match inner_response {
-            Ok(resp) => {
-                // 更新请求日志为成功
+        Ok(resp) => {
+            // 更新请求日志为成功
+            {
+                let mut state = state.lock().await;
+                if let Some(log) = state
+                    .request_manager
+                    .request_logs
+                    .iter_mut()
+                    .rev()
+                    .find(|log| log.id == current_id)
                 {
-                    let mut state = state.lock().await;
-                    if let Some(log) = state
-                        .request_manager
-                        .request_logs
-                        .iter_mut()
-                        .rev()
-                        .find(|log| log.id == current_id)
-                    {
-                        log.status = LogStatus::Success;
-                    }
+                    log.status = LogStatus::Success;
                 }
-                resp
             }
-            Err(mut e) => {
-                e = e.without_url();
-                // 更新请求日志为失败
-                {
-                    let mut state = state.lock().await;
-                    if let Some(log) = state
-                        .request_manager
-                        .request_logs
-                        .iter_mut()
-                        .rev()
-                        .find(|log| log.id == current_id)
-                    {
-                        log.status = LogStatus::Failure;
-                        log.error = Some(e.to_string());
-                    }
-                    state.request_manager.active_requests -= 1;
-                    state.request_manager.error_requests += 1;
-                }
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ChatError::RequestFailed(e.to_string()).to_json()),
-                ));
-            }
-        },
-        Err(_) => {
-            // 处理超时错误
+            resp
+        }
+        Err(mut e) => {
+            e = e.without_url();
+            // 更新请求日志为失败
             {
                 let mut state = state.lock().await;
                 if let Some(log) = state
@@ -522,14 +503,22 @@ pub async fn handle_chat(
                     .find(|log| log.id == current_id)
                 {
                     log.status = LogStatus::Failure;
-                    log.error = Some("Request timeout".to_string());
+                    log.error = Some(e.to_string());
                 }
                 state.request_manager.active_requests -= 1;
                 state.request_manager.error_requests += 1;
             }
+
+            // 根据错误类型返回不同的状态码
+            let status_code = if e.is_timeout() {
+                StatusCode::GATEWAY_TIMEOUT
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+
             return Err((
-                StatusCode::GATEWAY_TIMEOUT,
-                Json(ChatError::RequestFailed("Request timeout".to_string()).to_json()),
+                status_code,
+                Json(ChatError::RequestFailed(e.to_string()).to_json()),
             ));
         }
     };
@@ -543,11 +532,10 @@ pub async fn handle_chat(
     let convert_web_ref = current_config.include_web_references();
 
     if request.stream {
-        let response_id = format!("chatcmpl-{}", Uuid::new_v4().simple());
+        let response_id = format!("chatcmpl-{trace_id}");
         let is_start = Arc::new(AtomicBool::new(true));
         let start_time = std::time::Instant::now();
         let decoder = Arc::new(Mutex::new(StreamDecoder::new()));
-        let content_time = Arc::new(Mutex::new(std::time::Instant::now()));
 
         // 定义消息处理器的上下文结构体
         struct MessageProcessContext<'a> {
@@ -558,7 +546,6 @@ pub async fn handle_chat(
             state: &'a Mutex<AppState>,
             current_id: u64,
             need_usage: bool,
-            content_time: &'a Mutex<std::time::Instant>,
         }
 
         // 处理消息并生成响应数据的辅助函数
@@ -573,31 +560,9 @@ pub async fn handle_chat(
                     StreamMessage::Content(text) => {
                         let is_first = ctx.is_start.load(Ordering::SeqCst);
 
-                        if let Ok(mut time_tracker) = ctx.content_time.try_lock() {
-                            let interval = time_tracker.duration_as_secs_f64();
-                            if let Ok(mut state) = ctx.state.try_lock() {
-                                if let Some(log) = state
-                                    .request_manager
-                                    .request_logs
-                                    .iter_mut()
-                                    .rev()
-                                    .find(|log| log.id == ctx.current_id)
-                                {
-                                    if let Some(chain) = &mut log.chain {
-                                        chain.delays.push((text.clone(), interval));
-                                    } else {
-                                        log.chain = Some(Chain {
-                                            prompt: String::new(),
-                                            delays: vec![(text.clone(), interval)],
-                                        });
-                                    }
-                                }
-                            }
-                        }
-
                         let response = ChatResponse {
                             id: ctx.response_id.to_string(),
-                            object: OBJECT_CHAT_COMPLETION_CHUNK.to_string(),
+                            object: OBJECT_CHAT_COMPLETION_CHUNK,
                             created: chrono::Utc::now().timestamp(),
                             model: if is_first {
                                 Some(ctx.model.to_string())
@@ -654,7 +619,7 @@ pub async fn handle_chat(
 
                         let response = ChatResponse {
                             id: ctx.response_id.to_string(),
-                            object: OBJECT_CHAT_COMPLETION_CHUNK.to_string(),
+                            object: OBJECT_CHAT_COMPLETION_CHUNK,
                             created: chrono::Utc::now().timestamp(),
                             model: None,
                             choices: vec![Choice {
@@ -680,7 +645,7 @@ pub async fn handle_chat(
                         if ctx.need_usage {
                             let response = ChatResponse {
                                 id: ctx.response_id.to_string(),
-                                object: OBJECT_CHAT_COMPLETION_CHUNK.to_string(),
+                                object: OBJECT_CHAT_COMPLETION_CHUNK,
                                 created: chrono::Utc::now().timestamp(),
                                 model: None,
                                 choices: vec![],
@@ -691,11 +656,9 @@ pub async fn handle_chat(
                                 }),
                             };
                             response_data.push_str(&format!(
-                                "data: {}\n\ndata: [DONE]\n\n",
+                                "data: {}\n\n",
                                 serde_json::to_string(&response).unwrap()
                             ));
-                        } else {
-                            response_data.push_str("data: [DONE]\n\n");
                         };
                     }
                     StreamMessage::Debug(debug_prompt) => {
@@ -707,10 +670,14 @@ pub async fn handle_chat(
                                 .rev()
                                 .find(|log| log.id == ctx.current_id)
                             {
-                                log.chain = Some(Chain {
-                                    prompt: debug_prompt,
-                                    delays: vec![],
-                                });
+                                if let Some(chain) = &mut log.chain {
+                                    chain.prompt.push_str(&debug_prompt);
+                                } else {
+                                    log.chain = Some(Chain {
+                                        prompt: debug_prompt,
+                                        delays: vec![],
+                                    });
+                                }
                             }
                         }
                     }
@@ -754,10 +721,12 @@ pub async fn handle_chat(
                     }
                 }
                 Some(Err(e)) => {
-                    let error_message = format!("Failed to read response chunk: {}", e);
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ChatError::RequestFailed(error_message).to_json()),
+                        Json(
+                            ChatError::RequestFailed(format!("Failed to read response chunk: {e}"))
+                                .to_json(),
+                        ),
                     ));
                 }
                 None => {
@@ -787,68 +756,115 @@ pub async fn handle_chat(
         }
 
         // 处理后续的stream
-        let stream = stream.then({
-            let decoder = decoder.clone();
-            let response_id = response_id.clone();
-            let model = request.model.clone();
-            let is_start = is_start.clone();
-            let state = state.clone();
-            let need_usage = request.stream_options.is_some_and(|opt| opt.include_usage);
-            let content_time = content_time.clone();
-
-            move |chunk| {
+        let stream = stream
+            .then({
                 let decoder = decoder.clone();
                 let response_id = response_id.clone();
-                let model = model.clone();
+                let model = request.model.clone();
                 let is_start = is_start.clone();
                 let state = state.clone();
-                let need_usage = need_usage;
-                let content_time = content_time.clone();
+                let need_usage = request.stream_options.is_some_and(|opt| opt.include_usage);
 
-                async move {
-                    let chunk = chunk.unwrap_or_default();
+                move |chunk| {
+                    let decoder = decoder.clone();
+                    let response_id = response_id.clone();
+                    let model = model.clone();
+                    let is_start = is_start.clone();
+                    let state = state.clone();
+                    let need_usage = need_usage;
 
-                    let ctx = MessageProcessContext {
-                        response_id: &response_id,
-                        model: &model,
-                        is_start: &is_start,
-                        start_time,
-                        state: &state,
-                        current_id,
-                        need_usage,
-                        content_time: &content_time,
-                    };
+                    async move {
+                        let chunk = match chunk {
+                            Ok(c) => c,
+                            Err(e) => {
+                                crate::debug_println!("Find chunk error: {e}");
+                                return Ok::<_, Infallible>(Bytes::new());
+                            }
+                        };
 
-                    // 使用decoder处理chunk
-                    let messages = match decoder.lock().await.decode(&chunk, convert_web_ref) {
-                        Ok(msgs) => msgs,
-                        Err(e) => {
-                            eprintln!("[警告] Stream error: {}", e);
-                            return Ok::<_, Infallible>(Bytes::new());
+                        let ctx = MessageProcessContext {
+                            response_id: &response_id,
+                            model: &model,
+                            is_start: &is_start,
+                            start_time,
+                            state: &state,
+                            current_id,
+                            need_usage,
+                        };
+
+                        // 使用decoder处理chunk
+                        let messages = match decoder.lock().await.decode(&chunk, convert_web_ref) {
+                            Ok(msgs) => msgs,
+                            Err(e) => {
+                                match e {
+                                    // 处理普通空流错误
+                                    StreamError::EmptyStream => {
+                                        eprintln!(
+                                            "[警告] Stream error: empty stream (连续计数: {})",
+                                            decoder.lock().await.get_empty_stream_count()
+                                        );
+                                        return Ok(Bytes::new());
+                                    }
+                                    StreamError::ChatError(e) => {
+                                        return Ok(Bytes::from(
+                                            serde_json::to_string(
+                                                &e.into_error_response().into_common(),
+                                            )
+                                            .unwrap(),
+                                        ));
+                                    }
+                                    // 处理其他错误
+                                    _ => {
+                                        eprintln!("[警告] Stream error: {e}");
+                                        return Ok(Bytes::new());
+                                    }
+                                }
+                            }
+                        };
+
+                        let mut response_data = String::new();
+
+                        if let Some(first_msg) = decoder.lock().await.take_first_result() {
+                            let first_response = process_messages(first_msg, &ctx).await;
+                            response_data.push_str(&first_response);
                         }
-                    };
 
-                    let mut response_data = String::new();
+                        let current_response = process_messages(messages, &ctx).await;
+                        if !current_response.is_empty() {
+                            response_data.push_str(&current_response);
+                        }
 
-                    if let Some(first_msg) = decoder.lock().await.take_first_result() {
-                        let first_response = process_messages(first_msg, &ctx).await;
-                        response_data.push_str(&first_response);
+                        Ok(Bytes::from(response_data))
                     }
-
-                    let current_response = process_messages(messages, &ctx).await;
-                    if !current_response.is_empty() {
-                        response_data.push_str(&current_response);
-                    }
-
-                    Ok(Bytes::from(response_data))
                 }
-            }
-        });
+            })
+            .chain(futures::stream::once(async move {
+                // 更新delays
+                let mut state = state.lock().await;
+                if let Some(log) = state
+                    .request_manager
+                    .request_logs
+                    .iter_mut()
+                    .rev()
+                    .find(|log| log.id == current_id)
+                {
+                    if let Some(chain) = &mut log.chain {
+                        chain.delays = decoder.lock().await.take_content_delays();
+                    } else {
+                        log.chain = Some(Chain {
+                            prompt: String::new(),
+                            delays: decoder.lock().await.take_content_delays(),
+                        });
+                    }
+                }
+                Ok(Bytes::from_static(b"data: [DONE]\n\n"))
+            }));
 
         Ok(Response::builder()
-            .header("Cache-Control", "no-cache")
-            .header("Connection", "keep-alive")
+            .header(CACHE_CONTROL, NO_CACHE)
+            .header(CONNECTION, KEEP_ALIVE)
             .header(CONTENT_TYPE, "text/event-stream")
+            .header(TRANSFER_ENCODING, "chunked")
             .body(Body::from_stream(stream))
             .unwrap())
     } else {
@@ -857,17 +873,17 @@ pub async fn handle_chat(
         let mut decoder = StreamDecoder::new();
         let mut full_text = String::with_capacity(1024);
         let mut stream = response.bytes_stream();
-        let mut prompt = String::new();
-        let mut content_time = std::time::Instant::now();
-        let mut delays: Vec<(String, f64)> = Vec::new();
+        let mut prompt = String::with_capacity(1024);
 
         // 逐个处理chunks
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(|e| {
-                let error_message = format!("Failed to read response chunk: {}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ChatError::RequestFailed(error_message).to_json()),
+                    Json(
+                        ChatError::RequestFailed(format!("Failed to read response chunk: {e}"))
+                            .to_json(),
+                    ),
                 )
             })?;
 
@@ -877,12 +893,10 @@ pub async fn handle_chat(
                     for message in messages {
                         match message {
                             StreamMessage::Content(text) => {
-                                let interval = content_time.duration_as_secs_f64();
-                                delays.push((text.clone(), interval));
                                 full_text.push_str(&text);
                             }
                             StreamMessage::Debug(debug_prompt) => {
-                                prompt = debug_prompt;
+                                prompt.push_str(&debug_prompt);
                             }
                             _ => {}
                         }
@@ -931,8 +945,8 @@ pub async fn handle_chat(
         }
 
         let response_data = ChatResponse {
-            id: format!("chatcmpl-{}", Uuid::new_v4().simple()),
-            object: OBJECT_CHAT_COMPLETION.to_string(),
+            id: format!("chatcmpl-{trace_id}"),
+            object: OBJECT_CHAT_COMPLETION,
             created: chrono::Utc::now().timestamp(),
             model: Some(request.model),
             choices: vec![Choice {
@@ -965,25 +979,20 @@ pub async fn handle_chat(
             {
                 log.timing.total = total_time;
                 log.status = LogStatus::Success;
+                log.chain = Some(Chain {
+                    prompt,
+                    delays: decoder.take_content_delays(),
+                });
             }
         }
 
-        // 更新最终的延迟信息
-        if let Ok(mut state) = state.try_lock() {
-            if let Some(log) = state
-                .request_manager
-                .request_logs
-                .iter_mut()
-                .rev()
-                .find(|log| log.id == current_id)
-            {
-                log.chain = Some(Chain { prompt, delays });
-            }
-        }
-
+        let data = serde_json::to_string(&response_data).unwrap();
         Ok(Response::builder()
+            .header(CACHE_CONTROL, NO_CACHE)
+            .header(CONNECTION, KEEP_ALIVE)
             .header(CONTENT_TYPE, "application/json")
-            .body(Body::from(serde_json::to_string(&response_data).unwrap()))
+            .header(CONTENT_LENGTH, data.len())
+            .body(Body::from(data))
             .unwrap())
     }
 }

@@ -128,3 +128,12 @@ def_pub_const!(
 );
 
 // def_pub_const!(ERR_CHECKSUM_NO_GOOD => "checksum no good");
+
+// Claude system prompts
+def_pub_const!(
+    SYSTEM_PROMPT_CLAUDE_3_7_SONNET_20250224 => include_str!("prompts/Claude 3.7 Sonnet"),
+    SYSTEM_PROMPT_CLAUDE_3_5_SONNET_20241122_TEXT_ONLY => include_str!("prompts/Claude 3.5 Sonnet Text only"),
+    SYSTEM_PROMPT_CLAUDE_3_5_SONNET_20241122_TEXT_AND_IMAGES => include_str!("prompts/Claude 3.5 Sonnet Text and images"),
+    SYSTEM_PROMPT_CLAUDE_3_OPUS_20240712 => include_str!("prompts/Claude 3 Opus"),
+    SYSTEM_PROMPT_CLAUDE_3_HAIKU_20240712 => include_str!("prompts/Claude 3 Haiku")
+);

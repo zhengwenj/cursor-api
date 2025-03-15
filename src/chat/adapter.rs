@@ -113,8 +113,9 @@ async fn process_chat_inputs(
         .join("\n\n");
 
     // 使用默认指令或收集到的指令
+    let image_support = !disable_vision && SUPPORTED_IMAGE_MODELS.contains(&model_name);
     let instructions = if instructions.is_empty() {
-        get_default_instructions()
+        get_default_instructions(model_name, image_support)
     } else {
         instructions
     };
@@ -220,7 +221,6 @@ async fn process_chat_inputs(
 
     // 转换为 proto messages
     let mut messages = Vec::new();
-    let mut is_supported_model = None;
     for input in chat_inputs {
         let (text, images) = match input.content {
             MessageContent::Text(text) => (text, vec![]),
@@ -236,11 +236,7 @@ async fn process_chat_inputs(
                             }
                         }
                         "image_url" => {
-                            if is_supported_model.is_none() {
-                                is_supported_model =
-                                    Some(SUPPORTED_IMAGE_MODELS.contains(&model_name));
-                            }
-                            if !disable_vision && unsafe { is_supported_model.unwrap_unchecked() } {
+                            if image_support {
                                 if let Some(image_url) = &content.image_url {
                                     let url = image_url.url.clone();
                                     let client = ProxyPool::get_general_client();

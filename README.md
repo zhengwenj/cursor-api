@@ -9,6 +9,8 @@
 * 本程序拥有堪比客户端原本的速度，甚至可能更快。
 * 本程序的性能是非常厉害的。
 * 根据本项目开源协议，Fork的项目不能以作者的名义进行任何形式的宣传、推广或声明。
+* 目前暂停更新（已更新超2.5个月,求赞助:），做不下去了都，截至当前版本(v0.1.3-rc.5.2.2)，有事联系 nav@wisdgod.com (因为有人说很难联系到作者..从v0.1.3-rc.5.2.1起添加)。
+* 推荐自部署，[官方网站](https://cc.wisdgod.com) 仅用于作者测试，不保证稳定性。
 
 ## 获取key
 
@@ -43,7 +45,7 @@ token2,checksum2
 
 ### 模型列表
 
-写死了，后续也不会会支持自定义模型列表
+写死了，后续也不会会支持自定义模型列表，因为本身就支持动态更新，详见[更新模型列表说明](#更新模型列表说明)
 
 ```
 claude-3.5-sonnet
@@ -239,7 +241,8 @@ data: [DONE]
           "payment_id": "string",
           "days_remaining_on_trial": number
         }
-      }
+      },
+      "tags": ["string"]
     }
   ],
   "tokens_count": number
@@ -254,9 +257,50 @@ data: [DONE]
 * 请求格式:
 
 ```json
-{
-  "tokens": "string"  // token列表内容，将会直接覆盖 token_list 文件
-}
+[
+  {
+    "token": "string",
+    "checksum": "string",
+    "profile": {
+      "usage": {
+        "premium": {
+          "requests": number,
+          "requests_total": number,
+          "tokens": number,
+          "max_requests": number,
+          "max_tokens": number
+        },
+        "standard": {
+          "requests": number,
+          "requests_total": number,
+          "tokens": number,
+          "max_requests": number,
+          "max_tokens": number
+        },
+        "unknown": {
+          "requests": number,
+          "requests_total": number,
+          "tokens": number,
+          "max_requests": number,
+          "max_tokens": number
+        },
+        "start_of_month": "string"
+      },
+      "user": {
+        "email": "string",
+        "name": "string",
+        "id": "string",
+        "updated_at": "string"
+      },
+      "stripe": {
+        "membership_type": "free" | "free_trial" | "pro" | "enterprise",
+        "payment_id": "string",
+        "days_remaining_on_trial": number
+      }
+    },
+    "tags": ["string"]
+  }
+]
 ```
 
 * 响应格式:
@@ -338,7 +382,7 @@ data: [DONE]
 ```json
 {
   "tokens": ["string"],
-  "tags": ["string"]
+  "tags": ["string"] // index 0: 时区标识符(独有); index 1: 代理名称
 }
 ```
 
@@ -348,6 +392,28 @@ data: [DONE]
 {
   "status": "success",
   "message": "string"  // "标签更新成功"
+}
+```
+
+#### 更新Tokens Profile
+
+* 接口地址: `/tokens/profile/update`
+* 请求方法: POST
+* 认证方式: Bearer Token
+* 请求格式:
+
+```json
+[
+  "string" // tokens
+]
+```
+
+* 响应格式:
+
+```json
+{
+  "status": "success",
+  "message": "string"  // "已更新?个令牌配置, ?个令牌更新失败"
 }
 ```
 
@@ -753,6 +819,28 @@ string
 * 接口地址: `/logs`
 * 请求方法: POST
 * 认证方式: Bearer Token
+* 请求格式:
+
+```json
+{
+  "query": {
+    "limit": number,             // 可选，返回记录数量限制
+    "offset": number,            // 可选，起始位置偏移量
+    "status": "string",          // 可选，按状态过滤 ("pending"/"success"/"failure")
+    "model": "string",           // 可选，按模型名称过滤（支持部分匹配）
+    "from_date": "string",       // 可选，开始日期时间，RFC3339格式
+    "to_date": "string",         // 可选，结束日期时间，RFC3339格式
+    "email": "string",           // 可选，按用户邮箱过滤（支持部分匹配）
+    "membership_type": "string", // 可选，按会员类型过滤 ("free"/"free_trial"/"pro"/"enterprise")
+    "min_total_time": number,    // 可选，最小总耗时（秒）
+    "max_total_time": number,    // 可选，最大总耗时（秒）
+    "stream": boolean,           // 可选，是否为流式请求
+    "has_error": boolean,        // 可选，是否包含错误
+    "has_chain": boolean         // 可选，是否包含对话链
+  }
+}
+```
+
 * 响应格式:
 
 ```json
@@ -825,6 +913,13 @@ string
   "status": "success"
 }
 ```
+
+* 说明：
+  - 所有查询参数都是可选的
+  - 管理员可以查看所有日志，普通用户只能查看与其token相关的日志
+  - 如果提供了无效的状态或会员类型，将返回空结果
+  - 日期时间格式需遵循 RFC3339 标准，如："2024-03-20T15:30:00+08:00"
+  - 邮箱和模型名称支持部分匹配
 
 #### 获取用户信息
 
@@ -962,4 +1057,10 @@ string
 
 有人说少个二维码来着，还是算了。如果觉得好用，给点支持。其实没啥大不了的，没兴趣就不做了。不想那么多了。
 
-要不给我邮箱发口令红包？休息休息
+要不给我邮箱发口令红包？
+
+过了差不多两个多月，继续吐槽：
+
+我都不知道为什么现在还在更新，明明我自己都不用的，一看到bug反馈我就尽量马上去解决问题。不知道说什么好了。
+
+真得给我磕一个。

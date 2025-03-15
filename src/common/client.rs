@@ -1,22 +1,20 @@
-use super::utils::generate_hash;
 use crate::app::{
     constant::{
         CONTENT_TYPE_CONNECT_PROTO, CONTENT_TYPE_PROTO, CURSOR_API2_HOST, CURSOR_HOST,
         CURSOR_SETTINGS_URL, HEADER_NAME_GHOST_MODE, TRUE,
     },
     lazy::{
-        CURSOR_API2_STRIPE_URL, CURSOR_TIMEZONE, CURSOR_USAGE_API_URL, CURSOR_USER_API_URL,
-        REVERSE_PROXY_HOST, USE_REVERSE_PROXY,
+        PRI_REVERSE_PROXY_HOST, PUB_REVERSE_PROXY_HOST, USE_PRI_REVERSE_PROXY,
+        USE_PUB_REVERSE_PROXY, cursor_api2_stripe_url, cursor_usage_api_url, cursor_user_api_url,
     },
 };
 use reqwest::{
     Client, RequestBuilder,
     header::{
         ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, CACHE_CONTROL, CONNECTION, CONTENT_TYPE, COOKIE,
-        DNT, HOST, ORIGIN, PRAGMA, REFERER, TE, TRANSFER_ENCODING, USER_AGENT,
+        DNT, HOST, ORIGIN, PRAGMA, REFERER, TE, USER_AGENT,
     },
 };
-use uuid::Uuid;
 
 macro_rules! def_const {
     ($name:ident, $value:expr) => {
@@ -33,7 +31,7 @@ def_const!(PRIORITY, "priority");
 def_const!(ONE, "1");
 def_const!(ENCODINGS, "gzip,br");
 def_const!(VALUE_ACCEPT, "*/*");
-def_const!(VALUE_LANGUAGE, "zh-CN");
+def_const!(VALUE_LANGUAGE, "en-US");
 def_const!(EMPTY, "empty");
 def_const!(CORS, "cors");
 def_const!(NO_CACHE, "no-cache");
@@ -48,6 +46,18 @@ def_const!(U_EQ_4, "u=4");
 
 def_const!(PROXY_HOST, "x-co");
 
+pub(crate) struct AiServiceRequest<'a> {
+    pub(crate) client: Client,
+    pub(crate) auth_token: &'a str,
+    pub(crate) checksum: &'a str,
+    pub(crate) client_key: &'a str,
+    pub(crate) url: &'a str,
+    pub(crate) is_stream: bool,
+    pub(crate) timezone: &'static str,
+    pub(crate) trace_id: &'a str,
+    pub(crate) is_pri: bool,
+}
+
 /// 返回预构建的 Cursor API 客户端
 ///
 /// # 参数
@@ -59,46 +69,75 @@ def_const!(PROXY_HOST, "x-co");
 /// # 返回
 ///
 /// * `reqwest::RequestBuilder` - 配置好的请求构建器
-pub fn build_request(
-    client: Client,
-    auth_token: &str,
-    checksum: &str,
-    url: &str,
-    is_stream: bool,
-) -> RequestBuilder {
-    let trace_id = Uuid::new_v4().to_string();
-
-    let client = if *USE_REVERSE_PROXY {
-        client
-            .post(url)
-            .header(HOST, &*REVERSE_PROXY_HOST)
-            .header(PROXY_HOST, CURSOR_API2_HOST)
-    } else {
-        client.post(url).header(HOST, CURSOR_API2_HOST)
-    };
+pub fn build_request(req: AiServiceRequest) -> RequestBuilder {
+    #[inline]
+    fn get_client_and_host<'a>(
+        client: &Client,
+        url: &'a str,
+        is_pri: bool,
+        real_host: &'a str,
+    ) -> (RequestBuilder, &'a str) {
+        if is_pri && *USE_PRI_REVERSE_PROXY {
+            (
+                client.post(url).header(PROXY_HOST, real_host),
+                PRI_REVERSE_PROXY_HOST.as_str(),
+            )
+        } else if !is_pri && *USE_PUB_REVERSE_PROXY {
+            (
+                client.post(url).header(PROXY_HOST, real_host),
+                PUB_REVERSE_PROXY_HOST.as_str(),
+            )
+        } else {
+            (client.post(url), real_host)
+        }
+    }
+    let (client, host) = get_client_and_host(&req.client, req.url, req.is_pri, CURSOR_API2_HOST);
 
     client
         .header(
             CONTENT_TYPE,
-            if is_stream {
+            if req.is_stream {
                 CONTENT_TYPE_CONNECT_PROTO
             } else {
                 CONTENT_TYPE_PROTO
             },
         )
-        .bearer_auth(auth_token)
+        .bearer_auth(req.auth_token)
         .header("connect-accept-encoding", ENCODINGS)
         .header("connect-protocol-version", ONE)
         .header(USER_AGENT, "connect-es/1.6.1")
-        .header("x-amzn-trace-id", format!("Root={}", trace_id))
-        .header("x-client-key", generate_hash())
-        .header("x-cursor-checksum", checksum)
+        .header("x-amzn-trace-id", format!("Root={}", req.trace_id))
+        .header("x-client-key", req.client_key)
+        .header("x-cursor-checksum", req.checksum)
         .header("x-cursor-client-version", "0.42.5")
-        .header("x-cursor-timezone", &*CURSOR_TIMEZONE)
+        .header("x-cursor-timezone", req.timezone)
         .header(HEADER_NAME_GHOST_MODE, TRUE)
-        .header("x-request-id", trace_id)
-        .header(CONNECTION, KEEP_ALIVE)
-        .header(TRANSFER_ENCODING, "chunked")
+        .header("x-request-id", req.trace_id)
+        .header(HOST, host)
+        .header("Connection", KEEP_ALIVE)
+        .header("Transfer-Encoding", "chunked")
+}
+
+#[inline]
+fn get_client_and_host<'a>(
+    client: &Client,
+    url: &'a str,
+    is_pri: bool,
+    real_host: &'a str,
+) -> (RequestBuilder, &'a str) {
+    if is_pri && *USE_PRI_REVERSE_PROXY {
+        (
+            client.get(url).header(PROXY_HOST, real_host),
+            PRI_REVERSE_PROXY_HOST.as_str(),
+        )
+    } else if !is_pri && *USE_PUB_REVERSE_PROXY {
+        (
+            client.get(url).header(PROXY_HOST, real_host),
+            PUB_REVERSE_PROXY_HOST.as_str(),
+        )
+    } else {
+        (client.get(url), real_host)
+    }
 }
 
 /// 返回预构建的获取 Stripe 账户信息的 Cursor API 客户端
@@ -110,19 +149,16 @@ pub fn build_request(
 /// # 返回
 ///
 /// * `reqwest::RequestBuilder` - 配置好的请求构建器
-pub fn build_profile_request(client: &Client, auth_token: &str) -> RequestBuilder {
-    let client = if *USE_REVERSE_PROXY {
-        client
-            .get(&*CURSOR_API2_STRIPE_URL)
-            .header(HOST, &*REVERSE_PROXY_HOST)
-            .header(PROXY_HOST, CURSOR_API2_HOST)
-    } else {
-        client
-            .get(&*CURSOR_API2_STRIPE_URL)
-            .header(HOST, CURSOR_API2_HOST)
-    };
+pub fn build_profile_request(client: &Client, auth_token: &str, is_pri: bool) -> RequestBuilder {
+    let (client, host) = get_client_and_host(
+        client,
+        &cursor_api2_stripe_url(is_pri),
+        is_pri,
+        CURSOR_API2_HOST,
+    );
 
     client
+        .header(HOST, host)
         .header("sec-ch-ua", "\"Not-A.Brand\";v=\"99\", \"Chromium\";v=\"124\"")
         .header(HEADER_NAME_GHOST_MODE, TRUE)
         .header("sec-ch-ua-mobile", "?0")
@@ -152,19 +188,19 @@ pub fn build_profile_request(client: &Client, auth_token: &str) -> RequestBuilde
 /// # 返回
 ///
 /// * `reqwest::RequestBuilder` - 配置好的请求构建器
-pub fn build_usage_request(client: &Client, user_id: &str, auth_token: &str) -> RequestBuilder {
+pub fn build_usage_request(
+    client: &Client,
+    user_id: &str,
+    auth_token: &str,
+    is_pri: bool,
+) -> RequestBuilder {
     let session_token = format!("{}%3A%3A{}", user_id, auth_token);
 
-    let client = if *USE_REVERSE_PROXY {
-        client
-            .get(&*CURSOR_USAGE_API_URL)
-            .header(HOST, &*REVERSE_PROXY_HOST)
-            .header(PROXY_HOST, CURSOR_HOST)
-    } else {
-        client.get(&*CURSOR_USAGE_API_URL).header(HOST, CURSOR_HOST)
-    };
+    let (client, host) =
+        get_client_and_host(client, &cursor_usage_api_url(is_pri), is_pri, CURSOR_HOST);
 
     client
+        .header(HOST, host)
         .header(USER_AGENT, UA_WIN)
         .header(ACCEPT, VALUE_ACCEPT)
         .header(ACCEPT_LANGUAGE, VALUE_LANGUAGE)
@@ -197,19 +233,19 @@ pub fn build_usage_request(client: &Client, user_id: &str, auth_token: &str) -> 
 /// # 返回
 ///
 /// * `reqwest::RequestBuilder` - 配置好的请求构建器
-pub fn build_userinfo_request(client: &Client, user_id: &str, auth_token: &str) -> RequestBuilder {
+pub fn build_userinfo_request(
+    client: &Client,
+    user_id: &str,
+    auth_token: &str,
+    is_pri: bool,
+) -> RequestBuilder {
     let session_token = format!("{}%3A%3A{}", user_id, auth_token);
 
-    let client = if *USE_REVERSE_PROXY {
-        client
-            .get(&*CURSOR_USER_API_URL)
-            .header(HOST, &*REVERSE_PROXY_HOST)
-            .header(PROXY_HOST, CURSOR_HOST)
-    } else {
-        client.get(&*CURSOR_USER_API_URL).header(HOST, CURSOR_HOST)
-    };
+    let (client, host) =
+        get_client_and_host(client, &cursor_user_api_url(is_pri), is_pri, CURSOR_HOST);
 
     client
+        .header(HOST, host)
         .header(USER_AGENT, UA_WIN)
         .header(ACCEPT, VALUE_ACCEPT)
         .header(ACCEPT_LANGUAGE, VALUE_LANGUAGE)

@@ -154,14 +154,17 @@
 
       // 比较并只收集变更的配置
       for (const [key, value] of Object.entries(currentConfig)) {
-        // 跳过路径，因为已经添加
         if (key === 'path') continue;
 
         if (key === 'content') {
-          if (currentConfig.content.type !== 'default' &&
-            (configCache.content?.type !== currentConfig.content.type ||
-              configCache.content?.content !== currentConfig.content.content)) {
-            changes.content = value;
+          if (configCache.content?.type !== currentConfig.content.type ||
+            (currentConfig.content.type !== 'default' && configCache.content?.content !== currentConfig.content.content)) {
+            // 当类型为default时，只发送类型信息
+            if (currentConfig.content.type === 'default') {
+              changes.content = { type: 'default' };
+            } else {
+              changes.content = value;
+            }
           }
           continue;
         }

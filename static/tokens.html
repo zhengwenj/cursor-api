@@ -265,6 +265,8 @@
       width: 90%;
       max-width: 500px;
       color: var(--text-primary);
+      height: 80vh;
+      overflow-y: auto;
     }
 
     .modal-backdrop {
@@ -613,7 +615,8 @@
       left: auto;
     }
 
-    /* 代理名称可点击样式 */
+    /* 时区名称和代理名称共享样式 */
+    .timezone-name,
     .proxy-name {
       cursor: pointer;
       padding: 3px 8px;
@@ -627,6 +630,7 @@
       position: relative;
     }
 
+    .timezone-name:hover,
     .proxy-name:hover {
       background-color: var(--primary-color-alpha);
       color: var(--primary-color);
@@ -635,11 +639,13 @@
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
 
+    .timezone-name:active,
     .proxy-name:active {
       transform: translateY(0px);
       box-shadow: none;
     }
 
+    .timezone-name:hover::after,
     .proxy-name:hover::after {
       opacity: 1;
     }
@@ -667,6 +673,14 @@
           <option value="free_trial">试用版</option>
           <option value="pro">专业版</option>
           <option value="enterprise">企业版</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>时区筛选:</label>
+        <select id="timezoneFilter">
+          <option value="all">全部时区</option>
+          <option value="none">未指定时区</option>
+          <!-- 时区列表将在JavaScript中动态填充 -->
         </select>
       </div>
       <div class="filter-group">
@@ -731,9 +745,10 @@
         <thead>
           <tr>
             <th>账户/Token</th>
-            <th style="width: 20%;">会员类型</th>
-            <th style="width: 20%;">用量</th>
+            <th style="width: 15%;">会员类型</th>
+            <th style="width: 15%;">用量</th>
             <th style="width: 10%;">试用剩余</th>
+            <th style="width: 10%;">时区</th>
             <th style="width: 10%;">代理</th>
           </tr>
         </thead>
@@ -774,6 +789,9 @@
     <div class="context-menu-item" onclick="copyTokenToClipboard()">
       <span>复制Token</span>
       <span class="context-menu-shortcut">Ctrl+C</span>
+    </div>
+    <div class="context-menu-item" onclick="openTimezoneSelector()">
+      <span>设置时区</span>
     </div>
     <div class="context-menu-item proxy-menu">
       <span>设置代理</span>
@@ -964,6 +982,39 @@
   <!-- 全局通知区域 -->
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- 添加时区选择模态框 -->
+  <!-- 时区选择对话框 -->
+  <div class="modal-backdrop" id="timezoneModal-backdrop"></div>
+  <div class="modal" id="timezoneModal">
+    <div class="modal-header">
+      <h3>设置时区</h3>
+      <button class="modal-close" onclick="closeModal('timezoneModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>账户/Token:</label>
+        <div id="timezoneTokenDisplay"
+          style="word-break: break-all; background: var(--disabled-bg); padding: 8px; border-radius: var(--border-radius); margin-bottom: 10px;">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>搜索时区:</label>
+        <input type="text" id="timezoneSearchInput" placeholder="输入关键词搜索时区..." style="width: 100%">
+      </div>
+      <div class="form-group">
+        <label>时区列表:</label>
+        <div id="timezoneListContainer"
+          style="max-height: 300px; overflow-y: auto; margin-top: 8px; border: 1px solid var(--border-color); border-radius: var(--border-radius);">
+          <!-- 时区列表将在这里动态生成 -->
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeModal('timezoneModal')" class="secondary">取消</button>
+      <button onclick="saveTimezoneSelection()" class="primary">保存</button>
+    </div>
+  </div>
+
   <script>
     // 全局变量
     let allTokens = [];
@@ -1014,7 +1065,8 @@
       document.getElementById('trialMin').addEventListener('change', filterTokens);
       document.getElementById('trialMax').addEventListener('change', filterTokens);
       document.getElementById('profileFilter').addEventListener('change', filterTokens);
-      document.getElementById('proxyFilter').addEventListener('change', filterTokens); // 代理筛选监听
+      document.getElementById('proxyFilter').addEventListener('change', filterTokens);
+      document.getElementById('timezoneFilter').addEventListener('change', filterTokens); // 时区筛选监听
 
       // 设置键盘快捷键
       setupKeyboardShortcuts();
@@ -1229,10 +1281,27 @@
         if (!selectedTokens.has(token)) {
           clearSelection();
           selectToken(token);
+          updateSelectionStatus();
         }
+
+        // 设置当前处理的token
+        currentToken = token;
 
         // 更新代理子菜单
         updateProxySubmenu();
+
+        // 更新多选时的菜单项文本
+        if (selectedTokens.size > 1) {
+          document.querySelector('.context-menu-item[onclick="viewDetails()"] span:first-child').textContent = "查看详情(单个)";
+          document.querySelector('.context-menu-item[onclick="openTimezoneSelector()"] span:first-child').textContent = `设置时区(已选${selectedTokens.size}个)`;
+          document.querySelector('.context-menu-item.proxy-menu span:first-child').textContent = `设置代理(已选${selectedTokens.size}个)`;
+          document.querySelector('.context-menu-item[onclick="deleteSelectedTokens()"] span:first-child').textContent = `删除(已选${selectedTokens.size}个)`;
+        } else {
+          document.querySelector('.context-menu-item[onclick="viewDetails()"] span:first-child').textContent = "查看详情";
+          document.querySelector('.context-menu-item[onclick="openTimezoneSelector()"] span:first-child').textContent = "设置时区";
+          document.querySelector('.context-menu-item.proxy-menu span:first-child').textContent = "设置代理";
+          document.querySelector('.context-menu-item[onclick="deleteSelectedTokens()"] span:first-child').textContent = "删除";
+        }
 
         // 计算菜单位置
         positionContextMenu(contextMenu, e.clientX, e.clientY);
@@ -1246,7 +1315,7 @@
       });
     }
 
-    // 修改计算和设置菜单位置的函数
+    // 计算和设置菜单位置
     function positionContextMenu(menu, x, y) {
       // 首先显示菜单但设为不可见，以便获取其尺寸
       menu.style.display = 'block';
@@ -1287,7 +1356,7 @@
       adjustSubmenuPosition(menu, windowWidth, windowHeight);
     }
 
-    // 新增函数：调整子菜单位置
+    // 调整子菜单位置
     function adjustSubmenuPosition(menu, windowWidth, windowHeight) {
       const proxyMenu = menu.querySelector('.proxy-menu');
       if (!proxyMenu) return;
@@ -1410,6 +1479,7 @@
       const trialMaxValue = document.getElementById('trialMax').value;
       const profileFilter = document.getElementById('profileFilter').value;
       const proxyFilter = document.getElementById('proxyFilter').value;
+      const timezoneFilter = document.getElementById('timezoneFilter').value; // 保存时区筛选条件
 
       // 刷新代理列表
       await getProxies();
@@ -1420,6 +1490,7 @@
         renderTokens(allTokens);
         updateStatusBar();
         updateProxyFilter(); // 更新代理筛选下拉框
+        updateTimezoneFilter(); // 更新时区筛选下拉框
 
         // 恢复筛选条件
         document.getElementById('searchInput').value = searchTerm;
@@ -1430,6 +1501,7 @@
         document.getElementById('trialMax').value = trialMaxValue;
         document.getElementById('profileFilter').value = profileFilter;
         document.getElementById('proxyFilter').value = proxyFilter;
+        document.getElementById('timezoneFilter').value = timezoneFilter; // 恢复时区筛选条件
 
         // 应用筛选
         filterTokens();
@@ -1471,22 +1543,30 @@
       }
 
       const tokensToUpdate = [...selectedTokens];
-      // 第一项为空字符串，第二项为代理名称
-      const tags = proxyName ? ['', proxyName] : [];
-
-      showToast('正在更新代理设置...', 'info');
-      const data = await makeAuthenticatedRequest('/tokens/tags/update', {
-        method: 'POST',
-        body: JSON.stringify({
-          tokens: tokensToUpdate,
-          tags: tags
-        })
+      const tokensData = tokensToUpdate.map(token => {
+        // 获取当前token的时区设置
+        const tokenObj = allTokens.find(t => t.token === token);
+        const timezone = tokenObj?.tags?.[0] || '';
+        // 保留时区设置，更新代理设置
+        return { token, tags: [timezone, proxyName] };
       });
 
-      if (data && data.status === 'success') {
+      showToast('正在更新代理设置...', 'info');
+      const promises = tokensData.map(data =>
+        makeAuthenticatedRequest('/tokens/tags/update', {
+          method: 'POST',
+          body: JSON.stringify({
+            tokens: [data.token],
+            tags: data.tags
+          })
+        })
+      );
+
+      try {
+        await Promise.all(promises);
         showToast('代理设置成功', 'success');
         getTokenInfo(); // 刷新Token列表
-      } else {
+      } catch (error) {
         showToast('代理设置失败', 'error');
       }
     }
@@ -1532,6 +1612,7 @@
 
         const email = user.email || '';
         const displayName = email || token.token.substring(0, 15) + '...';
+        const timezone = token.tags?.[0] || ''; // 获取时区
 
         return `
           <tr data-token="${token.token}" data-checksum="${token.checksum}" data-index="${index}" class="${selectedTokens.has(token.token) ? 'selected' : ''}">
@@ -1542,6 +1623,7 @@
             <td>${formatMembershipType(stripe.membership_type)}</td>
             <td>${premium.requests || 0}/${premium.max_requests || '∞'}</td>
             <td>${stripe.days_remaining_on_trial > 0 ? `${stripe.days_remaining_on_trial}天` : '-'}</td>
+            <td><span class="timezone-name" onclick="openTimezoneSelectorForToken('${token.token}', event)">${timezone || '未指定'}</span></td>
             <td><span class="proxy-name" onclick="openProxySelector('${displayName}','${token.token}', event)">${token.tags ? token.tags[1] || '未指定' : '未指定'}</span></td>
           </tr>
         `;
@@ -1552,8 +1634,8 @@
       rows.forEach(row => {
         row.addEventListener('click', function (e) {
 
-          // 如果点击的是代理名称，不处理行选择
-          if (e.target.classList.contains('proxy-name')) {
+          // 如果点击的是代理名称或时区名称，不处理行选择
+          if (e.target.classList.contains('proxy-name') || e.target.classList.contains('timezone-name')) {
             return;
           }
 
@@ -1611,6 +1693,19 @@
       updateProxySubmenu();
     }
 
+    // 为单个Token打开时区选择器
+    function openTimezoneSelectorForToken(token, event) {
+      // 阻止事件冒泡，避免触发行选择
+      event.stopPropagation();
+
+      // 选中该Token
+      clearSelection();
+      selectToken(token);
+
+      // 打开时区选择器
+      openTimezoneSelector();
+    }
+
     // 筛选Token
     function filterTokens() {
       const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -1620,7 +1715,8 @@
       const trialMinValue = document.getElementById('trialMin').value;
       const trialMaxValue = document.getElementById('trialMax').value;
       const profileFilter = document.getElementById('profileFilter').value;
-      const proxyFilter = document.getElementById('proxyFilter').value;  // 新增代理筛选
+      const proxyFilter = document.getElementById('proxyFilter').value;
+      const timezoneFilter = document.getElementById('timezoneFilter').value;  // 新增时区筛选
 
       const filteredTokens = allTokens.filter(token => {
         const profile = token.profile || {};
@@ -1680,7 +1776,18 @@
           }
         }
 
-        return searchMatch && membershipMatch && usageMatch && trialMatch && profileMatch && proxyMatch;
+        // 时区筛选
+        let timezoneMatch = true;
+        if (timezoneFilter !== 'all') {
+          const tokenTimezone = token.tags?.[0] || '';
+          if (timezoneFilter === 'none') {
+            timezoneMatch = tokenTimezone === '';
+          } else {
+            timezoneMatch = tokenTimezone === timezoneFilter;
+          }
+        }
+
+        return searchMatch && membershipMatch && usageMatch && trialMatch && profileMatch && proxyMatch && timezoneMatch;
       });
 
       renderTokens(filteredTokens);
@@ -1803,6 +1910,8 @@
       const stripe = profile.stripe || {};
       const usage = profile.usage || {};
       const premium = usage.premium || {};
+      const timezone = tokenObj.tags?.[0] || '-';
+      const proxy = tokenObj.tags?.[1] || '-';
 
       document.getElementById('detailsTitle').textContent = user.email || '未知账户';
 
@@ -1815,6 +1924,14 @@
           <div class="details-property">
             <div class="details-property-name">Checksum</div>
             <div class="details-property-value">${tokenObj.checksum || '-'}</div>
+          </div>
+          <div class="details-property">
+            <div class="details-property-name">时区</div>
+            <div class="details-property-value">${timezone}</div>
+          </div>
+          <div class="details-property">
+            <div class="details-property-name">代理</div>
+            <div class="details-property-value">${proxy}</div>
           </div>
           <div class="details-property">
             <div class="details-property-name">会员类型</div>
@@ -2090,21 +2207,39 @@
 
       reader.onload = async function (e) {
         try {
-          const tokensText = e.target.result;
+          const tokensJson = JSON.parse(e.target.result);
+
+          if (!Array.isArray(tokensJson)) {
+            throw new Error('导入的数据格式不正确，应为数组');
+          }
+
+          const isValid = tokensJson.every(tokenObj => {
+            return typeof tokenObj.token === 'string' &&
+              typeof tokenObj.checksum === 'string' &&
+              typeof tokenObj.profile === 'object' &&
+              typeof tokenObj.profile.usage === 'object' &&
+              typeof tokenObj.profile.user === 'object' &&
+              typeof tokenObj.profile.stripe === 'object' &&
+              Array.isArray(tokenObj.tags);
+          });
+
+          if (!isValid) {
+            throw new Error('导入的数据结构不符合要求，请检查后重试');
+          }
 
           closeModal('importModal');
           showToast('正在导入Token...', 'info');
 
           const data = await makeAuthenticatedRequest('/tokens/update', {
-            body: JSON.stringify({
-              tokens: tokensText
-            })
+            body: JSON.stringify(tokensJson)
           });
 
           if (data) {
             showToast('Token列表导入成功', 'success');
             fileInput.value = '';
             getTokenInfo();
+          } else {
+            showToast('导入失败，服务器未返回有效响应', 'error');
           }
         } catch (error) {
           showToast('导入失败: ' + error.message, 'error');
@@ -2464,6 +2599,245 @@
         proxyUsage[proxy] = (proxyUsage[proxy] || 0) + 1;
       });
       return proxyUsage;
+    }
+
+    // 修正时区选择器函数
+    // 打开时区选择器
+    function openTimezoneSelector() {
+      if (selectedTokens.size === 0) {
+        showToast('请先选择Token', 'info');
+        return;
+      }
+
+      // 设置当前正在编辑的token
+      currentEditingToken = [...selectedTokens][0];
+      const tokenObj = allTokens.find(t => t.token === currentEditingToken);
+      if (!tokenObj) return;
+
+      // 使用邮箱或者token的简短显示
+      const email = tokenObj.profile?.user?.email || '';
+      const displayName = email || tokenObj.token.substring(0, 15) + '...';
+
+      // 显示当前选中的Token数量和账户信息
+      let displayText = '';
+      if (selectedTokens.size === 1) {
+        displayText = displayName;
+      } else {
+        displayText = `已选择 ${selectedTokens.size} 个账户/Token`;
+      }
+      document.getElementById('timezoneTokenDisplay').textContent = displayText;
+
+      // 初始化时区列表
+      initializeTimezoneList();
+
+      // 设置当前选中的时区
+      const currentTimezone = tokenObj.tags?.[0] || '';
+      highlightSelectedTimezone(currentTimezone);
+
+      // 显示模态框
+      showModal('timezoneModal');
+
+      // 设置搜索框事件
+      document.getElementById('timezoneSearchInput').addEventListener('input', searchTimezones);
+      document.getElementById('timezoneSearchInput').value = '';
+
+      // 关闭右键菜单
+      document.getElementById('contextMenu').style.display = 'none';
+    }
+
+    // 全局时区列表数组
+    let timezoneList = [];
+
+    // 初始化时区列表
+    function initializeTimezoneList() {
+      try {
+        // 尝试使用Intl.supportedValuesOf获取时区列表（现代浏览器支持）
+        if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+          timezoneList = Intl.supportedValuesOf('timeZone');
+        } else {
+          // 回退到预定义的常用时区列表
+          timezoneList = [
+            'Africa/Abidjan', 'Africa/Accra', 'Africa/Addis_Ababa', 'Africa/Algiers',
+            'Africa/Cairo', 'Africa/Casablanca', 'Africa/Johannesburg', 'Africa/Lagos',
+            'Africa/Nairobi', 'America/Anchorage', 'America/Argentina/Buenos_Aires',
+            'America/Bogota', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+            'America/Mexico_City', 'America/New_York', 'America/Phoenix', 'America/Sao_Paulo',
+            'America/Toronto', 'Asia/Bangkok', 'Asia/Dubai', 'Asia/Hong_Kong',
+            'Asia/Jakarta', 'Asia/Karachi', 'Asia/Kolkata', 'Asia/Manila', 'Asia/Seoul',
+            'Asia/Shanghai', 'Asia/Singapore', 'Asia/Taipei', 'Asia/Tehran', 'Asia/Tokyo',
+            'Australia/Melbourne', 'Australia/Perth', 'Australia/Sydney',
+            'Europe/Amsterdam', 'Europe/Athens', 'Europe/Berlin', 'Europe/Brussels',
+            'Europe/Istanbul', 'Europe/London', 'Europe/Madrid', 'Europe/Moscow', 'Europe/Paris',
+            'Europe/Rome', 'Europe/Stockholm', 'Pacific/Auckland', 'Pacific/Honolulu',
+            'UTC'
+          ];
+        }
+
+        renderTimezoneList(timezoneList);
+      } catch (error) {
+        console.error('获取时区列表失败:', error);
+        showToast('获取时区列表失败', 'error');
+      }
+    }
+
+    // 渲染时区列表
+    function renderTimezoneList(timezones) {
+      const container = document.getElementById('timezoneListContainer');
+
+      // 添加一个"未指定"选项
+      let html = `
+        <div class="timezone-item" data-timezone="" onclick="selectTimezone('')">
+          <span>未指定</span>
+        </div>
+      `;
+
+      // 添加其他时区选项
+      timezones.forEach(timezone => {
+        html += `
+          <div class="timezone-item" data-timezone="${timezone}" onclick="selectTimezone('${timezone}')">
+            <span>${timezone}</span>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+
+      // 添加样式
+      const style = document.createElement('style');
+      style.textContent = `
+        .timezone-item {
+          padding: 8px 16px;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          border-bottom: 1px solid var(--border-color);
+        }
+        .timezone-item:last-child {
+          border-bottom: none;
+        }
+        .timezone-item:hover {
+          background: var(--primary-color-alpha);
+        }
+        .timezone-item.selected {
+          background: var(--primary-color);
+          color: white;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // 搜索时区
+    function searchTimezones() {
+      const searchTerm = document.getElementById('timezoneSearchInput').value.toLowerCase();
+
+      // 如果搜索词为空，显示所有时区
+      if (!searchTerm) {
+        renderTimezoneList(timezoneList);
+        return;
+      }
+
+      // 过滤匹配的时区
+      const filteredTimezones = timezoneList.filter(timezone =>
+        timezone.toLowerCase().includes(searchTerm)
+      );
+
+      renderTimezoneList(filteredTimezones);
+    }
+
+    // 选择时区
+    let selectedTimezone = '';
+    function selectTimezone(timezone) {
+      selectedTimezone = timezone;
+      highlightSelectedTimezone(timezone);
+    }
+
+    // 高亮显示选中的时区
+    function highlightSelectedTimezone(timezone) {
+      // 移除所有选中状态
+      const items = document.querySelectorAll('.timezone-item');
+      items.forEach(item => item.classList.remove('selected'));
+
+      // 添加选中状态
+      const selectedItem = document.querySelector(`.timezone-item[data-timezone="${timezone}"]`);
+      if (selectedItem) {
+        selectedItem.classList.add('selected');
+      }
+    }
+
+    // 保存时区选择
+    async function saveTimezoneSelection() {
+      if (selectedTokens.size === 0) return;
+
+      closeModal('timezoneModal');
+
+      const tokensToUpdate = [...selectedTokens];
+      const tokensData = tokensToUpdate.map(token => {
+        // 获取当前token的标签
+        const tokenObj = allTokens.find(t => t.token === token);
+        if (!tokenObj) return null;
+
+        // 保持原来的代理设置（在tags[1]中）
+        const proxyName = tokenObj.tags?.[1] || '';
+        return { token, tags: [selectedTimezone, proxyName] };
+      }).filter(Boolean); // 过滤掉null值
+
+      if (tokensData.length === 0) {
+        showToast('没有可更新的Token', 'error');
+        return;
+      }
+
+      showToast(`正在更新${tokensData.length}个Token的时区设置...`, 'info');
+
+      // 使用Promise.all并行处理所有更新请求
+      const promises = tokensData.map(data =>
+        makeAuthenticatedRequest('/tokens/tags/update', {
+          method: 'POST',
+          body: JSON.stringify({
+            tokens: [data.token],
+            tags: data.tags
+          })
+        })
+      );
+
+      try {
+        await Promise.all(promises);
+        showToast('时区设置成功', 'success');
+        getTokenInfo(); // 刷新Token列表
+      } catch (error) {
+        showToast('时区设置失败', 'error');
+        console.error('设置时区出错:', error);
+      }
+    }
+
+    // 添加更新时区筛选下拉框功能
+    function updateTimezoneFilter() {
+      const timezoneFilterSelect = document.getElementById('timezoneFilter');
+
+      // 保持第一个和第二个选项（全部时区和未指定时区）
+      while (timezoneFilterSelect.options.length > 2) {
+        timezoneFilterSelect.remove(2);
+      }
+
+      // 获取所有使用的时区并统计数量
+      const timezoneUsage = {};
+      allTokens.forEach(token => {
+        const timezone = token.tags?.[0] || '';
+        if (timezone) { // 只统计非空时区
+          timezoneUsage[timezone] = (timezoneUsage[timezone] || 0) + 1;
+        }
+      });
+
+      // 按使用量排序时区
+      const sortedTimezones = Object.keys(timezoneUsage).sort((a, b) =>
+        timezoneUsage[b] - timezoneUsage[a]
+      );
+
+      // 添加时区选项
+      sortedTimezones.forEach(timezone => {
+        const option = document.createElement('option');
+        option.value = timezone;
+        option.textContent = `${timezone} (${timezoneUsage[timezone]})`;
+        timezoneFilterSelect.appendChild(option);
+      });
     }
   </script>
 </body>

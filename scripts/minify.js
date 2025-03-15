@@ -6,6 +6,7 @@ const CleanCSS = require('clean-css');
 const MarkdownIt = require('markdown-it');
 const fs = require('fs');
 const path = require('path');
+const MarkdownItAnchor = require('markdown-it-anchor');
 
 // 配置选项
 const options = {
@@ -41,6 +42,9 @@ async function minifyFile(inputPath, outputPath) {
         html: true,
         linkify: true,
         typographer: true
+      }).use(MarkdownItAnchor, {
+        // 可选：自定义slug生成函数
+        slugify: (s) => String(s).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fa5\-]/g, '')
       });
       const readmeMdPath = path.join(__dirname, '..', 'README.md');
       const markdownContent = fs.readFileSync(readmeMdPath, 'utf8');
@@ -108,6 +112,21 @@ async function minifyFile(inputPath, outputPath) {
         a {
             color: #58a6ff;
         }
+        /* 标题链接样式 */
+        h1:hover .header-anchor,
+        h2:hover .header-anchor,
+        h3:hover .header-anchor,
+        h4:hover .header-anchor,
+        h5:hover .header-anchor,
+        h6:hover .header-anchor {
+            opacity: 1;
+        }
+        .header-anchor {
+            opacity: 0;
+            font-size: 0.85em;
+            margin-left: 0.25em;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -123,6 +142,10 @@ async function minifyFile(inputPath, outputPath) {
         minified = await minifyHtml(content, options);
         minified = minified.replace(/`([\s\S]*?)`/g, (_match, p1) => {
           return '`' + p1.replace(/\\n\s+/g, '') + '`';
+        }).replace(/'([\s\S]*?)'/g, (_match, p1) => {
+          return '\'' + p1.replace(/\\n\s+/g, '') + '\'';
+        }).replace(/"([\s\S]*?)"/g, (_match, p1) => {
+          return '"' + p1.replace(/\\n\s+/g, '') + '"';
         });
         break;
       case '.js':
@@ -130,6 +153,10 @@ async function minifyFile(inputPath, outputPath) {
         minified = result.code;
         minified = minified.replace(/`([\s\S]*?)`/g, (_match, p1) => {
           return '`' + p1.replace(/\\n\s+/g, '') + '`';
+        }).replace(/'([\s\S]*?)'/g, (_match, p1) => {
+          return '\'' + p1.replace(/\\n\s+/g, '') + '\'';
+        }).replace(/"([\s\S]*?)"/g, (_match, p1) => {
+          return '"' + p1.replace(/\\n\s+/g, '') + '"';
         });
         break;
       case '.css':

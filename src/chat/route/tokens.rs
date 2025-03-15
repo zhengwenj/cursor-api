@@ -4,15 +4,14 @@ use crate::{
         TokenTagsUpdateRequest, TokenUpdateRequest, TokensDeleteRequest, TokensDeleteResponse,
     },
     common::{
-        model::{ApiStatus, ErrorResponse, userinfo::TokenProfile},
+        model::{ApiStatus, ErrorResponse},
         utils::{
-            generate_checksum_with_default, generate_checksum_with_repair,
-            load_tokens_from_content, parse_token, validate_token,
+            generate_checksum_with_default, generate_checksum_with_repair, generate_hash, parse_token, validate_token
         },
     },
 };
 use axum::{Json, extract::State, http::StatusCode};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub async fn handle_get_tokens(
@@ -32,40 +31,10 @@ pub async fn handle_get_tokens(
 
 pub async fn handle_update_tokens(
     State(state): State<Arc<Mutex<AppState>>>,
-    Json(request): Json<TokenUpdateRequest>,
+    Json(tokens): Json<TokenUpdateRequest>,
 ) -> Result<Json<TokenInfoResponse>, StatusCode> {
-    // 获取当前的 token_manager 以保留现有 token 的 profile 和 tags
-    let current_token_manager = {
-        let state = state.lock().await;
-        state.token_manager.clone()
-    };
-
-    // 创建 token -> (profile, tags) 映射
-    let token_info_map: HashMap<String, (Option<TokenProfile>, Option<Vec<String>>)> =
-        current_token_manager
-            .tokens
-            .iter()
-            .map(|token| {
-                (
-                    token.token.clone(),
-                    (token.profile.clone(), token.tags.clone()),
-                )
-            })
-            .collect();
-
-    // 从请求内容加载新的 tokens
-    let mut new_tokens = load_tokens_from_content(&request.tokens);
-
-    // 为相同的 token 保留原有的 profile 和 tags
-    for token_info in &mut new_tokens {
-        if let Some((profile, tags)) = token_info_map.get(&token_info.token) {
-            token_info.profile = profile.clone();
-            token_info.tags = tags.clone();
-        }
-    }
-
     // 创建新的 TokenManager
-    let token_manager = TokenManager::new(new_tokens);
+    let token_manager = TokenManager::new(tokens);
     let tokens_count = token_manager.tokens.len();
 
     // 保存到文件
@@ -117,6 +86,7 @@ pub async fn handle_add_tokens(
                     .as_deref()
                     .map(generate_checksum_with_repair)
                     .unwrap_or_else(generate_checksum_with_default),
+                client_key: Some(generate_hash()),
                 profile: None,
                 tags: request.tags.clone(),
             });
@@ -336,8 +306,8 @@ pub async fn handle_update_tokens_profile(
     let token_manager = &mut state_guard.token_manager;
 
     // 批量更新tokens的profile
-    let mut updated_count = 0;
-    let mut failed_count = 0;
+    let mut updated_count: u32 = 0;
+    let mut failed_count: u32 = 0;
 
     for token in &tokens {
         // 验证token是否在token_manager中存在
@@ -350,6 +320,7 @@ pub async fn handle_update_tokens_profile(
             if let Some(profile) = crate::common::utils::get_token_profile(
                 token_manager.tokens[token_idx].get_client(),
                 token,
+                true,
             )
             .await
             {
@@ -365,18 +336,16 @@ pub async fn handle_update_tokens_profile(
     }
 
     // 保存更改
-    if updated_count > 0 {
-        if token_manager.save_tokens().await.is_err() {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    status: ApiStatus::Error,
-                    code: None,
-                    error: Some("Failed to save token profiles".to_string()),
-                    message: Some("无法保存令牌配置数据".to_string()),
-                }),
-            ));
-        }
+    if updated_count > 0 && token_manager.save_tokens().await.is_err() {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                status: ApiStatus::Error,
+                code: None,
+                error: Some("Failed to save token profiles".to_string()),
+                message: Some("无法保存令牌配置数据".to_string()),
+            }),
+        ));
     }
 
     let message = format!(

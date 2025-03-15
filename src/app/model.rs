@@ -1,4 +1,7 @@
-use crate::common::model::{ApiStatus, userinfo::TokenProfile};
+use crate::common::{
+    model::{ApiStatus, userinfo::TokenProfile},
+    utils::generate_hash,
+};
 use proxy_pool::ProxyPool;
 use reqwest::Client;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
@@ -10,8 +13,8 @@ mod vision_ability;
 pub use vision_ability::VisionAbility;
 mod config;
 pub use config::AppConfig;
-pub mod proxy_pool;
 mod build_key;
+pub mod proxy_pool;
 pub use build_key::*;
 mod state;
 pub use state::*;
@@ -20,7 +23,7 @@ pub use proxy::*;
 
 use super::constant::{STATUS_FAILURE, STATUS_PENDING, STATUS_SUCCESS};
 
-#[derive(Clone, Archive, RkyvDeserialize, RkyvSerialize)]
+#[derive(Clone, PartialEq, Archive, RkyvDeserialize, RkyvSerialize)]
 pub enum LogStatus {
     Pending,
     Success,
@@ -80,26 +83,37 @@ pub struct Chain {
 #[derive(Serialize, Clone, Archive, RkyvDeserialize, RkyvSerialize)]
 pub struct TimingInfo {
     pub total: f64, // 总用时(秒)
-    // #[serde(skip_serializing_if = "Option::is_none")]
-    // pub first: Option<f64>, // 首字时间(秒)
+                    // #[serde(skip_serializing_if = "Option::is_none")]
+                    // pub first: Option<f64>, // 首字时间(秒)
 }
 
 // 用于存储 token 信息
-#[derive(Clone, Serialize, Archive, RkyvSerialize, RkyvDeserialize)]
+#[derive(Clone, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize)]
 pub struct TokenInfo {
     pub token: String,
     pub checksum: String,
+    #[serde(
+        skip_serializing,
+        default = "generate_client_key"
+    )]
+    pub client_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile: Option<TokenProfile>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+}
+
+#[inline(always)]
+fn generate_client_key() -> Option<String> {
+    Some(generate_hash())
 }
 
 impl TokenInfo {
     /// 获取适用于此 token 的 HTTP 客户端
-    /// 
+    ///
     /// 如果 tags 中包含 "proxy" 标签，会尝试使用其后一个标签作为代理 URL
     /// 例如: tags = ["proxy", "http://localhost:8080"] 将使用 http://localhost:8080 作为代理
-    /// 
+    ///
     /// 如果没有找到有效的代理配置，将返回默认客户端
     pub fn get_client(&self) -> Client {
         // if let Some(tags) = &self.tags {
@@ -120,13 +134,37 @@ impl TokenInfo {
             ProxyPool::get_general_client()
         }
     }
+
+    pub fn timezone_name(&self) -> &'static str {
+        use std::str::FromStr as _;
+        if let Some(Some(Ok(tz))) = self.tags.as_ref().map(|tags| {
+            tags.get(0)
+                .filter(|s| !s.is_empty())
+                .map(|s| chrono_tz::Tz::from_str(s.as_str()))
+        }) {
+            tz.name()
+        } else {
+            super::lazy::GENERAL_TIMEZONE.name()
+        }
+    }
+
+    // pub fn now(&self) -> chrono::DateTime<chrono_tz::Tz> {
+    //     use std::str::FromStr as _;
+    //     if let Some(Some(Ok(tz))) = self.tags.as_ref().map(|tags| {
+    //         tags.get(0)
+    //             .filter(|s| !s.is_empty())
+    //             .map(|s| chrono_tz::Tz::from_str(s.as_str()))
+    //     }) {
+    //         use chrono::TimeZone as _;
+    //         tz.from_utc_datetime(&chrono::Utc::now().naive_utc())
+    //     } else {
+    //         super::lazy::now_in_general_timezone()
+    //     }
+    // }
 }
 
 // TokenUpdateRequest 结构体
-#[derive(Deserialize)]
-pub struct TokenUpdateRequest {
-    pub tokens: String,
-}
+pub type TokenUpdateRequest = Vec<TokenInfo>;
 
 #[derive(Deserialize)]
 pub struct TokenAddRequest {
@@ -165,16 +203,14 @@ impl DeleteResponseExpectation {
     pub fn needs_updated_tokens(&self) -> bool {
         matches!(
             self,
-            DeleteResponseExpectation::UpdatedTokens
-                | DeleteResponseExpectation::Detailed
+            DeleteResponseExpectation::UpdatedTokens | DeleteResponseExpectation::Detailed
         )
     }
 
     pub fn needs_failed_tokens(&self) -> bool {
         matches!(
             self,
-            DeleteResponseExpectation::FailedTokens
-                | DeleteResponseExpectation::Detailed
+            DeleteResponseExpectation::FailedTokens | DeleteResponseExpectation::Detailed
         )
     }
 }

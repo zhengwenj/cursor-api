@@ -1,47 +1,36 @@
+use crate::app::lazy::{PROXIES_FILE_PATH, SERVICE_TIMEOUT, TCP_KEEPALIVE};
 use memmap2::{MmapMut, MmapOptions};
 use parking_lot::RwLock;
 use reqwest::{Client, Proxy};
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::str::FromStr;
 use std::sync::LazyLock;
-
+use std::time::Duration;
 mod proxy_url;
-use super::super::lazy::PROXIES_FILE_PATH;
-use proxy_url::UrlWrapper;
-
-// 恢复原来的常量定义
-pub const NO_PROXY: &str = "no";
-pub const EMPTY_PROXY: &str = "";
-pub const SYSTEM_PROXY: &str = "system";
-pub const DEFAULT_PROXY: &str = "default";
+use proxy_url::StringUrl;
 
 // 新的代理值常量
 pub const NON_PROXY: &str = "non";
 pub const SYS_PROXY: &str = "sys";
 
-// 静态映射，将原来的值映射到新的值
-pub static PROXY_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
-    let mut map = HashMap::new();
-    map.insert(NO_PROXY, NON_PROXY);
-    map.insert(EMPTY_PROXY, NON_PROXY); // 空字符串也映射到NON_PROXY
-    map.insert(SYSTEM_PROXY, SYS_PROXY);
-    map.insert(DEFAULT_PROXY, SYS_PROXY); // DEFAULT_PROXY映射到SYS_PROXY
-    map
-});
-
 // 直接初始化PROXY_POOL为一个带有系统代理的基本实例
 pub static PROXY_POOL: LazyLock<RwLock<ProxyPool>> = LazyLock::new(|| {
-    let mut clients = HashMap::new();
-
-    // 添加系统代理
-    let system_client = Client::new();
-    clients.insert(SYS_PROXY.to_string(), system_client.clone());
+    let system_client = Client::builder()
+        .https_only(true)
+        .http1_only()
+        .tcp_keepalive(Duration::from_secs(*TCP_KEEPALIVE))
+        .timeout(Duration::from_secs(*SERVICE_TIMEOUT))
+        .http1_title_case_headers()
+        .build()
+        .expect("创建默认系统客户端失败");
 
     RwLock::new(ProxyPool {
-        clients,
+        proxies: HashMap::from([(SYS_PROXY.to_string(), SingleProxy::Sys)]),
+        clients: HashMap::from([(SingleProxy::Sys, system_client.clone())]),
         general: Some(system_client),
     })
 });
@@ -90,42 +79,101 @@ impl Proxies {
     }
 
     // 更新全局代理池
-    pub fn update_global_pool(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn update_global_pool(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // 获取全局代理池的写锁
         let mut pool = PROXY_POOL.write();
 
-        // 清除现有的客户端
-        pool.clients.clear();
-
-        let proxies = self.get_proxies();
-        if proxies.is_empty() {
-            // 添加系统代理
-            let system_client = Client::new();
-            pool.clients
-                .insert(SYS_PROXY.to_string(), system_client.clone());
-            pool.general = Some(system_client);
-            return Ok(());
+        // 确保self.proxies至少有系统代理，且general有效
+        if self.proxies.is_empty() {
+            self.proxies.insert(SYS_PROXY.to_string(), SingleProxy::Sys);
+            self.general = SYS_PROXY.to_string();
+        } else if !self.proxies.contains_key(&self.general) {
+            // general指向的代理不存在，更新为某个存在的代理
+            self.general = self.proxies.keys().next().unwrap().clone();
         }
 
-        // 初始化客户端并设置第一个代理为通用客户端
-        let mut first_name = None;
-        for (name, proxy) in proxies {
-            if first_name.is_none() {
-                first_name = Some(name.clone());
+        // 1. 收集当前配置中的所有唯一代理
+        let current_proxies: HashSet<&SingleProxy> = self.proxies.values().collect();
+
+        // 2. 直接更新代理映射，避免克隆
+        pool.proxies = self.proxies.clone();
+
+        // 3. 更新客户端实例
+        // 为新的代理配置创建客户端
+        for proxy in &current_proxies {
+            if !pool.clients.contains_key(proxy) {
+                // 创建新的客户端
+                match proxy {
+                    SingleProxy::Non => {
+                        pool.clients.insert(
+                            SingleProxy::Non,
+                            Client::builder()
+                                .https_only(true)
+                                .http1_only()
+                                .tcp_keepalive(Duration::from_secs(*TCP_KEEPALIVE))
+                                .timeout(Duration::from_secs(*SERVICE_TIMEOUT))
+                                .http1_title_case_headers()
+                                .no_proxy()
+                                .build()
+                                .expect("创建无代理客户端失败"),
+                        );
+                    }
+                    SingleProxy::Sys => {
+                        pool.clients.insert(
+                            SingleProxy::Sys,
+                            Client::builder()
+                                .https_only(true)
+                                .http1_only()
+                                .tcp_keepalive(Duration::from_secs(*TCP_KEEPALIVE))
+                                .timeout(Duration::from_secs(*SERVICE_TIMEOUT))
+                                .http1_title_case_headers()
+                                .build()
+                                .expect("创建默认客户端失败"),
+                        );
+                    }
+                    SingleProxy::Url(url) => {
+                        if let Ok(proxy_obj) = Proxy::all(url.to_string()) {
+                            pool.clients.insert(
+                                (*proxy).clone(),
+                                Client::builder()
+                                    .https_only(true)
+                                    .http1_only()
+                                    .tcp_keepalive(Duration::from_secs(*TCP_KEEPALIVE))
+                                    .timeout(Duration::from_secs(*SERVICE_TIMEOUT))
+                                    .http1_title_case_headers()
+                                    .proxy(proxy_obj)
+                                    .build()
+                                    .expect("创建代理客户端失败"),
+                            );
+                        }
+                    }
+                }
             }
-
-            // 初始化客户端
-            pool.append(name, &proxy);
         }
 
-        // 设置通用客户端
-        if let Some(name) = first_name {
-            pool.general = pool.clients.get(&name).cloned();
+        // 4. 移除不再使用的客户端
+        let to_remove: Vec<SingleProxy> = pool
+            .clients
+            .keys()
+            .filter(|proxy| !current_proxies.contains(proxy))
+            .cloned()
+            .collect();
+
+        for proxy in to_remove {
+            pool.clients.remove(&proxy);
+        }
+
+        // 5. 设置通用客户端
+        if let Some(proxy) = self.proxies.get(&self.general) {
+            if let Some(client) = pool.clients.get(proxy) {
+                pool.general = Some(client.clone());
+            } else {
+                // 这不应该发生
+                unreachable!()
+            }
         } else {
-            // 添加系统代理
-            let system_client = Client::new();
-            pool.clients
-                .insert(SYS_PROXY.to_string(), system_client.clone());
-            pool.general = Some(system_client);
+            // 这不应该发生
+            unreachable!()
         }
 
         Ok(())
@@ -172,7 +220,7 @@ impl Proxies {
     }
 
     // 更新全局代理池并保存配置
-    pub async fn update_and_save(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn update_and_save(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // 更新全局代理池
         self.update_global_pool()?;
 
@@ -181,12 +229,12 @@ impl Proxies {
     }
 }
 
-#[derive(Clone, Archive, RkyvDeserialize, RkyvSerialize)]
+#[derive(Clone, Archive, RkyvDeserialize, RkyvSerialize, PartialEq, Eq, Hash)]
 #[archive(compare(PartialEq))]
 pub enum SingleProxy {
     Non,
     Sys,
-    Url(UrlWrapper),
+    Url(StringUrl),
 }
 
 impl Serialize for SingleProxy {
@@ -209,7 +257,7 @@ impl<'de> Deserialize<'de> for SingleProxy {
     {
         struct SingleProxyVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for SingleProxyVisitor {
+        impl serde::de::Visitor<'_> for SingleProxyVisitor {
             type Value = SingleProxy;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -220,22 +268,13 @@ impl<'de> Deserialize<'de> for SingleProxy {
             where
                 E: serde::de::Error,
             {
-                // 检查是否是保留的代理名称，如果是则进行映射
-                if let Some(&mapped) = PROXY_MAP.get(value) {
-                    match mapped {
-                        NON_PROXY => return Ok(Self::Value::Non),
-                        SYS_PROXY => return Ok(Self::Value::Sys),
-                        _ => {}
-                    }
-                }
-
-                // 直接匹配新的代理值
                 match value {
                     NON_PROXY => Ok(Self::Value::Non),
                     SYS_PROXY => Ok(Self::Value::Sys),
-                    url_str => url::Url::parse(url_str)
-                        .map(|url| Self::Value::Url(UrlWrapper::from(url)))
-                        .map_err(|e| E::custom(format!("Invalid URL: {}", e))),
+                    url_str => Ok(Self::Value::Url(
+                        StringUrl::from_str(url_str)
+                            .map_err(|e| E::custom(format!("Invalid URL: {e}")))?,
+                    )),
                 }
             }
         }
@@ -244,91 +283,73 @@ impl<'de> Deserialize<'de> for SingleProxy {
     }
 }
 
-impl ToString for SingleProxy {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for SingleProxy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Non => NON_PROXY.to_string(),
-            Self::Sys => SYS_PROXY.to_string(),
-            Self::Url(url) => url.to_string(),
+            Self::Non => write!(f, "{NON_PROXY}"),
+            Self::Sys => write!(f, "{SYS_PROXY}"),
+            Self::Url(url) => write!(f, "{url}"),
         }
     }
 }
 
 impl FromStr for SingleProxy {
-    type Err = url::ParseError;
+    type Err = reqwest::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // 检查是否是保留的代理名称，如果是则进行映射
-        if let Some(&mapped) = PROXY_MAP.get(s) {
-            match mapped {
-                NON_PROXY => return Ok(Self::Non),
-                SYS_PROXY => return Ok(Self::Sys),
-                _ => {}
-            }
-        }
-
-        // 直接匹配新的代理值
         match s {
             NON_PROXY => Ok(Self::Non),
             SYS_PROXY => Ok(Self::Sys),
-            url_str => url::Url::parse(url_str).map(|url| Self::Url(UrlWrapper::from(url))),
+            url_str => Ok(Self::Url(StringUrl::from_str(url_str)?)),
         }
     }
 }
 
 pub struct ProxyPool {
-    // name to client
-    clients: HashMap<String, Client>,
+    // 名称到代理配置的映射 - 类似于 Proxies 中的 proxies 字段
+    proxies: HashMap<String, SingleProxy>,
+    // 代理配置到客户端实例的映射 - 避免重复创建相同配置的客户端
+    clients: HashMap<SingleProxy, Client>,
+    // 通用客户端 - 用于未指定特定代理的请求
     general: Option<Client>,
 }
 
+/// ProxyPool 是系统内部使用的代理池实现，
+/// 而 Proxies 是面向用户的配置结构。
+///
+/// ProxyPool 存在的目的：
+/// 1. 优化相同代理配置的客户端管理，避免重复创建
+/// 2. 提供高效的客户端查找机制
+/// 3. 维护代理连接的生命周期
 impl ProxyPool {
-    // 添加客户端
-    fn append(&mut self, name: &str, proxy: &SingleProxy) {
-        if self.clients.contains_key(name) {
-            return;
-        }
-
-        // 根据SingleProxy类型创建客户端
-        let client = match proxy {
-            SingleProxy::Non => Client::builder()
-                .no_proxy()
-                .build()
-                .expect("创建无代理客户端失败"),
-            SingleProxy::Sys => Client::new(),
-            SingleProxy::Url(url) => {
-                if let Ok(proxy_obj) = Proxy::all(&url.to_string()) {
-                    Client::builder()
-                        .proxy(proxy_obj)
-                        .build()
-                        .expect("创建代理客户端失败")
-                } else {
-                    return;
-                }
-            }
-        };
-
-        self.clients.insert(name.to_string(), client);
-    }
-
     // 获取客户端
     pub fn get_client(url: &str) -> Client {
         let pool = PROXY_POOL.read();
 
-        // 检查是否需要映射
-        let mapped_url = PROXY_MAP.get(url).copied().unwrap_or(url);
+        // 先通过名称查找代理配置
+        if let Some(proxy) = pool.proxies.get(url.trim()) {
+            // 然后通过代理配置查找客户端
+            if let Some(client) = pool.clients.get(proxy) {
+                return client.clone();
+            }
+        }
 
-        pool.clients
-            .get(mapped_url.trim())
-            .cloned()
-            .unwrap_or_else(Self::get_general_client)
+        // 返回通用客户端或默认客户端
+        pool.general
+            .clone()
+            .expect("general client should be initialized")
     }
 
+    // 获取通用客户端
     pub fn get_general_client() -> Client {
         let pool = PROXY_POOL.read();
-        pool.general.clone().expect("获取通用客户端不应该失败")
+        pool.general
+            .clone()
+            .expect("general client should be initialized")
     }
 
+    // 获取客户端或通用客户端
+    #[inline]
     pub fn get_client_or_general(url: Option<&str>) -> Client {
         match url {
             Some(url) => Self::get_client(url),

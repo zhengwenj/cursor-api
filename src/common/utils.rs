@@ -17,7 +17,7 @@ use super::model::{
 use crate::{
     app::{
         constant::{COMMA, FALSE, TRUE},
-        lazy::{CURSOR_API2_CHAT_MODELS_URL, TOKEN_DELIMITER, USE_COMMA_DELIMITER},
+        lazy::{TOKEN_DELIMITER, USE_COMMA_DELIMITER, cursor_api2_chat_models_url},
         model::proxy_pool::ProxyPool,
     },
     chat::{
@@ -99,11 +99,15 @@ impl InstantExt for Instant {
     }
 }
 
-pub async fn get_token_profile(client: Client, auth_token: &str) -> Option<TokenProfile> {
+pub async fn get_token_profile(
+    client: Client,
+    auth_token: &str,
+    is_pri: bool,
+) -> Option<TokenProfile> {
     let user_id = extract_user_id(auth_token)?;
 
     // 构建请求客户端
-    let request = super::client::build_usage_request(&client, &user_id, auth_token);
+    let request = super::client::build_usage_request(&client, &user_id, auth_token, is_pri);
 
     // 发送请求并获取响应
     // let response = client.send().await.ok()?;
@@ -118,10 +122,10 @@ pub async fn get_token_profile(client: Client, auth_token: &str) -> Option<Token
         .await
         .ok()?;
 
-    let user = get_user_profile(&client, auth_token).await?;
+    let user = get_user_profile(&client, auth_token, is_pri).await?;
 
     // 从 Stripe 获取用户资料
-    let stripe = get_stripe_profile(&client, auth_token).await?;
+    let stripe = get_stripe_profile(&client, auth_token, is_pri).await?;
 
     // 映射响应数据到 TokenProfile
     Some(TokenProfile {
@@ -131,8 +135,12 @@ pub async fn get_token_profile(client: Client, auth_token: &str) -> Option<Token
     })
 }
 
-pub async fn get_stripe_profile(client: &Client, auth_token: &str) -> Option<StripeProfile> {
-    let client = super::client::build_profile_request(client, auth_token);
+pub async fn get_stripe_profile(
+    client: &Client,
+    auth_token: &str,
+    is_pri: bool,
+) -> Option<StripeProfile> {
+    let client = super::client::build_profile_request(client, auth_token, is_pri);
     let response = client
         .send()
         .await
@@ -143,11 +151,15 @@ pub async fn get_stripe_profile(client: &Client, auth_token: &str) -> Option<Str
     Some(response)
 }
 
-pub async fn get_user_profile(client: &Client, auth_token: &str) -> Option<UserProfile> {
+pub async fn get_user_profile(
+    client: &Client,
+    auth_token: &str,
+    is_pri: bool,
+) -> Option<UserProfile> {
     let user_id = extract_user_id(auth_token)?;
 
     // 构建请求客户端
-    let client = super::client::build_userinfo_request(client, &user_id, auth_token);
+    let client = super::client::build_userinfo_request(client, &user_id, auth_token, is_pri);
 
     // 发送请求并获取响应
     let user_profile = client.send().await.ok()?.json::<UserProfile>().await.ok()?;
@@ -159,26 +171,36 @@ pub async fn get_available_models(
     client: Client,
     auth_token: &str,
     checksum: &str,
+    client_key: &str,
+    timezone: &'static str,
+    is_pri: bool,
 ) -> Option<Vec<Model>> {
-    let client = super::client::build_request(
-        client,
-        auth_token,
-        checksum,
-        &CURSOR_API2_CHAT_MODELS_URL,
-        false,
-    );
-    let request = AvailableModelsRequest {
-        is_nightly: true,
-        include_long_context_models: true,
+    let response = {
+        let trace_id = uuid::Uuid::new_v4().to_string();
+        let client = super::client::build_request(super::client::AiServiceRequest {
+            client,
+            auth_token,
+            checksum,
+            client_key,
+            url: cursor_api2_chat_models_url(is_pri),
+            is_stream: false,
+            timezone,
+            trace_id: &trace_id,
+            is_pri,
+        });
+        let request = AvailableModelsRequest {
+            is_nightly: true,
+            include_long_context_models: true,
+        };
+        client
+            .body(encode_message(&request, false).unwrap())
+            .send()
+            .await
+            .ok()?
+            .bytes()
+            .await
+            .ok()?
     };
-    let response = client
-        .body(encode_message(&request, false).unwrap())
-        .send()
-        .await
-        .ok()?
-        .bytes()
-        .await
-        .ok()?;
     let available_models = AvailableModelsResponse::decode(response.as_ref()).ok()?;
     Some(
         available_models
@@ -349,12 +371,12 @@ pub fn token_to_tokeninfo(
 }
 
 /// 将 TokenInfo 转换为 JWT token
-pub fn tokeninfo_to_token(info: &key_config::TokenInfo) -> Option<(String, String, Client)> {
+pub fn tokeninfo_to_token(mut info: key_config::TokenInfo) -> Option<(String, String, Client)> {
     // 构建 payload
     let payload = TokenPayload {
-        sub: info.sub.clone(),
+        sub: std::mem::take(&mut info.sub),
         exp: info.exp,
-        randomness: info.randomness.clone(),
+        randomness: std::mem::take(&mut info.randomness),
         time: (info.exp - 2592000000).to_string(), // exp - 30000天
         iss: ISSUER.to_string(),
         scope: SCOPE.to_string(),

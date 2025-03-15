@@ -277,6 +277,13 @@
       word-break: break-word;
     }
 
+    .token-info-container {
+      flex: 1;
+      overflow-y: auto;
+      margin: 0 -20px;
+      padding: 20px;
+    }
+
     /* 对话预览特定样式 */
     .prompt-preview .tooltip-content {
       width: 320px;
@@ -468,6 +475,58 @@
         flex: 1;
       }
     }
+
+    .pagination-container {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .pagination-info {
+      flex: 1;
+    }
+
+    .pagination-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .page-jumper {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-left: 15px;
+    }
+
+    .page-input {
+      width: 60px;
+      padding: 5px;
+      border-radius: var(--border-radius);
+      border: 1px solid var(--border-color);
+      text-align: center;
+    }
+
+    .page-input:focus {
+      border-color: var(--primary-color);
+      outline: none;
+    }
+
+    .page-go-btn {
+      padding: 5px 10px;
+      border-radius: var(--border-radius);
+      border: 1px solid var(--border-color);
+      background: var(--card-background);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .page-go-btn:hover {
+      background: var(--primary-color);
+      color: white;
+      border-color: var(--primary-color);
+    }
   </style>
 </head>
 
@@ -479,6 +538,71 @@
       <label>认证令牌:</label>
       <input type="password" id="authToken" placeholder="输入 AUTH_TOKEN">
     </div>
+
+    <!-- 添加查询参数区域 -->
+    <div class="form-group" style="margin-top: 15px;">
+      <details>
+        <summary>高级筛选</summary>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+          <div>
+            <label for="statusFilter">状态:</label>
+            <select id="statusFilter" class="form-control">
+              <option value="">全部</option>
+              <option value="success">成功</option>
+              <option value="failure">失败</option>
+              <option value="pending">处理中</option>
+            </select>
+          </div>
+          <div>
+            <label for="modelFilter">模型:</label>
+            <input type="text" id="modelFilter" class="form-control" placeholder="模型名称">
+          </div>
+          <div>
+            <label for="emailFilter">用户邮箱:</label>
+            <input type="text" id="emailFilter" class="form-control" placeholder="用户邮箱">
+          </div>
+          <div>
+            <label for="membershipFilter">会员类型:</label>
+            <select id="membershipFilter" class="form-control">
+              <option value="">全部</option>
+              <option value="free">免费</option>
+              <option value="free_trial">试用</option>
+              <option value="pro">专业版</option>
+              <option value="enterprise">企业版</option>
+            </select>
+          </div>
+          <div>
+            <label for="streamFilter">流式响应:</label>
+            <select id="streamFilter" class="form-control">
+              <option value="">全部</option>
+              <option value="true">是</option>
+              <option value="false">否</option>
+            </select>
+          </div>
+          <div>
+            <label for="errorFilter">包含错误:</label>
+            <select id="errorFilter" class="form-control">
+              <option value="">全部</option>
+              <option value="true">是</option>
+              <option value="false">否</option>
+            </select>
+          </div>
+          <div>
+            <label for="pageSize">每页显示:</label>
+            <select id="pageSize" class="form-control">
+              <option value="10">10 条</option>
+              <option value="20" selected>20 条</option>
+              <option value="50">50 条</option>
+              <option value="100">100 条</option>
+            </select>
+          </div>
+          <div style="display: flex; align-items: flex-end;">
+            <button onclick="applyFilters()" style="margin-top: 8px;">应用筛选</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
     <div class="refresh-container">
       <div class="button-group">
         <button onclick="fetchLogs()">刷新日志</button>
@@ -533,6 +657,25 @@
         <tbody id="logsBody"></tbody>
       </table>
     </div>
+
+    <!-- 添加分页控件 -->
+    <div class="pagination-container"
+      style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+      <div class="pagination-info">
+        共 <span id="totalRecords">0</span> 条记录，
+        每页 <input type="number" id="customPageSize" class="page-input" min="5" max="100" value="20"> 条
+        <button class="page-go-btn" onclick="changePageSize()">应用</button>
+      </div>
+      <div class="pagination-controls">
+        <button id="prevPage" onclick="changePage(-1)" disabled>&laquo; 上一页</button>
+        <span id="currentPage">第 1 页</span>
+        <button id="nextPage" onclick="changePage(1)" disabled>下一页 &raquo;</button>
+        <div class="page-jumper">
+          跳转到第 <input type="number" id="pageNumberInput" class="page-input" min="1" value="1"> 页
+          <button class="page-go-btn" onclick="jumpToPage()">GO</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="message"></div>
@@ -547,71 +690,73 @@
           <span class="close">&times;</span>
         </div>
       </div>
-      <table class="message-table">
-        <tr>
-          <td>Token:</td>
-          <td id="modalToken"></td>
-        </tr>
-        <tr>
-          <td>校验和:</td>
-          <td id="modalChecksum"></td>
-        </tr>
-        <tr>
-          <td colspan="2" style="text-align: center; font-weight: bold; background-color: var(--border-color);">
-            用户信息
-          </td>
-        </tr>
-        <tr>
-          <td>邮箱:</td>
-          <td id="modalEmail"></td>
-        </tr>
-        <tr>
-          <td>用户名:</td>
-          <td id="modalName"></td>
-        </tr>
-        <tr>
-          <td>用户ID:</td>
-          <td id="modalId"></td>
-        </tr>
-        <tr>
-          <td>更新时间:</td>
-          <td id="modalUpdatedAt"></td>
-        </tr>
-        <tr>
-          <td colspan="2" style="text-align: center; font-weight: bold; background-color: var(--border-color);">
-            会员信息
-          </td>
-        </tr>
-        <tr>
-          <td>会员类型:</td>
-          <td id="modalMemberType"></td>
-        </tr>
-        <tr>
-          <td>支付ID:</td>
-          <td id="modalPaymentId"></td>
-        </tr>
-        <tr>
-          <td>试用剩余:</td>
-          <td id="modalTrialDays"></td>
-        </tr>
-        <tr>
-          <td colspan="2" style="text-align: center; font-weight: bold; background-color: var(--border-color);">
-            使用量统计 (最近30天)
-          </td>
-        </tr>
-        <tr>
-          <td>Premium models:</td>
-          <td id="modalPremiumUsage"></td>
-        </tr>
-        <tr>
-          <td>Standard models:</td>
-          <td id="modalStandardUsage"></td>
-        </tr>
-        <tr>
-          <td>Unknown models:</td>
-          <td id="modalUnknownUsage"></td>
-        </tr>
-      </table>
+      <div class="token-info-container">
+        <table class="message-table">
+          <tr>
+            <td>Token:</td>
+            <td id="modalToken"></td>
+          </tr>
+          <tr>
+            <td>校验和:</td>
+            <td id="modalChecksum"></td>
+          </tr>
+          <tr>
+            <td colspan="2" style="text-align: center; font-weight: bold; background-color: var(--border-color);">
+              用户信息
+            </td>
+          </tr>
+          <tr>
+            <td>邮箱:</td>
+            <td id="modalEmail"></td>
+          </tr>
+          <tr>
+            <td>用户名:</td>
+            <td id="modalName"></td>
+          </tr>
+          <tr>
+            <td>用户ID:</td>
+            <td id="modalId"></td>
+          </tr>
+          <tr>
+            <td>更新时间:</td>
+            <td id="modalUpdatedAt"></td>
+          </tr>
+          <tr>
+            <td colspan="2" style="text-align: center; font-weight: bold; background-color: var(--border-color);">
+              会员信息
+            </td>
+          </tr>
+          <tr>
+            <td>会员类型:</td>
+            <td id="modalMemberType"></td>
+          </tr>
+          <tr>
+            <td>支付ID:</td>
+            <td id="modalPaymentId"></td>
+          </tr>
+          <tr>
+            <td>试用剩余:</td>
+            <td id="modalTrialDays"></td>
+          </tr>
+          <tr>
+            <td colspan="2" style="text-align: center; font-weight: bold; background-color: var(--border-color);">
+              使用量统计 (最近30天)
+            </td>
+          </tr>
+          <tr>
+            <td>Premium models:</td>
+            <td id="modalPremiumUsage"></td>
+          </tr>
+          <tr>
+            <td>Standard models:</td>
+            <td id="modalStandardUsage"></td>
+          </tr>
+          <tr>
+            <td>Unknown models:</td>
+            <td id="modalUnknownUsage"></td>
+          </tr>
+        </table>
+      </div>
       <div id="usageProgressContainer"></div>
     </div>
   </div>
@@ -652,13 +797,17 @@
   </div>
 
   <!-- 添加 Chart.js 库 -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"
-    integrity="sha512-0im+NZpDrlsC+p6iSc13cqlMNPqdT6e0hUF8NAaxdaGOmPuV9DdVpWYOCHHrMQNVDb2TByQoDbHx34MT6g16ZA=="
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"
+    integrity="sha512-IMvjDnJzMKoQZLPYQHxR4g8nm0sSd9bR7Kl5ayxnPHV8ChqVpHCdBYXGib3ZftuDlfaceqn7t47fObseBCEEJw=="
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
   <script>
     let refreshInterval;
     let requestsChart;
+    let currentPageIndex = 0;
+    let pageSize = 20;
+    let totalRecords = 0;
+    let currentFilters = {};
 
     function updateStats(data) {
       document.getElementById('totalRequests').textContent = data.total || 0;
@@ -890,6 +1039,11 @@
       updateStats(data);
       updateChart(data);
 
+      // 更新总记录数和分页信息
+      totalRecords = data.total;
+      document.getElementById('totalRecords').textContent = totalRecords;
+      updatePaginationControls();
+
       tbody.innerHTML = data.logs.map(log => {
         // 预处理延迟数据以避免HTML解析问题
         let delaysData = '';
@@ -956,8 +1110,129 @@
       }
     }
 
+    // 更新分页控件状态
+    function updatePaginationControls() {
+      const prevPageBtn = document.getElementById('prevPage');
+      const nextPageBtn = document.getElementById('nextPage');
+      const currentPageSpan = document.getElementById('currentPage');
+      const pageNumberInput = document.getElementById('pageNumberInput');
+      const customPageSize = document.getElementById('customPageSize');
+
+      // 计算总页数
+      const totalPages = Math.ceil(totalRecords / pageSize) || 1;
+
+      // 禁用或启用上一页按钮
+      prevPageBtn.disabled = currentPageIndex <= 0;
+
+      // 禁用或启用下一页按钮（如果当前页是最后一页或没有足够的记录）
+      const hasMorePages = (currentPageIndex + 1) * pageSize < totalRecords;
+      nextPageBtn.disabled = !hasMorePages;
+
+      // 更新当前页显示
+      currentPageSpan.textContent = `第 ${currentPageIndex + 1} 页 / 共 ${totalPages} 页`;
+
+      // 同步输入框数值
+      pageNumberInput.value = currentPageIndex + 1;
+      pageNumberInput.max = totalPages;
+      customPageSize.value = pageSize;
+    }
+
+    // 切换页码
+    function changePage(delta) {
+      currentPageIndex += delta;
+      if (currentPageIndex < 0) currentPageIndex = 0;
+
+      fetchLogs();
+    }
+
+    // 跳转到指定页
+    function jumpToPage() {
+      const pageNumberInput = document.getElementById('pageNumberInput');
+      const pageNumber = parseInt(pageNumberInput.value);
+      const totalPages = Math.ceil(totalRecords / pageSize) || 1;
+
+      if (isNaN(pageNumber) || pageNumber < 1) {
+        showGlobalMessage('请输入有效的页码', true);
+        pageNumberInput.value = currentPageIndex + 1;
+        return;
+      }
+
+      if (pageNumber > totalPages) {
+        showGlobalMessage(`页码超出范围，最大页码为 ${totalPages}`, true);
+        pageNumberInput.value = totalPages;
+        return;
+      }
+
+      currentPageIndex = pageNumber - 1;
+      fetchLogs();
+    }
+
+    // 更改每页显示数量
+    function changePageSize() {
+      const customPageSize = document.getElementById('customPageSize');
+      const newPageSize = parseInt(customPageSize.value);
+
+      if (isNaN(newPageSize) || newPageSize < 5 || newPageSize > 100) {
+        showGlobalMessage('每页显示数量必须在5-100之间', true);
+        customPageSize.value = pageSize;
+        return;
+      }
+
+      // 重置到第一页并使用新的pageSize
+      currentPageIndex = 0;
+      pageSize = newPageSize;
+      fetchLogs();
+    }
+
+    // 应用筛选条件
+    function applyFilters() {
+      // 重置到第一页
+      currentPageIndex = 0;
+
+      // 获取所有筛选值
+      const status = document.getElementById('statusFilter').value;
+      const model = document.getElementById('modelFilter').value;
+      const email = document.getElementById('emailFilter').value;
+      const membership = document.getElementById('membershipFilter').value;
+      const stream = document.getElementById('streamFilter').value;
+      const hasError = document.getElementById('errorFilter').value;
+
+      // 更新每页显示数量（如果在高级筛选中设置了）
+      const pageSizeSelect = document.getElementById('pageSize');
+      if (pageSizeSelect) {
+        pageSize = parseInt(pageSizeSelect.value);
+        // 同步自定义输入框
+        document.getElementById('customPageSize').value = pageSize;
+      }
+
+      // 更新当前筛选条件
+      currentFilters = {};
+
+      if (status) currentFilters.status = status;
+      if (model) currentFilters.model = model;
+      if (email) currentFilters.email = email;
+      if (membership) currentFilters.membership_type = membership;
+      if (stream) currentFilters.stream = stream === 'true';
+      if (hasError) currentFilters.has_error = hasError === 'true';
+
+      // 获取筛选后的数据
+      fetchLogs();
+    }
+
     async function fetchLogs() {
-      const data = await makeAuthenticatedRequest('/logs');
+      // 构建查询参数
+      const query = {
+        limit: pageSize,
+        offset: currentPageIndex * pageSize,
+        ...currentFilters
+      };
+
+      // 发送请求
+      const data = await makeAuthenticatedRequest('/logs', {
+        method: 'POST',
+        body: JSON.stringify({ query })
+      });
+
       if (data) {
         updateTable(data);
         showGlobalMessage('日志获取成功');
@@ -978,10 +1253,29 @@
       const authToken = getAuthToken();
       if (authToken) {
         document.getElementById('authToken').value = authToken;
+
+        // 设置默认页大小
+        pageSize = parseInt(document.getElementById('pageSize').value || "20");
+        document.getElementById('customPageSize').value = pageSize;
+
         fetchLogs();
       }
       // 启动自动刷新
       refreshInterval = setInterval(fetchLogs, 60000);
+
+      // 添加页码输入框回车键支持
+      document.getElementById('pageNumberInput').addEventListener('keyup', function (event) {
+        if (event.key === 'Enter') {
+          jumpToPage();
+        }
+      });
+
+      // 添加页面大小输入框回车键支持
+      document.getElementById('customPageSize').addEventListener('keyup', function (event) {
+        if (event.key === 'Enter') {
+          changePageSize();
+        }
+      });
     });
 
     // 初始化 token 处理

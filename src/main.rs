@@ -48,9 +48,9 @@ async fn main() {
     std::panic::set_hook(Box::new(|info| {
         // std::env::set_var("RUST_BACKTRACE", "1");
         if let Some(msg) = info.payload().downcast_ref::<String>() {
-            eprintln!("{}", msg);
+            eprintln!("{msg}");
         } else if let Some(msg) = info.payload().downcast_ref::<&str>() {
-            eprintln!("{}", msg);
+            eprintln!("{msg}");
         }
     }));
 
@@ -69,7 +69,7 @@ async fn main() {
 
     // 尝试加载保存的配置
     if let Err(e) = AppConfig::load_saved_config() {
-        eprintln!("加载保存的配置失败: {}", e);
+        eprintln!("加载保存的配置失败: {e}");
     }
 
     // 创建一个克隆用于后台任务
@@ -93,7 +93,7 @@ async fn main() {
 
             let mut app_state = state_for_reload.lock().await;
             app_state.token_manager.update_checksum();
-            // debug_println!("checksum 自动刷新: {}", next_reload);
+            // debug_println!("checksum 自动刷新: {next_reload}");
         }
     });
 
@@ -128,7 +128,7 @@ async fn main() {
 
         // 保存配置
         if let Err(e) = AppConfig::save_config() {
-            eprintln!("保存配置失败: {}", e);
+            eprintln!("保存配置失败: {e}");
         } else {
             println!("配置已保存");
         }
@@ -136,7 +136,7 @@ async fn main() {
         // 保存状态
         let state = state_for_shutdown.lock().await;
         if let Err(e) = state.save_state().await {
-            eprintln!("保存状态失败: {}", e);
+            eprintln!("保存状态失败: {e}");
         } else {
             println!("状态已保存");
         }
@@ -213,14 +213,14 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .unwrap_or_else(|e| {
-            eprintln!("无法绑定到地址 {}: {}", addr, e);
+            eprintln!("无法绑定到地址 {addr}: {e}");
             std::process::exit(1);
         });
     let server = axum::serve(listener, app);
     tokio::select! {
         result = server => {
             if let Err(e) = result {
-                eprintln!("服务器错误: {}", e);
+                eprintln!("服务器错误: {e}");
             }
         }
         _ = shutdown_signal => {

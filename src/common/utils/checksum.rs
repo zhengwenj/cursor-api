@@ -2,13 +2,16 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD as BASE64};
 use rand::Rng as _;
 use sha2::{Digest, Sha256};
 
+#[inline]
 pub fn generate_hash() -> String {
-    let random_bytes = rand::rng().random::<[u8; 32]>();
-    let mut hasher = Sha256::new();
-    hasher.update(random_bytes);
-    hex::encode(hasher.finalize())
+    hex::encode(
+        Sha256::new()
+            .chain_update(rand::rng().random::<[u8; 32]>())
+            .finalize(),
+    )
 }
 
+#[inline]
 fn obfuscate_bytes(bytes: &mut [u8]) {
     let mut prev: u8 = 165;
     for (idx, byte) in bytes.iter_mut().enumerate() {
@@ -18,6 +21,7 @@ fn obfuscate_bytes(bytes: &mut [u8]) {
     }
 }
 
+#[inline]
 fn deobfuscate_bytes(bytes: &mut [u8]) {
     let mut prev: u8 = 165;
     for (idx, byte) in bytes.iter_mut().enumerate() {
@@ -47,6 +51,7 @@ pub fn generate_timestamp_header() -> String {
     BASE64.encode(&timestamp_bytes)
 }
 
+#[inline]
 pub fn generate_checksum(device_id: &str, mac_addr: Option<&str>) -> String {
     let encoded = generate_timestamp_header();
     match mac_addr {
@@ -55,6 +60,7 @@ pub fn generate_checksum(device_id: &str, mac_addr: Option<&str>) -> String {
     }
 }
 
+#[inline]
 pub fn generate_checksum_with_default() -> String {
     generate_checksum(&generate_hash(), Some(&generate_hash()))
 }

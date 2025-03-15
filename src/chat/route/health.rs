@@ -31,7 +31,6 @@ use axum::{
     },
     response::{IntoResponse, Response},
 };
-use chrono::Local;
 use reqwest::header::AUTHORIZATION;
 use std::sync::Arc;
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
@@ -60,7 +59,7 @@ pub async fn handle_health(
     headers: HeaderMap,
 ) -> Json<HealthCheckResponse> {
     let start_time = get_start_time();
-    let uptime = (Local::now() - start_time).num_seconds();
+    let uptime = (chrono::Local::now() - start_time).num_seconds();
 
     // 先检查 headers 是否包含有效的认证信息
     let stats = if headers

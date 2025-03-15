@@ -12,6 +12,7 @@ message KeyConfig {
     string signature = 4;  // 签名
     bytes machine_id = 5;  // 机器ID的SHA256哈希值
     bytes mac_id = 6;      // MAC地址的SHA256哈希值
+    // string timezone = 7;   // 时区
     optional string proxy_name = 8; // 代理名称
   }
 

@@ -27,7 +27,7 @@ pub async fn handle_user_info(Json(request): Json<TokenRequest>) -> Json<GetUser
         }
     };
 
-    match get_token_profile(ProxyPool::get_general_client(), &token).await {
+    match get_token_profile(ProxyPool::get_general_client(), &token, false).await {
         Some(usage) => Json(GetUserInfo::Usage(Box::new(usage))),
         None => Json(GetUserInfo::Error {
             error: ERR_NODATA.to_string(),

@@ -53,25 +53,25 @@ fn update_sqlite_tokens(
         println!("{}: {}", key, value);
     }
 
-    // 更新值
+    // 自动创建项并更新值
     conn.execute(
-        "UPDATE ItemTable SET value = ? WHERE key = 'cursorAuth/refreshToken'",
+        "INSERT OR REPLACE INTO ItemTable (key, value) VALUES ('cursorAuth/refreshToken', ?)",
         [refresh_token],
     )?;
     conn.execute(
-        "UPDATE ItemTable SET value = ? WHERE key = 'cursorAuth/accessToken'",
+        "INSERT OR REPLACE INTO ItemTable (key, value) VALUES ('cursorAuth/accessToken', ?)",
         [access_token],
     )?;
     conn.execute(
-        "UPDATE ItemTable SET value = ? WHERE key = 'cursorAuth/cachedEmail'",
+        "INSERT OR REPLACE INTO ItemTable (key, value) VALUES ('cursorAuth/cachedEmail', ?)",
         [email],
     )?;
     conn.execute(
-        "UPDATE ItemTable SET value = ? WHERE key = 'cursorAuth/cachedSignUpType'",
+        "INSERT OR REPLACE INTO ItemTable (key, value) VALUES ('cursorAuth/cachedSignUpType', ?)",
         [signup_type],
     )?;
     conn.execute(
-        "UPDATE ItemTable SET value = ? WHERE key = 'cursorAuth/stripeMembershipType'",
+        "INSERT OR REPLACE INTO ItemTable (key, value) VALUES ('cursorAuth/stripeMembershipType', ?)",
         [membership_type],
     )?;
 

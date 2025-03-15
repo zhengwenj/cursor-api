@@ -37,7 +37,7 @@ pub async fn handle_update_proxies(
     Json(request): Json<ProxyUpdateRequest>,
 ) -> Result<Json<ProxyInfoResponse>, (StatusCode, Json<ErrorResponse>)> {
     // 获取新的代理配置
-    let proxies = request.proxies;
+    let mut proxies = request.proxies;
 
     // 更新全局代理池并保存配置
     if let Err(e) = proxies.update_and_save().await {
@@ -46,7 +46,7 @@ pub async fn handle_update_proxies(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(format!("Failed to save proxy configuration: {}", e)),
+                error: Some(format!("Failed to save proxy configuration: {e}")),
                 message: Some("无法保存代理配置".to_string()),
             }),
         ));
@@ -109,7 +109,7 @@ pub async fn handle_add_proxy(
                 Json(ErrorResponse {
                     status: ApiStatus::Error,
                     code: None,
-                    error: Some(format!("Failed to save proxy configuration: {}", e)),
+                    error: Some(format!("Failed to save proxy configuration: {e}")),
                     message: Some("无法保存代理配置".to_string()),
                 }),
             ));
@@ -129,7 +129,7 @@ pub async fn handle_add_proxy(
             proxies: None,
             proxies_count,
             general_proxy: None,
-            message: Some(format!("已添加 {} 个新代理", added_count)),
+            message: Some(format!("已添加 {added_count} 个新代理")),
         }))
     } else {
         // 如果没有新代理，返回当前状态
@@ -177,7 +177,7 @@ pub async fn handle_delete_proxies(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(format!("Failed to save proxy configuration: {}", e)),
+                error: Some(format!("Failed to save proxy configuration: {e}")),
                 message: Some("无法保存代理配置".to_string()),
             }),
         ));
@@ -241,7 +241,7 @@ pub async fn handle_set_general_proxy(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(format!("Failed to save proxy configuration: {}", e)),
+                error: Some(format!("Failed to save proxy configuration: {e}")),
                 message: Some("无法保存代理配置".to_string()),
             }),
         ));

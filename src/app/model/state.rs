@@ -1,4 +1,4 @@
-use crate::common::utils::{generate_checksum_with_repair, get_token_profile};
+use crate::common::utils::{generate_checksum_with_repair, generate_hash};
 use memmap2::{MmapMut, MmapOptions};
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
@@ -123,6 +123,7 @@ impl TokenManager {
     pub fn update_checksum(&mut self) {
         for token_info in self.tokens.iter_mut() {
             token_info.checksum = generate_checksum_with_repair(&token_info.checksum);
+            token_info.client_key = Some(generate_hash());
         }
     }
 
@@ -230,7 +231,7 @@ impl Default for AppState {
 impl AppState {
     pub fn new() -> Self {
         // 尝试加载保存的数据
-        let (request_logs, mut token_manager, proxies) = tokio::task::block_in_place(|| {
+        let (request_logs, token_manager, mut proxies) = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let logs = RequestStatsManager::load_logs().await.unwrap_or_default();
                 let token_manager = TokenManager::load_tokens()
@@ -244,22 +245,21 @@ impl AppState {
         });
 
         // 查询缺失的 token profiles
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                for token_info in token_manager.tokens.iter_mut() {
-                    if let Some(profile) =
-                        get_token_profile(token_info.get_client(), &token_info.token).await
-                    {
-                        token_info.profile = Some(profile);
-                    }
-                }
-            })
-        });
+        // tokio::task::block_in_place(|| {
+        //     tokio::runtime::Handle::current().block_on(async {
+        //         for token_info in token_manager.tokens.iter_mut() {
+        //             if let Some(profile) =
+        //                 get_token_profile(token_info.get_client(), &token_info.token).await
+        //             {
+        //                 token_info.profile = Some(profile);
+        //             }
+        //         }
+        //     })
+        // });
 
         // 更新全局代理池
-        let proxies_clone = proxies.clone();
-        if let Err(e) = proxies_clone.update_global_pool() {
-            eprintln!("更新全局代理池失败: {}", e);
+        if let Err(e) = proxies.update_global_pool() {
+            eprintln!("更新全局代理池失败: {e}");
         }
 
         Self {

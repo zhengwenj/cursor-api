@@ -5,9 +5,11 @@ use std::collections::HashMap;
 #[cfg(not(any(feature = "use-minified")))]
 use std::fs;
 #[cfg(not(debug_assertions))]
+#[cfg(feature = "__preview")]
 use std::fs::File;
 use std::io::Result;
 #[cfg(not(debug_assertions))]
+#[cfg(feature = "__preview")]
 use std::io::{Read, Write};
 #[cfg(not(any(feature = "use-minified")))]
 use std::path::Path;
@@ -175,6 +177,7 @@ fn minify_assets() -> Result<()> {
  * 只在 release 模式下执行，debug/dev 模式下完全跳过
  */
 #[cfg(not(debug_assertions))]
+#[cfg(feature = "__preview")]
 fn update_version() -> Result<()> {
     let version_path = "VERSION";
     // VERSION文件的监控已经在main函数中添加，此处无需重复
@@ -222,6 +225,7 @@ fn update_version() -> Result<()> {
 fn main() -> Result<()> {
     // 更新版本号 - 只在 release 构建时执行
     #[cfg(not(debug_assertions))]
+    #[cfg(feature = "__preview")]
     update_version()?;
 
     // Proto 文件处理

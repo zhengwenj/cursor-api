@@ -1,8 +1,6 @@
-use super::generate_checksum_with_repair;
-use crate::app::{constant::COMMA, model::TokenInfo};
 use crate::common::model::token::TokenPayload;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use chrono::{DateTime, Local, TimeZone};
+use chrono::{DateTime, Local, TimeZone as _};
 
 // 解析token
 pub fn parse_token(token_part: &str) -> String {
@@ -24,39 +22,39 @@ pub fn parse_token(token_part: &str) -> String {
 }
 
 // Token 加载函数，支持从字符串内容加载
-pub fn load_tokens_from_content(content: &str) -> Vec<TokenInfo> {
-    let token_map: std::collections::HashMap<String, String> = content
-        .lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                return None;
-            }
+// pub fn load_tokens_from_content(content: &str) -> Vec<TokenInfo> {
+//     let token_map: std::collections::HashMap<String, String> = content
+//         .lines()
+//         .filter_map(|line| {
+//             let line = line.trim();
+//             if line.is_empty() || line.starts_with('#') {
+//                 return None;
+//             }
 
-            let parts: Vec<&str> = line.split(COMMA).collect();
-            match parts[..] {
-                [token_part, checksum] => {
-                    let token = parse_token(token_part);
-                    Some((token, generate_checksum_with_repair(checksum)))
-                }
-                _ => {
-                    eprintln!("警告: 忽略无效的token-list行: {}", line);
-                    None
-                }
-            }
-        })
-        .collect();
+//             let parts: Vec<&str> = line.split(COMMA).collect();
+//             match parts[..] {
+//                 [token_part, checksum] => {
+//                     let token = parse_token(token_part);
+//                     Some((token, generate_checksum_with_repair(checksum)))
+//                 }
+//                 _ => {
+//                     eprintln!("警告: 忽略无效的token-list行: {}", line);
+//                     None
+//                 }
+//             }
+//         })
+//         .collect();
 
-    token_map
-        .into_iter()
-        .map(|(token, checksum)| TokenInfo {
-            token,
-            checksum,
-            profile: None,
-            tags: None,
-        })
-        .collect()
-}
+//     token_map
+//         .into_iter()
+//         .map(|(token, checksum)| TokenInfo {
+//             token,
+//             checksum,
+//             profile: None,
+//             tags: None,
+//         })
+//         .collect()
+// }
 
 pub(super) const HEADER_B64: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 pub(super) const ISSUER: &str = "https://authentication.cursor.sh";
