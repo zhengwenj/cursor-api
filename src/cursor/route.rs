@@ -6,8 +6,9 @@ mod token;
 pub use token::{handle_basic_calibration, handle_build_key};
 mod tokens;
 pub use tokens::{
-    handle_add_tokens, handle_delete_tokens, handle_get_tokens, handle_update_token_tags,
-    handle_update_tokens, handle_update_tokens_profile,
+    handle_add_tokens, handle_delete_tokens, handle_get_token_tags, handle_get_tokens,
+    handle_get_tokens_by_tag, handle_update_token_tags, handle_update_tokens,
+    handle_update_tokens_profile,
 };
 mod checksum;
 pub use checksum::{handle_get_checksum, handle_get_hash, handle_get_timestamp_header};

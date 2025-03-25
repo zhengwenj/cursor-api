@@ -1,4 +1,4 @@
-use super::aiserver::v1::ErrorDetails;
+use super::{aiserver::v1::ErrorDetails, constant::UNKNOWN};
 use crate::common::model::{ApiStatus, ErrorResponse as CommonErrorResponse};
 use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
 use prost::Message as _;
@@ -46,7 +46,7 @@ impl ChatError {
         if self.error.details.is_empty() {
             return ErrorResponse {
                 status: 500,
-                code: "unknown".to_string(),
+                code: UNKNOWN.to_string(),
                 error: None,
             };
         }
@@ -98,7 +98,7 @@ impl ErrorResponse {
     // }
 
     pub fn status_code(&self) -> StatusCode {
-        StatusCode::from_u16(self.status).unwrap()
+        StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
     }
 
     pub fn native_code(&self) -> String {
@@ -108,16 +108,25 @@ impl ErrorResponse {
         )
     }
 
-    pub fn into_common(self) -> CommonErrorResponse {
+    pub fn details(&self) -> Option<String> {
+        self.error.as_ref().map(
+            |error| error.details.clone(),
+        )
+    }
+
+    pub fn into_common(mut self) -> CommonErrorResponse {
         CommonErrorResponse {
             status: ApiStatus::Error,
             code: Some(self.status),
             error: self
                 .error
-                .as_ref()
-                .map(|error| error.message.clone())
-                .or(Some(self.code.clone())),
-            message: self.error.as_ref().map(|error| error.details.clone()),
+                .as_mut()
+                .map(|error| std::mem::take(&mut error.message))
+                .or(Some(self.code)),
+            message: self
+                .error
+                .as_mut()
+                .map(|error| std::mem::take(&mut error.details)),
         }
     }
 }

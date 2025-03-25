@@ -10,18 +10,9 @@ use crate::{
             cursor_api2_chat_web_url,
         },
         model::{
-            AppConfig, AppState, Chain, LogStatus, RequestLog, TimingInfo, TokenInfo, UsageCheck,
-            proxy_pool::ProxyPool,
+            AppConfig, AppState, Chain, ErrorInfo, LogStatus, OptionUsage, Prompt, RequestLog,
+            TimingInfo, TokenInfo, UsageCheck, proxy_pool::ProxyPool,
         },
-    },
-    chat::{
-        config::KeyConfig,
-        constant::{Models, USAGE_CHECK_MODELS},
-        error::StreamError,
-        model::{
-            ChatResponse, Choice, Delta, Message, MessageContent, ModelsResponse, Role, Usage,
-        },
-        stream::{StreamDecoder, StreamMessage},
     },
     common::{
         client::{AiServiceRequest, build_request},
@@ -30,9 +21,19 @@ use crate::{
         },
         utils::{
             TrimNewlines as _, format_time_ms, from_base64, generate_hash, get_available_models,
-            get_token_profile, tokeninfo_to_token, validate_token_and_checksum,
+            get_token_profile, get_token_usage, tokeninfo_to_token, validate_token_and_checksum,
         },
     },
+    cursor::{
+        config::KeyConfig,
+        constant::{Models, USAGE_CHECK_MODELS},
+        error::StreamError,
+        model::{
+            ChatResponse, Choice, Delta, Message, MessageContent, ModelsResponse, Role, Usage,
+        },
+        stream::{StreamDecoder, StreamMessage},
+    },
+    leak::intern_string,
 };
 use axum::{
     Json,
@@ -116,7 +117,7 @@ pub async fn handle_models(
             from_base64(&token[*KEY_PREFIX_LEN..])
                 .and_then(|decoded_bytes| KeyConfig::decode(&decoded_bytes[..]).ok())
                 .and_then(|key_config| key_config.auth_token)
-                .and_then(|info| tokeninfo_to_token(info))
+                .and_then(tokeninfo_to_token)
                 .map(|(token, checksum, client)| {
                     (token, checksum, None, client, GENERAL_TIMEZONE.name())
                 })
@@ -178,25 +179,25 @@ pub async fn handle_chat(
     headers: HeaderMap,
     Json(request): Json<ChatRequest>,
 ) -> Result<Response<Body>, (StatusCode, Json<ErrorResponse>)> {
-    let allow_claude = AppConfig::get_allow_claude();
-
     let is_search = request.model.ends_with("-online");
-    let model_name = if is_search {
-        request.model[..request.model.len() - 7].to_string()
-    } else {
-        request.model.clone()
-    };
 
     // 验证模型是否支持并获取模型信息
-    let model =
-        if Models::exists(&model_name) || (allow_claude && request.model.starts_with("claude-")) {
-            Some(&model_name)
+    let model = {
+        let model_name = if is_search {
+            &request.model[..request.model.len() - 7]
+        } else {
+            &request.model
+        };
+
+        if let Some(model) = Models::find_id(model_name) {
+            model
         } else {
             return Err((
                 StatusCode::BAD_REQUEST,
                 Json(ChatError::ModelNotSupported(request.model).to_json()),
             ));
-        };
+        }
+    };
 
     let request_time = chrono::Local::now();
 
@@ -304,7 +305,7 @@ pub async fn handle_chat(
             if log.token_info.token == auth_token {
                 if let Some(profile) = &log.token_info.profile {
                     if profile.stripe.membership_type == MembershipType::Free {
-                        let is_premium = USAGE_CHECK_MODELS.contains(&model_name.as_str());
+                        let is_premium = USAGE_CHECK_MODELS.contains(&model);
                         need_profile_check = if is_premium {
                             profile
                                 .usage
@@ -342,15 +343,10 @@ pub async fn handle_chat(
         current_id = next_id;
 
         // 如果需要获取用户使用情况,创建后台任务获取profile
-        if model
-            .map(|m| {
-                Model::is_usage_check(
-                    m,
-                    UsageCheck::from_proto(current_config.usage_check_models.as_ref()),
-                )
-            })
-            .unwrap_or(false)
-        {
+        if Model::is_usage_check(
+            model,
+            UsageCheck::from_proto(current_config.usage_check_models.as_ref()),
+        ) {
             let auth_token_clone = auth_token.clone();
             let state_clone = state_clone.clone();
             let log_id = next_id;
@@ -393,7 +389,7 @@ pub async fn handle_chat(
         state.request_manager.request_logs.push(RequestLog {
             id: next_id,
             timestamp: request_time,
-            model: request.model.clone(),
+            model: intern_string(request.model),
             token_info: TokenInfo {
                 token: auth_token.clone(),
                 checksum: checksum.clone(),
@@ -405,7 +401,7 @@ pub async fn handle_chat(
             timing: TimingInfo { total: 0.0 },
             stream: request.stream,
             status: LogStatus::Pending,
-            error: None,
+            error: ErrorInfo::None,
         });
 
         if !*IS_UNLIMITED_REQUEST_LOGS
@@ -420,7 +416,7 @@ pub async fn handle_chat(
     // 将消息转换为hex格式
     let hex_data = match super::adapter::encode_chat_message(
         request.messages,
-        &model_name,
+        model,
         current_config.disable_vision(),
         current_config.enable_slow_pool(),
         is_search,
@@ -438,7 +434,7 @@ pub async fn handle_chat(
                 .find(|log| log.id == current_id)
             {
                 log.status = LogStatus::Failure;
-                log.error = Some(e.to_string());
+                log.error = ErrorInfo::Error(intern_string(e.to_string()));
             }
             state.request_manager.active_requests -= 1;
             state.request_manager.error_requests += 1;
@@ -453,8 +449,8 @@ pub async fn handle_chat(
 
     // 构建请求客户端
     let trace_id = uuid::Uuid::new_v4();
-    let client = build_request(AiServiceRequest {
-        client,
+    let req = build_request(AiServiceRequest {
+        client: client.clone(),
         auth_token: auth_token.as_str(),
         checksum: checksum.as_str(),
         client_key: client_key.as_str(),
@@ -470,7 +466,7 @@ pub async fn handle_chat(
     });
     let trace_id = trace_id.simple();
     // 发送请求
-    let response = client.body(hex_data).send().await;
+    let response = req.body(hex_data).send().await;
 
     // 处理请求结果
     let response = match response {
@@ -503,7 +499,7 @@ pub async fn handle_chat(
                     .find(|log| log.id == current_id)
                 {
                     log.status = LogStatus::Failure;
-                    log.error = Some(e.to_string());
+                    log.error = ErrorInfo::Error(intern_string(e.to_string()));
                 }
                 state.request_manager.active_requests -= 1;
                 state.request_manager.error_requests += 1;
@@ -536,16 +532,56 @@ pub async fn handle_chat(
         let is_start = Arc::new(AtomicBool::new(true));
         let start_time = std::time::Instant::now();
         let decoder = Arc::new(Mutex::new(StreamDecoder::new()));
+        let is_usage_sent = Arc::new(AtomicBool::new(false));
+        let need_usage = if request.stream_options.is_some_and(|opt| opt.include_usage) {
+            Arc::new(Mutex::new(NeedUsage::Need {
+                client,
+                auth_token,
+                checksum,
+                client_key,
+                timezone,
+                is_pri,
+            }))
+        } else {
+            Arc::new(Mutex::new(NeedUsage::None))
+        };
 
         // 定义消息处理器的上下文结构体
         struct MessageProcessContext<'a> {
             response_id: &'a str,
-            model: &'a str,
+            model: &'static str,
             is_start: &'a AtomicBool,
             start_time: std::time::Instant,
             state: &'a Mutex<AppState>,
             current_id: u64,
-            need_usage: bool,
+            need_usage: &'a Mutex<NeedUsage>,
+            is_usage_sent: &'a AtomicBool,
+        }
+
+        #[derive(Default)]
+        enum NeedUsage {
+            #[default]
+            None,
+            Need {
+                client: reqwest::Client,
+                auth_token: String,
+                checksum: String,
+                client_key: String,
+                timezone: &'static str,
+                is_pri: bool,
+            },
+        }
+
+        impl NeedUsage {
+            #[inline(always)]
+            const fn is_need(&self) -> bool {
+                matches!(*self, Self::Need { .. })
+            }
+
+            #[inline(always)]
+            fn take(&mut self) -> Self {
+                std::mem::take(self)
+            }
         }
 
         // 处理消息并生成响应数据的辅助函数
@@ -558,17 +594,13 @@ pub async fn handle_chat(
             for message in messages {
                 match message {
                     StreamMessage::Content(text) => {
-                        let is_first = ctx.is_start.load(Ordering::SeqCst);
+                        let is_first = ctx.is_start.load(Ordering::Acquire);
 
                         let response = ChatResponse {
                             id: ctx.response_id.to_string(),
                             object: OBJECT_CHAT_COMPLETION_CHUNK,
                             created: chrono::Utc::now().timestamp(),
-                            model: if is_first {
-                                Some(ctx.model.to_string())
-                            } else {
-                                None
-                            },
+                            model: if is_first { Some(ctx.model) } else { None },
                             choices: vec![Choice {
                                 index: 0,
                                 message: None,
@@ -579,7 +611,7 @@ pub async fn handle_chat(
                                         None
                                     },
                                     content: if is_first {
-                                        ctx.is_start.store(false, Ordering::SeqCst);
+                                        ctx.is_start.store(false, Ordering::Release);
                                         Some(text.trim_leading_newlines())
                                     } else {
                                         Some(text)
@@ -588,7 +620,7 @@ pub async fn handle_chat(
                                 logprobs: None,
                                 finish_reason: None,
                             }],
-                            usage: if ctx.need_usage {
+                            usage: if ctx.need_usage.lock().await.is_need() {
                                 TriState::Null
                             } else {
                                 TriState::None
@@ -599,6 +631,62 @@ pub async fn handle_chat(
                             "data: {}\n\n",
                             serde_json::to_string(&response).unwrap()
                         ));
+                    }
+                    StreamMessage::Usage(usage_uuid) => {
+                        if !ctx.is_usage_sent.load(Ordering::Acquire) {
+                            if let NeedUsage::Need {
+                                client,
+                                auth_token,
+                                checksum,
+                                client_key,
+                                timezone,
+                                is_pri,
+                            } = ctx.need_usage.lock().await.take()
+                            {
+                                let usage = get_token_usage(
+                                    client,
+                                    &auth_token,
+                                    &checksum,
+                                    &client_key,
+                                    timezone,
+                                    is_pri,
+                                    usage_uuid,
+                                )
+                                .await;
+                                if let Some(ref usage) = usage {
+                                    let mut state = ctx.state.lock().await;
+                                    if let Some(log) = state
+                                        .request_manager
+                                        .request_logs
+                                        .iter_mut()
+                                        .rev()
+                                        .find(|log| log.id == ctx.current_id)
+                                    {
+                                        if let Some(chain) = &mut log.chain {
+                                            chain.usage = OptionUsage::Uasge {
+                                                input: usage.prompt_tokens,
+                                                output: usage.completion_tokens,
+                                            }
+                                        }
+                                    }
+                                }
+                                let response = ChatResponse {
+                                    id: ctx.response_id.to_string(),
+                                    object: OBJECT_CHAT_COMPLETION_CHUNK,
+                                    created: chrono::Utc::now().timestamp(),
+                                    model: None,
+                                    choices: vec![],
+                                    usage: TriState::Some(usage.unwrap_or_default()),
+                                };
+                                response_data.push_str(&format!(
+                                    "data: {}\n\n",
+                                    serde_json::to_string(&response).unwrap()
+                                ));
+                                ctx.is_usage_sent.store(true, Ordering::Release);
+                            }
+                        } else {
+                            crate::debug_println!("usage is sent, but find {usage_uuid}");
+                        }
                     }
                     StreamMessage::StreamEnd => {
                         // 计算总时间和首次片段时间
@@ -632,7 +720,7 @@ pub async fn handle_chat(
                                 logprobs: None,
                                 finish_reason: Some(FINISH_REASON_STOP.to_string()),
                             }],
-                            usage: if ctx.need_usage {
+                            usage: if ctx.need_usage.lock().await.is_need() {
                                 TriState::Null
                             } else {
                                 TriState::None
@@ -642,7 +730,9 @@ pub async fn handle_chat(
                             "data: {}\n\n",
                             serde_json::to_string(&response).unwrap()
                         ));
-                        if ctx.need_usage {
+                        if !ctx.is_usage_sent.load(Ordering::Acquire)
+                            && ctx.need_usage.lock().await.is_need()
+                        {
                             let response = ChatResponse {
                                 id: ctx.response_id.to_string(),
                                 object: OBJECT_CHAT_COMPLETION_CHUNK,
@@ -659,6 +749,7 @@ pub async fn handle_chat(
                                 "data: {}\n\n",
                                 serde_json::to_string(&response).unwrap()
                             ));
+                            ctx.is_usage_sent.store(true, Ordering::Release);
                         };
                     }
                     StreamMessage::Debug(debug_prompt) => {
@@ -670,12 +761,14 @@ pub async fn handle_chat(
                                 .rev()
                                 .find(|log| log.id == ctx.current_id)
                             {
-                                if let Some(chain) = &mut log.chain {
-                                    chain.prompt.push_str(&debug_prompt);
+                                if log.chain.is_some() {
+                                    crate::debug_println!("UB!1 {debug_prompt:?}");
+                                    // chain.prompt.push_str(&debug_prompt);
                                 } else {
                                     log.chain = Some(Chain {
-                                        prompt: debug_prompt,
+                                        prompt: Prompt::new(debug_prompt),
                                         delays: vec![],
+                                        usage: OptionUsage::None,
                                     });
                                 }
                             }
@@ -708,7 +801,11 @@ pub async fn handle_chat(
                                 .find(|log| log.id == current_id)
                             {
                                 log.status = LogStatus::Failure;
-                                log.error = Some(error_response.native_code());
+                                log.error =
+                                    ErrorInfo::Error(intern_string(error_response.native_code()));
+                                if let Some(detail) = error_response.details() {
+                                    log.error.add_detail(&detail)
+                                }
                                 log.timing.total =
                                     format_time_ms(start_time.elapsed().as_secs_f64());
                                 state.request_manager.error_requests += 1;
@@ -741,7 +838,7 @@ pub async fn handle_chat(
                             .find(|log| log.id == current_id)
                         {
                             log.status = LogStatus::Failure;
-                            log.error = Some("Empty stream response".to_string());
+                            log.error = ErrorInfo::Error(intern_string("Empty stream response"));
                             state.request_manager.error_requests += 1;
                         }
                     }
@@ -759,19 +856,15 @@ pub async fn handle_chat(
         let stream = stream
             .then({
                 let decoder = decoder.clone();
-                let response_id = response_id.clone();
-                let model = request.model.clone();
-                let is_start = is_start.clone();
                 let state = state.clone();
-                let need_usage = request.stream_options.is_some_and(|opt| opt.include_usage);
 
                 move |chunk| {
                     let decoder = decoder.clone();
                     let response_id = response_id.clone();
-                    let model = model.clone();
                     let is_start = is_start.clone();
                     let state = state.clone();
-                    let need_usage = need_usage;
+                    let is_usage_sent = is_usage_sent.clone();
+                    let need_usage = need_usage.clone();
 
                     async move {
                         let chunk = match chunk {
@@ -784,12 +877,13 @@ pub async fn handle_chat(
 
                         let ctx = MessageProcessContext {
                             response_id: &response_id,
-                            model: &model,
+                            model,
                             is_start: &is_start,
                             start_time,
                             state: &state,
                             current_id,
-                            need_usage,
+                            need_usage: &need_usage,
+                            is_usage_sent: &is_usage_sent,
                         };
 
                         // 使用decoder处理chunk
@@ -852,8 +946,9 @@ pub async fn handle_chat(
                         chain.delays = decoder.lock().await.take_content_delays();
                     } else {
                         log.chain = Some(Chain {
-                            prompt: String::new(),
+                            prompt: Prompt::Origin(String::new()),
                             delays: decoder.lock().await.take_content_delays(),
+                            usage: OptionUsage::None,
                         });
                     }
                 }
@@ -873,7 +968,8 @@ pub async fn handle_chat(
         let mut decoder = StreamDecoder::new();
         let mut full_text = String::with_capacity(1024);
         let mut stream = response.bytes_stream();
-        let mut prompt = String::with_capacity(1024);
+        let mut prompt = Prompt::None;
+        let mut usage_uuid = String::new();
 
         // 逐个处理chunks
         while let Some(chunk) = stream.next().await {
@@ -895,8 +991,15 @@ pub async fn handle_chat(
                             StreamMessage::Content(text) => {
                                 full_text.push_str(&text);
                             }
+                            StreamMessage::Usage(uuid) => {
+                                usage_uuid = uuid;
+                            }
                             StreamMessage::Debug(debug_prompt) => {
-                                prompt.push_str(&debug_prompt);
+                                if prompt.is_none() {
+                                    prompt = Prompt::new(debug_prompt);
+                                } else {
+                                    crate::debug_println!("UB!2 {debug_prompt:?}");
+                                }
                             }
                             _ => {}
                         }
@@ -904,12 +1007,44 @@ pub async fn handle_chat(
                 }
                 Err(StreamError::ChatError(error)) => {
                     let error_response = error.into_error_response();
+                    {
+                        let mut state = state.lock().await;
+                        if let Some(log) = state
+                            .request_manager
+                            .request_logs
+                            .iter_mut()
+                            .rev()
+                            .find(|log| log.id == current_id)
+                        {
+                            log.status = LogStatus::Failure;
+                            log.error =
+                                ErrorInfo::Error(intern_string(error_response.native_code()));
+                            if let Some(detail) = error_response.details() {
+                                log.error.add_detail(&detail)
+                            }
+                            state.request_manager.error_requests += 1;
+                        }
+                    }
                     return Err((
                         error_response.status_code(),
                         Json(error_response.into_common()),
                     ));
                 }
                 Err(e) => {
+                    {
+                        let mut state = state.lock().await;
+                        if let Some(log) = state
+                            .request_manager
+                            .request_logs
+                            .iter_mut()
+                            .rev()
+                            .find(|log| log.id == current_id)
+                        {
+                            log.status = LogStatus::Failure;
+                            log.error = ErrorInfo::Error(intern_string(e.to_string()));
+                            state.request_manager.error_requests += 1;
+                        }
+                    }
                     let error_response = ErrorResponse {
                         status: ApiStatus::Error,
                         code: Some(500),
@@ -934,7 +1069,7 @@ pub async fn handle_chat(
                     .find(|log| log.id == current_id)
                 {
                     log.status = LogStatus::Failure;
-                    log.error = Some("Empty response received".to_string());
+                    log.error = ErrorInfo::Error(intern_string("Empty response received"));
                     state.request_manager.error_requests += 1;
                 }
             }
@@ -944,11 +1079,34 @@ pub async fn handle_chat(
             ));
         }
 
+        let (usage1, usage2) = if !usage_uuid.is_empty() {
+            let result = get_token_usage(
+                client,
+                &auth_token,
+                &checksum,
+                &client_key,
+                timezone,
+                is_pri,
+                usage_uuid,
+            )
+            .await;
+            let result2 = match result {
+                Some(ref usage) => OptionUsage::Uasge {
+                    input: usage.prompt_tokens,
+                    output: usage.completion_tokens,
+                },
+                None => OptionUsage::None,
+            };
+            (result, result2)
+        } else {
+            (None, OptionUsage::None)
+        };
+
         let response_data = ChatResponse {
             id: format!("chatcmpl-{trace_id}"),
             object: OBJECT_CHAT_COMPLETION,
             created: chrono::Utc::now().timestamp(),
-            model: Some(request.model),
+            model: Some(model),
             choices: vec![Choice {
                 index: 0,
                 message: Some(Message {
@@ -959,11 +1117,7 @@ pub async fn handle_chat(
                 logprobs: None,
                 finish_reason: Some(FINISH_REASON_STOP.to_string()),
             }],
-            usage: TriState::Some(Usage {
-                prompt_tokens: 0,
-                completion_tokens: 0,
-                total_tokens: 0,
-            }),
+            usage: TriState::Some(usage1.unwrap_or_default()),
         };
 
         {
@@ -982,6 +1136,7 @@ pub async fn handle_chat(
                 log.chain = Some(Chain {
                     prompt,
                     delays: decoder.take_content_delays(),
+                    usage: usage2,
                 });
             }
         }
@@ -996,3 +1151,11 @@ pub async fn handle_chat(
             .unwrap())
     }
 }
+
+// pub async fn handle_completion(
+//     State(state): State<Arc<Mutex<AppState>>>,
+//     headers: HeaderMap,
+//     Json(request): Json<ChatRequest>,
+// ) -> Result<Response<Body>, (StatusCode, Json<ErrorResponse>)> {
+
+// }

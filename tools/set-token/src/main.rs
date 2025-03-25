@@ -50,7 +50,7 @@ fn update_sqlite_tokens(
     })?;
     for row in rows {
         let (key, value) = row?;
-        println!("{}: {}", key, value);
+        println!("{key}: {value}");
     }
 
     // 自动创建项并更新值

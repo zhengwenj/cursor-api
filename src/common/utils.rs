@@ -17,15 +17,22 @@ use super::model::{
 use crate::{
     app::{
         constant::{COMMA, FALSE, TRUE},
-        lazy::{TOKEN_DELIMITER, USE_COMMA_DELIMITER, cursor_api2_chat_models_url},
+        lazy::{
+            TOKEN_DELIMITER, USE_COMMA_DELIMITER, cursor_api2_chat_models_url,
+            cursor_api2_token_usage_url,
+        },
         model::proxy_pool::ProxyPool,
     },
-    chat::{
-        aiserver::v1::{AvailableModelsRequest, AvailableModelsResponse},
+    cursor::{
+        aiserver::v1::{
+            AvailableModelsRequest, AvailableModelsResponse, GetTokenUsageRequest,
+            GetTokenUsageResponse,
+        },
+        config::key_config,
         constant::{
             ANTHROPIC, CREATED, CURSOR, DEEPSEEK, GOOGLE, MODEL_OBJECT, OPENAI, UNKNOWN, XAI,
         },
-        model::Model,
+        model::{Model, Usage},
     },
 };
 
@@ -67,6 +74,19 @@ pub fn parse_usize_from_env(key: &str, default: usize) -> usize {
 
 pub trait TrimNewlines {
     fn trim_leading_newlines(self) -> Self;
+}
+
+impl TrimNewlines for &str {
+    #[inline(always)]
+    fn trim_leading_newlines(self) -> Self {
+        let bytes = self.as_bytes();
+        if bytes.len() >= 2 && bytes[0] == b'\n' && bytes[1] == b'\n' {
+            unsafe {
+                return self.get_unchecked(2..)
+            }
+        }
+        self
+    }
 }
 
 impl TrimNewlines for String {
@@ -206,11 +226,8 @@ pub async fn get_available_models(
         available_models
             .models
             .into_iter()
-            .map(|model| Model {
-                id: model.name.clone(),
-                created: CREATED,
-                object: MODEL_OBJECT,
-                owned_by: {
+            .map(|model| {
+                let owned_by = {
                     let mut chars = model.name.chars();
                     match chars.next() {
                         Some('g') => match chars.next() {
@@ -236,10 +253,60 @@ pub async fn get_available_models(
                         // 其他情况
                         _ => UNKNOWN,
                     }
-                },
+                };
+
+                Model {
+                    id: crate::leak::intern_string(model.name),
+                    created: CREATED,
+                    object: MODEL_OBJECT,
+                    owned_by,
+                }
             })
             .collect(),
     )
+}
+
+pub async fn get_token_usage(
+    client: Client,
+    auth_token: &str,
+    checksum: &str,
+    client_key: &str,
+    timezone: &'static str,
+    is_pri: bool,
+    usage_uuid: String,
+) -> Option<Usage> {
+    let response = {
+        let trace_id = uuid::Uuid::new_v4().to_string();
+        let client = super::client::build_request(super::client::AiServiceRequest {
+            client,
+            auth_token,
+            checksum,
+            client_key,
+            url: cursor_api2_token_usage_url(is_pri),
+            is_stream: false,
+            timezone,
+            trace_id: &trace_id,
+            is_pri,
+        });
+        let request = GetTokenUsageRequest { usage_uuid };
+        client
+            .body(encode_message(&request, false).unwrap())
+            .send()
+            .await
+            .ok()?
+            .bytes()
+            .await
+            .ok()?
+    };
+    let token_usage = GetTokenUsageResponse::decode(response.as_ref()).ok()?;
+    let prompt_tokens = token_usage.input_tokens;
+    let completion_tokens = token_usage.output_tokens;
+    let total_tokens = prompt_tokens + completion_tokens;
+    Some(Usage {
+        prompt_tokens,
+        completion_tokens,
+        total_tokens,
+    })
 }
 
 pub fn validate_token_and_checksum(auth_token: &str) -> Option<(String, String)> {
@@ -319,11 +386,10 @@ pub fn extract_token(auth_token: &str) -> Option<String> {
     }
 }
 
+#[inline(always)]
 pub fn format_time_ms(seconds: f64) -> f64 {
     (seconds * 1000.0).round() / 1000.0
 }
-
-use crate::chat::config::key_config;
 
 /// 将 JWT token 转换为 TokenInfo
 pub fn token_to_tokeninfo(
@@ -408,6 +474,7 @@ pub fn tokeninfo_to_token(mut info: key_config::TokenInfo) -> Option<(String, St
     ))
 }
 
+#[inline(always)]
 pub fn encode_message(
     message: &impl prost::Message,
     with_gzip: bool,

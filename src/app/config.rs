@@ -67,7 +67,7 @@ pub async fn handle_config_update(
                 page_content: AppConfig::get_page_content(&request.path),
                 vision_ability: AppConfig::get_vision_ability(),
                 enable_slow_pool: AppConfig::get_slow_pool(),
-                enable_all_claude: AppConfig::get_allow_claude(),
+                enable_long_context: AppConfig::get_long_context(),
                 usage_check_models: AppConfig::get_usage_check(),
                 enable_dynamic_key: AppConfig::get_dynamic_key(),
                 share_token: AppConfig::get_share_token(),
@@ -86,7 +86,7 @@ pub async fn handle_config_update(
                             Json(ErrorResponse {
                                 status: ApiStatus::Failure,
                                 code: Some(500),
-                                error: Some(format!("更新页面内容失败: {}", e)),
+                                error: Some(format!("更新页面内容失败: {e}")),
                                 message: None,
                             }),
                         ));
@@ -97,7 +97,7 @@ pub async fn handle_config_update(
             handle_updates!(request,
                 vision_ability => AppConfig::update_vision_ability,
                 enable_slow_pool => AppConfig::update_slow_pool,
-                enable_all_claude => AppConfig::update_allow_claude,
+                enable_long_context => AppConfig::update_long_context,
                 usage_check_models => AppConfig::update_usage_check,
                 enable_dynamic_key => AppConfig::update_dynamic_key,
                 share_token => AppConfig::update_share_token,
@@ -120,7 +120,7 @@ pub async fn handle_config_update(
                         Json(ErrorResponse {
                             status: ApiStatus::Failure,
                             code: Some(500),
-                            error: Some(format!("重置页面内容失败: {}", e)),
+                            error: Some(format!("重置页面内容失败: {e}")),
                             message: None,
                         }),
                     ));
@@ -130,7 +130,7 @@ pub async fn handle_config_update(
             handle_resets!(request,
                 vision_ability => AppConfig::reset_vision_ability,
                 enable_slow_pool => AppConfig::reset_slow_pool,
-                enable_all_claude => AppConfig::reset_allow_claude,
+                enable_long_context => AppConfig::reset_long_context,
                 usage_check_models => AppConfig::reset_usage_check,
                 enable_dynamic_key => AppConfig::reset_dynamic_key,
                 share_token => AppConfig::reset_share_token,

@@ -1,6 +1,7 @@
 mod app;
-mod chat;
 mod common;
+mod cursor;
+mod leak;
 
 use app::{
     config::handle_config_update,
@@ -11,9 +12,9 @@ use app::{
         ROUTE_PROXIES_ADD_PATH, ROUTE_PROXIES_DELETE_PATH, ROUTE_PROXIES_GET_PATH,
         ROUTE_PROXIES_PATH, ROUTE_PROXIES_SET_GENERAL_PATH, ROUTE_PROXIES_UPDATE_PATH,
         ROUTE_README_PATH, ROUTE_ROOT_PATH, ROUTE_STATIC_PATH, ROUTE_TOKENS_ADD_PATH,
-        ROUTE_TOKENS_DELETE_PATH, ROUTE_TOKENS_GET_PATH, ROUTE_TOKENS_PATH,
-        ROUTE_TOKENS_PROFILE_UPDATE_PATH, ROUTE_TOKENS_TAGS_UPDATE_PATH, ROUTE_TOKENS_UPDATE_PATH,
-        ROUTE_USER_INFO_PATH,
+        ROUTE_TOKENS_BY_TAG_GET_PATH, ROUTE_TOKENS_DELETE_PATH, ROUTE_TOKENS_GET_PATH,
+        ROUTE_TOKENS_PATH, ROUTE_TOKENS_PROFILE_UPDATE_PATH, ROUTE_TOKENS_TAGS_GET_PATH,
+        ROUTE_TOKENS_TAGS_UPDATE_PATH, ROUTE_TOKENS_UPDATE_PATH, ROUTE_USER_INFO_PATH,
     },
     lazy::{AUTH_TOKEN, ROUTE_CHAT_PATH, ROUTE_MODELS_PATH},
     model::*,
@@ -22,21 +23,21 @@ use axum::{
     Router, middleware,
     routing::{get, post},
 };
-use chat::{
+use common::utils::{parse_string_from_env, parse_usize_from_env};
+use cursor::{
     middleware::admin_auth_middleware,
     route::{
         handle_about, handle_add_proxy, handle_add_tokens, handle_api_page,
         handle_basic_calibration, handle_build_key, handle_build_key_page, handle_config_page,
         handle_delete_proxies, handle_delete_tokens, handle_env_example, handle_get_checksum,
-        handle_get_hash, handle_get_proxies, handle_get_timestamp_header, handle_get_tokens,
-        handle_health, handle_logs, handle_logs_post, handle_proxies_page, handle_readme,
-        handle_root, handle_set_general_proxy, handle_static, handle_tokens_page,
-        handle_update_proxies, handle_update_token_tags, handle_update_tokens,
+        handle_get_hash, handle_get_proxies, handle_get_timestamp_header, handle_get_token_tags,
+        handle_get_tokens, handle_get_tokens_by_tag, handle_health, handle_logs, handle_logs_post,
+        handle_proxies_page, handle_readme, handle_root, handle_set_general_proxy, handle_static,
+        handle_tokens_page, handle_update_proxies, handle_update_token_tags, handle_update_tokens,
         handle_update_tokens_profile, handle_user_info,
     },
     service::{handle_chat, handle_models},
 };
-use common::utils::{parse_string_from_env, parse_usize_from_env};
 use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::Mutex;
@@ -65,7 +66,7 @@ async fn main() {
     AppConfig::init();
 
     // 初始化应用状态
-    let state = Arc::new(Mutex::new(AppState::new()));
+    let state = Arc::new(Mutex::new(AppState::new().await));
 
     // 尝试加载保存的配置
     if let Err(e) = AppConfig::load_saved_config() {
@@ -154,10 +155,12 @@ async fn main() {
                 .route(ROUTE_TOKENS_UPDATE_PATH, post(handle_update_tokens))
                 .route(ROUTE_TOKENS_ADD_PATH, post(handle_add_tokens))
                 .route(ROUTE_TOKENS_DELETE_PATH, post(handle_delete_tokens))
+                .route(ROUTE_TOKENS_TAGS_GET_PATH, post(handle_get_token_tags))
                 .route(
                     ROUTE_TOKENS_TAGS_UPDATE_PATH,
                     post(handle_update_token_tags),
                 )
+                .route(ROUTE_TOKENS_BY_TAG_GET_PATH, post(handle_get_tokens_by_tag))
                 .route(
                     ROUTE_TOKENS_PROFILE_UPDATE_PATH,
                     post(handle_update_tokens_profile),
@@ -210,6 +213,7 @@ async fn main() {
     #[cfg(feature = "__preview")]
     println!("当前是测试版，有问题及时反馈哦~");
 
+    app::lazy::get_start_time();
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .unwrap_or_else(|e| {

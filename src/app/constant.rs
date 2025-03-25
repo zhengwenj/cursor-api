@@ -46,7 +46,9 @@ def_pub_const!(
     ROUTE_TOKENS_UPDATE_PATH => "/tokens/update",
     ROUTE_TOKENS_ADD_PATH => "/tokens/add",
     ROUTE_TOKENS_DELETE_PATH => "/tokens/delete",
+    ROUTE_TOKENS_TAGS_GET_PATH => "/tokens/tags/get",
     ROUTE_TOKENS_TAGS_UPDATE_PATH => "/tokens/tags/update",
+    ROUTE_TOKENS_BY_TAG_GET_PATH => "/tokens/by-tag/get",
     ROUTE_TOKENS_PROFILE_UPDATE_PATH => "/tokens/profile/update",
     ROUTE_PROXIES_PATH => "/proxies",
     ROUTE_PROXIES_GET_PATH => "/proxies/get",
@@ -109,7 +111,8 @@ def_pub_const!(
 // Object type constants
 def_pub_const!(
     OBJECT_CHAT_COMPLETION => "chat.completion",
-    OBJECT_CHAT_COMPLETION_CHUNK => "chat.completion.chunk"
+    OBJECT_CHAT_COMPLETION_CHUNK => "chat.completion.chunk",
+    // OBJECT_TEXT_COMPLETION => "text_completion"
 );
 
 // def_pub_const!(

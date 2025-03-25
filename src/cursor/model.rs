@@ -12,7 +12,7 @@ pub enum MessageContent {
 #[derive(Serialize, Deserialize)]
 pub struct VisionMessageContent {
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub rtype: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -32,10 +32,11 @@ pub struct Message {
     pub content: MessageContent,
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Copy, PartialEq)]
+#[repr(u8)]
 pub enum Role {
     #[serde(rename = "system", alias = "developer")]
-    System,
+    System = 0u8,
     #[serde(rename = "user", alias = "human")]
     User,
     #[serde(rename = "assistant", alias = "ai")]
@@ -48,7 +49,7 @@ pub struct ChatResponse {
     pub object: &'static str,
     pub created: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
+    pub model: Option<&'static str>,
     pub choices: Vec<Choice>,
     #[serde(skip_serializing_if = "TriState::is_none")]
     pub usage: TriState<Usage>,
@@ -75,9 +76,15 @@ pub struct Delta {
 
 #[derive(Serialize)]
 pub struct Usage {
-    pub prompt_tokens: u32,
-    pub completion_tokens: u32,
-    pub total_tokens: u32,
+    pub prompt_tokens: i32,
+    pub completion_tokens: i32,
+    pub total_tokens: i32,
+}
+
+impl Default for Usage {
+    fn default() -> Self {
+        Self { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+    }
 }
 
 // 聊天请求
@@ -97,9 +104,9 @@ pub struct StreamOptions {
 }
 
 // 模型定义
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 pub struct Model {
-    pub id: String,
+    pub id: &'static str,
     pub created: &'static i64,
     pub object: &'static str,
     pub owned_by: &'static str,
@@ -112,15 +119,18 @@ impl PartialEq for Model {
 }
 
 use super::constant::{Models, USAGE_CHECK_MODELS};
-use crate::{app::model::{AppConfig, UsageCheck}, common::model::tri::TriState};
+use crate::{
+    app::model::{AppConfig, UsageCheck},
+    common::model::tri::TriState,
+};
 
 impl Model {
-    pub fn is_usage_check(model_id: &String, usage_check: Option<UsageCheck>) -> bool {
+    pub fn is_usage_check(model_id: &str, usage_check: Option<UsageCheck>) -> bool {
         match usage_check.unwrap_or(AppConfig::get_usage_check()) {
             UsageCheck::None => false,
-            UsageCheck::Default => USAGE_CHECK_MODELS.contains(&model_id.as_str()),
+            UsageCheck::Default => USAGE_CHECK_MODELS.contains(&model_id),
             UsageCheck::All => true,
-            UsageCheck::Custom(models) => models.contains(model_id),
+            UsageCheck::Custom(models) => models.contains(&model_id),
         }
     }
 }
@@ -132,6 +142,7 @@ pub struct ModelsResponse {
 }
 
 impl ModelsResponse {
+    #[inline]
     pub(super) fn new(data: Arc<Vec<Model>>) -> Self {
         Self {
             object: "list",
@@ -139,6 +150,7 @@ impl ModelsResponse {
         }
     }
 
+    #[inline]
     pub(super) fn with_default_models() -> Self {
         Self::new(Models::to_arc())
     }

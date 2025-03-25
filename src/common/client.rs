@@ -152,7 +152,7 @@ fn get_client_and_host<'a>(
 pub fn build_profile_request(client: &Client, auth_token: &str, is_pri: bool) -> RequestBuilder {
     let (client, host) = get_client_and_host(
         client,
-        &cursor_api2_stripe_url(is_pri),
+        cursor_api2_stripe_url(is_pri),
         is_pri,
         CURSOR_API2_HOST,
     );
@@ -197,7 +197,7 @@ pub fn build_usage_request(
     let session_token = format!("{}%3A%3A{}", user_id, auth_token);
 
     let (client, host) =
-        get_client_and_host(client, &cursor_usage_api_url(is_pri), is_pri, CURSOR_HOST);
+        get_client_and_host(client, cursor_usage_api_url(is_pri), is_pri, CURSOR_HOST);
 
     client
         .header(HOST, host)
@@ -242,7 +242,7 @@ pub fn build_userinfo_request(
     let session_token = format!("{}%3A%3A{}", user_id, auth_token);
 
     let (client, host) =
-        get_client_and_host(client, &cursor_user_api_url(is_pri), is_pri, CURSOR_HOST);
+        get_client_and_host(client, cursor_user_api_url(is_pri), is_pri, CURSOR_HOST);
 
     client
         .header(HOST, host)

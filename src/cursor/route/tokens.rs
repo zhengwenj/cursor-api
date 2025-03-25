@@ -4,9 +4,10 @@ use crate::{
         TokenTagsUpdateRequest, TokenUpdateRequest, TokensDeleteRequest, TokensDeleteResponse,
     },
     common::{
-        model::{ApiStatus, ErrorResponse},
+        model::{ApiStatus, ErrorResponse, NormalResponse},
         utils::{
-            generate_checksum_with_default, generate_checksum_with_repair, generate_hash, parse_token, validate_token
+            generate_checksum_with_default, generate_checksum_with_repair, generate_hash,
+            parse_token, validate_token,
         },
     },
 };
@@ -348,13 +349,57 @@ pub async fn handle_update_tokens_profile(
         ));
     }
 
-    let message = format!(
-        "已更新{}个令牌配置, {}个令牌更新失败",
-        updated_count, failed_count
-    );
+    let message = format!("已更新{updated_count}个令牌配置, {failed_count}个令牌更新失败");
 
     Ok(Json(CommonResponse {
         status: ApiStatus::Success,
         message: Some(message),
     }))
+}
+
+pub async fn handle_get_token_tags(
+    State(state): State<Arc<Mutex<AppState>>>,
+) -> Result<Json<NormalResponse<Vec<String>>>, StatusCode> {
+    let state = state.lock().await;
+    let tags: Vec<_> = state.token_manager.tags.iter().cloned().collect();
+    let len = tags.len();
+
+    Ok(Json(NormalResponse {
+        status: ApiStatus::Success,
+        data: Some(tags),
+        message: Some(format!("获取到{len}个标签")),
+    }))
+}
+
+pub async fn handle_get_tokens_by_tag(
+    State(state): State<Arc<Mutex<AppState>>>,
+    Json(tag): Json<String>,
+) -> Result<Json<TokenInfoResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let state = state.lock().await;
+
+    match state.token_manager.get_tokens_by_tag(&tag) {
+        Ok(tokens) => {
+            let tokens_vec = tokens
+                .iter()
+                .map(|&t| t.clone())
+                .collect::<Vec<TokenInfo>>();
+            let tokens_count = tokens_vec.len();
+
+            Ok(Json(TokenInfoResponse {
+                status: ApiStatus::Success,
+                tokens: Some(tokens_vec),
+                tokens_count,
+                message: Some(format!("获取到{tokens_count}个标签为{tag}的令牌")),
+            }))
+        }
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                status: ApiStatus::Error,
+                code: None,
+                error: Some(e.to_string()),
+                message: Some(format!("标签\"{tag}\"不存在")),
+            }),
+        )),
+    }
 }

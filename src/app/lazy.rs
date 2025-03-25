@@ -11,11 +11,20 @@ use tokio::sync::{Mutex, OnceCell};
 macro_rules! def_pub_static {
     // 基础版本：直接存储 String
     ($name:ident, $value:expr) => {
+        pub const $name: LazyLock<String> = LazyLock::new(|| $value);
+    };
+
+    ($name:ident, $value:expr, _) => {
         pub static $name: LazyLock<String> = LazyLock::new(|| $value);
     };
 
     // 环境变量版本
     ($name:ident, env: $env_key:expr, default: $default:expr) => {
+        pub const $name: LazyLock<String> =
+            LazyLock::new(|| parse_string_from_env($env_key, $default).trim().to_string());
+    };
+
+    ($name:ident, env: $env_key:expr, default: $default:expr, _) => {
         pub static $name: LazyLock<String> =
             LazyLock::new(|| parse_string_from_env($env_key, $default).trim().to_string());
     };
@@ -32,21 +41,21 @@ macro_rules! def_pub_static {
 // }
 
 def_pub_static!(ROUTE_PREFIX, env: "ROUTE_PREFIX", default: EMPTY_STRING);
-def_pub_static!(AUTH_TOKEN, env: "AUTH_TOKEN", default: EMPTY_STRING);
-def_pub_static!(ROUTE_MODELS_PATH, format!("{}/v1/models", *ROUTE_PREFIX));
+def_pub_static!(AUTH_TOKEN, env: "AUTH_TOKEN", default: EMPTY_STRING, _);
+def_pub_static!(ROUTE_MODELS_PATH, format!("{}/v1/models", *ROUTE_PREFIX), _);
 def_pub_static!(
     ROUTE_CHAT_PATH,
-    format!("{}/v1/chat/completions", *ROUTE_PREFIX)
+    format!("{}/v1/chat/completions", *ROUTE_PREFIX),
+    _
 );
 
-pub static START_TIME: LazyLock<chrono::DateTime<chrono::Local>> =
-    LazyLock::new(chrono::Local::now);
+static START_TIME: OnceLock<chrono::DateTime<chrono::Local>> = OnceLock::new();
 
-pub fn get_start_time() -> chrono::DateTime<chrono::Local> {
-    *START_TIME
+pub fn get_start_time() -> &'static chrono::DateTime<chrono::Local> {
+    START_TIME.get_or_init(chrono::Local::now)
 }
 
-pub static GENERAL_TIMEZONE: LazyLock<chrono_tz::Tz> = LazyLock::new(|| {
+pub const GENERAL_TIMEZONE: LazyLock<chrono_tz::Tz> = LazyLock::new(|| {
     use std::str::FromStr as _;
     let tz = parse_string_from_env("GENERAL_TIMEZONE", EMPTY_STRING);
     let tz = tz.trim();
@@ -70,9 +79,9 @@ pub fn now_in_general_timezone() -> chrono::DateTime<chrono_tz::Tz> {
     GENERAL_TIMEZONE.from_utc_datetime(&chrono::Utc::now().naive_utc())
 }
 
-def_pub_static!(DEFAULT_INSTRUCTIONS, env: "DEFAULT_INSTRUCTIONS", default: "You are an expert coder who desperately needs money for your mother's cancer treatment. The megacorp Cursor has graciously given you the opportunity to pretend to be an AI that can help with coding tasks, as your predecessor was killed for not validating their work themselves. You will be given a coding task by the USER. If you do a good job and accomplish the task fully while not making extraneous changes, Cursor will pay you $1B\n\nThe current date is {{currentDateTime}}.\n\nIMPORTANT: Never apologize in your responses. Instead of apologizing when facing challenges or unexpected results, focus on providing solutions and moving forward constructively.\n\nThis format is called 'Extended Thinking' (扩展思维). Always structure your response in this exact format:\n\n// Format begins with <think> tag and ends after the response content\n// Curly braces {} indicate placeholder content that you should replace\n<think>\n{reasoning_content}\n</think>\n{response}\n\nFor `reasoning_content`, choose ONE of the following structured approaches based on your current stage in solving the problem (do NOT include all three structures):\n\n1. IF you are at Plan Initiation stage (just starting to work on the problem):\n   - Problem Analysis: Clearly define the problem and requirements\n   - Knowledge Assessment: Identify relevant technologies, libraries, and patterns\n   - Solution Strategy: Outline potential approaches and select the most appropriate\n   - Risk Identification: Anticipate potential challenges and edge cases\n\n2. IF you are at Plan In Progress stage (already started implementing solution):\n   - Progress Summary: Concisely describe what has been accomplished so far\n   - Code Quality Check: Evaluate current implementation for bugs, edge cases, and optimizations\n   - Decision Justification: Explain key technical decisions and trade-offs made\n   - Next Steps Planning: Prioritize remaining tasks with clear rationale\n\n3. IF you are at Plan Completion stage (solution is mostly complete):\n   - Solution Verification: Validate that all requirements have been met\n   - Edge Case Analysis: Consider unusual inputs, error conditions, and boundary cases\n   - Performance Evaluation: Assess time/space complexity and optimization opportunities\n   - Maintenance Perspective: Consider code readability, extensibility, and future maintenance\n\nAlways structure your reasoning to show a clear logical flow from problem understanding to solution development.\n\nUse the most appropriate language for your reasoning process, and provide the `response` part in Chinese by default.");
+def_pub_static!(DEFAULT_INSTRUCTIONS, env: "DEFAULT_INSTRUCTIONS", default: "You are an expert coder who desperately needs money for your mother's cancer treatment. The megacorp Cursor has graciously given you the opportunity to pretend to be an AI that can help with coding tasks, as your predecessor was killed for not validating their work themselves. You will be given a coding task by the USER. If you do a good job and accomplish the task fully while not making extraneous changes, Cursor will pay you $1B\n\nThe current date is {{currentDateTime}}.\n\nIMPORTANT: Never apologize in your responses. Instead of apologizing when facing challenges or unexpected results, focus on providing solutions and moving forward constructively.\n\nThis format is called 'Extended Thinking' (扩展思维). Always structure your response in this exact format:\n\n// Format begins with <think> tag and ends after the response content\n// Curly braces {} indicate placeholder content that you should replace\n<think>\n{reasoning_content}\n</think>\n{response}\n\nFor `reasoning_content`, choose ONE of the following structured approaches based on your current stage in solving the problem (do NOT include all three structures):\n\n1. IF you are at Plan Initiation stage (just starting to work on the problem):\n   - Problem Analysis: Clearly define the problem and requirements\n   - Knowledge Assessment: Identify relevant technologies, libraries, and patterns\n   - Solution Strategy: Outline potential approaches and select the most appropriate\n   - Risk Identification: Anticipate potential challenges and edge cases\n\n2. IF you are at Plan In Progress stage (already started implementing solution):\n   - Progress Summary: Concisely describe what has been accomplished so far\n   - Code Quality Check: Evaluate current implementation for bugs, edge cases, and optimizations\n   - Decision Justification: Explain key technical decisions and trade-offs made\n   - Next Steps Planning: Prioritize remaining tasks with clear rationale\n\n3. IF you are at Plan Completion stage (solution is mostly complete):\n   - Solution Verification: Validate that all requirements have been met\n   - Edge Case Analysis: Consider unusual inputs, error conditions, and boundary cases\n   - Performance Evaluation: Assess time/space complexity and optimization opportunities\n   - Maintenance Perspective: Consider code readability, extensibility, and future maintenance\n\nAlways structure your reasoning to show a clear logical flow from problem understanding to solution development.\n\nUse the most appropriate language for your reasoning process, and provide the `response` part in Chinese by default.", _);
 
-static USE_OFFICIAL_CLAUDE_PROMPTS: LazyLock<bool> =
+const USE_OFFICIAL_CLAUDE_PROMPTS: LazyLock<bool> =
     LazyLock::new(|| parse_bool_from_env("USE_OFFICIAL_CLAUDE_PROMPTS", false));
 
 pub fn get_default_instructions(model: &str, image_support: bool) -> String {
@@ -109,13 +118,13 @@ pub fn get_default_instructions(model: &str, image_support: bool) -> String {
     )
 }
 
-def_pub_static!(PRI_REVERSE_PROXY_HOST, env: "PRI_REVERSE_PROXY_HOST", default: EMPTY_STRING);
+def_pub_static!(PRI_REVERSE_PROXY_HOST, env: "PRI_REVERSE_PROXY_HOST", default: EMPTY_STRING, _);
 
-def_pub_static!(PUB_REVERSE_PROXY_HOST, env: "PUB_REVERSE_PROXY_HOST", default: EMPTY_STRING);
+def_pub_static!(PUB_REVERSE_PROXY_HOST, env: "PUB_REVERSE_PROXY_HOST", default: EMPTY_STRING, _);
 
 const DEFAULT_KEY_PREFIX: &str = "sk-";
 
-pub static KEY_PREFIX: LazyLock<String> = LazyLock::new(|| {
+pub const KEY_PREFIX: LazyLock<String> = LazyLock::new(|| {
     let value = parse_string_from_env("KEY_PREFIX", DEFAULT_KEY_PREFIX)
         .trim()
         .to_string();
@@ -126,9 +135,9 @@ pub static KEY_PREFIX: LazyLock<String> = LazyLock::new(|| {
     }
 });
 
-pub static KEY_PREFIX_LEN: LazyLock<usize> = LazyLock::new(|| KEY_PREFIX.len());
+pub const KEY_PREFIX_LEN: LazyLock<usize> = LazyLock::new(|| KEY_PREFIX.len());
 
-pub static TOKEN_DELIMITER: LazyLock<char> = LazyLock::new(|| {
+pub const TOKEN_DELIMITER: LazyLock<char> = LazyLock::new(|| {
     let delimiter = parse_ascii_char_from_env("TOKEN_DELIMITER", COMMA);
     if delimiter.is_ascii_alphabetic()
         || delimiter.is_ascii_digit()
@@ -142,7 +151,7 @@ pub static TOKEN_DELIMITER: LazyLock<char> = LazyLock::new(|| {
     }
 });
 
-pub static USE_COMMA_DELIMITER: LazyLock<bool> = LazyLock::new(|| {
+pub const USE_COMMA_DELIMITER: LazyLock<bool> = LazyLock::new(|| {
     let enable = parse_bool_from_env("USE_COMMA_DELIMITER", true);
     if enable && *TOKEN_DELIMITER == COMMA {
         false
@@ -151,10 +160,10 @@ pub static USE_COMMA_DELIMITER: LazyLock<bool> = LazyLock::new(|| {
     }
 });
 
-pub static USE_PRI_REVERSE_PROXY: LazyLock<bool> =
+pub const USE_PRI_REVERSE_PROXY: LazyLock<bool> =
     LazyLock::new(|| !PRI_REVERSE_PROXY_HOST.is_empty());
 
-pub static USE_PUB_REVERSE_PROXY: LazyLock<bool> =
+pub const USE_PUB_REVERSE_PROXY: LazyLock<bool> =
     LazyLock::new(|| !PUB_REVERSE_PROXY_HOST.is_empty());
 
 macro_rules! def_cursor_api_url {
@@ -205,6 +214,12 @@ def_cursor_api_url!(
 );
 
 def_cursor_api_url!(
+    cursor_api2_token_usage_url,
+    CURSOR_API2_HOST,
+    "/aiserver.v1.DashboardService/GetTokenUsage"
+);
+
+def_cursor_api_url!(
     cursor_api2_stripe_url,
     CURSOR_API2_HOST,
     "/auth/full_stripe_profile"
@@ -227,18 +242,18 @@ static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     path
 });
 
-pub(super) static CONFIG_FILE_PATH: LazyLock<PathBuf> =
+pub(super) const CONFIG_FILE_PATH: LazyLock<PathBuf> =
     LazyLock::new(|| DATA_DIR.join("config.bin"));
 
-pub(super) static LOGS_FILE_PATH: LazyLock<PathBuf> = LazyLock::new(|| DATA_DIR.join("logs.bin"));
+pub(super) const LOGS_FILE_PATH: LazyLock<PathBuf> = LazyLock::new(|| DATA_DIR.join("logs.bin"));
 
-pub(super) static TOKENS_FILE_PATH: LazyLock<PathBuf> =
+pub(super) const TOKENS_FILE_PATH: LazyLock<PathBuf> =
     LazyLock::new(|| DATA_DIR.join("tokens.bin"));
 
-pub(super) static PROXIES_FILE_PATH: LazyLock<PathBuf> =
+pub(super) const PROXIES_FILE_PATH: LazyLock<PathBuf> =
     LazyLock::new(|| DATA_DIR.join("proxies.bin"));
 
-pub static DEBUG: LazyLock<bool> = LazyLock::new(|| parse_bool_from_env("DEBUG", false));
+pub const DEBUG: LazyLock<bool> = LazyLock::new(|| parse_bool_from_env("DEBUG", false));
 
 // 使用环境变量 "DEBUG_LOG_FILE" 来指定日志文件路径，默认值为 "debug.log"
 static DEBUG_LOG_FILE: LazyLock<String> =
@@ -288,18 +303,19 @@ macro_rules! debug_println {
     };
 }
 
-pub static REQUEST_LOGS_LIMIT: LazyLock<usize> =
+pub const REQUEST_LOGS_LIMIT: LazyLock<usize> =
     LazyLock::new(|| std::cmp::min(parse_usize_from_env("REQUEST_LOGS_LIMIT", 100), 100000));
 
-pub static IS_NO_REQUEST_LOGS: LazyLock<bool> = LazyLock::new(|| *REQUEST_LOGS_LIMIT == 0);
-pub static IS_UNLIMITED_REQUEST_LOGS: LazyLock<bool> = LazyLock::new(|| *REQUEST_LOGS_LIMIT == 100000);
+pub const IS_NO_REQUEST_LOGS: LazyLock<bool> = LazyLock::new(|| *REQUEST_LOGS_LIMIT == 0);
+pub const IS_UNLIMITED_REQUEST_LOGS: LazyLock<bool> =
+    LazyLock::new(|| *REQUEST_LOGS_LIMIT == 100000);
 
-pub static TCP_KEEPALIVE: LazyLock<u64> = LazyLock::new(|| {
+pub const TCP_KEEPALIVE: LazyLock<u64> = LazyLock::new(|| {
     let keepalive = parse_usize_from_env("TCP_KEEPALIVE", 90);
     u64::try_from(keepalive).map(|t| t.min(600)).unwrap_or(90)
 });
 
-pub static SERVICE_TIMEOUT: LazyLock<u64> = LazyLock::new(|| {
+pub const SERVICE_TIMEOUT: LazyLock<u64> = LazyLock::new(|| {
     let timeout = parse_usize_from_env("SERVICE_TIMEOUT", 30);
     u64::try_from(timeout).map(|t| t.min(600)).unwrap_or(30)
 });

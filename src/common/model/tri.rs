@@ -18,8 +18,9 @@ impl<T> TriState<T> {
     //     matches!(self, TriState::Null)
     // }
 
-    pub fn is_none(&self) -> bool {
-        matches!(self, TriState::None)
+    #[inline(always)]
+    pub const fn is_none(&self) -> bool {
+        matches!(*self, TriState::None)
     }
 }
 

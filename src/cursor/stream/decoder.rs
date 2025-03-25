@@ -1,14 +1,15 @@
-use crate::chat::{
+use crate::common::utils::InstantExt as _;
+use crate::cursor::{
     aiserver::v1::{StreamChatResponse, WebReference},
     error::{ChatError, StreamError},
 };
-use crate::common::utils::InstantExt as _;
 use flate2::read::GzDecoder;
 use prost::Message;
 use std::io::Read;
 use std::time::Instant;
 
 // 解压gzip数据
+#[inline]
 fn decompress_gzip(data: &[u8]) -> Option<Vec<u8>> {
     let mut decoder = GzDecoder::new(data);
     let mut decompressed = Vec::new();
@@ -58,6 +59,8 @@ pub enum StreamMessage {
     ContentStart,
     // 消息内容
     Content(String),
+    // 额度消耗
+    Usage(String),
     // 流结束标志
     StreamEnd,
 }
@@ -225,6 +228,7 @@ impl StreamDecoder {
         Ok(messages)
     }
 
+    #[inline]
     fn process_message(
         &self,
         msg_type: u8,
@@ -236,22 +240,25 @@ impl StreamDecoder {
             2 => self.handle_json_message(msg_data),
             3 => self.handle_gzip_json_message(msg_data),
             t => {
-                eprintln!("收到未知消息类型: {}，请尝试联系开发者以获取支持", t);
-                crate::debug_println!("消息类型: {}，消息内容: {}", t, hex::encode(msg_data));
+                eprintln!("收到未知消息类型: {t}，请尝试联系开发者以获取支持");
+                crate::debug_println!("消息类型: {t}，消息内容: {}", hex::encode(msg_data));
                 Ok(None)
             }
         }
     }
 
+    #[inline]
     fn handle_text_message(&self, msg_data: &[u8]) -> Result<Option<StreamMessage>, StreamError> {
         if let Ok(response) = StreamChatResponse::decode(msg_data) {
-            // println!("[text] StreamChatResponse [hex: {}]: {:?}", hex::encode(msg_data), response);
+            // crate::debug_println!("[text] StreamChatResponse [hex: {}]: {:#?}", hex::encode(msg_data), response);
             if !response.text.is_empty() {
                 Ok(Some(StreamMessage::Content(response.text)))
             } else if let Some(filled_prompt) = response.filled_prompt {
                 Ok(Some(StreamMessage::Debug(filled_prompt)))
             } else if let Some(web_citation) = response.web_citation {
                 Ok(Some(StreamMessage::WebReference(web_citation.references)))
+            } else if let Some(usage_uuid) = response.usage_uuid {
+                Ok(Some(StreamMessage::Usage(usage_uuid)))
             } else {
                 Ok(None)
             }
@@ -260,16 +267,19 @@ impl StreamDecoder {
         }
     }
 
+    #[inline]
     fn handle_gzip_message(&self, msg_data: &[u8]) -> Result<Option<StreamMessage>, StreamError> {
         if let Some(text) = decompress_gzip(msg_data) {
             if let Ok(response) = StreamChatResponse::decode(&text[..]) {
-                // println!("[gzip] StreamChatResponse [hex: {}]: {:?}", hex::encode(msg_data), response);
+                // crate::debug_println!("[gzip] StreamChatResponse [hex: {}]: {:#?}", hex::encode(msg_data), response);
                 if !response.text.is_empty() {
                     Ok(Some(StreamMessage::Content(response.text)))
                 } else if let Some(filled_prompt) = response.filled_prompt {
                     Ok(Some(StreamMessage::Debug(filled_prompt)))
                 } else if let Some(web_citation) = response.web_citation {
                     Ok(Some(StreamMessage::WebReference(web_citation.references)))
+                } else if let Some(usage_uuid) = response.usage_uuid {
+                    Ok(Some(StreamMessage::Usage(usage_uuid)))
                 } else {
                     Ok(None)
                 }
@@ -281,12 +291,13 @@ impl StreamDecoder {
         }
     }
 
+    #[inline]
     fn handle_json_message(&self, msg_data: &[u8]) -> Result<Option<StreamMessage>, StreamError> {
         if msg_data.len() == 2 {
             return Ok(Some(StreamMessage::StreamEnd));
         }
         if let Ok(text) = String::from_utf8(msg_data.to_vec()) {
-            // println!("[text] JSON消息 [hex: {}]: {}", hex::encode(msg_data), text);
+            // crate::debug_println!("[text] JSON消息 [hex: {}]: {}", hex::encode(msg_data), text);
             if let Ok(error) = serde_json::from_str::<ChatError>(&text) {
                 return Err(StreamError::ChatError(error));
             }
@@ -294,6 +305,7 @@ impl StreamDecoder {
         Ok(None)
     }
 
+    #[inline]
     fn handle_gzip_json_message(
         &self,
         msg_data: &[u8],
@@ -303,7 +315,7 @@ impl StreamDecoder {
                 return Ok(Some(StreamMessage::StreamEnd));
             }
             if let Ok(text) = String::from_utf8(text) {
-                // println!("[gzip] JSON消息 [hex: {}]: {}", hex::encode(msg_data), text);
+                // crate::debug_println!("[gzip] JSON消息 [hex: {}]: {}", hex::encode(msg_data), text);
                 if let Ok(error) = serde_json::from_str::<ChatError>(&text) {
                     return Err(StreamError::ChatError(error));
                 }
@@ -343,8 +355,11 @@ mod tests {
                             println!("流结束");
                             break;
                         }
+                        StreamMessage::Usage(msg) => {
+                            println!("额度uuid: {msg}");
+                        }
                         StreamMessage::Content(msg) => {
-                            println!("消息内容: {}", msg);
+                            println!("消息内容: {msg}");
                         }
                         StreamMessage::WebReference(refs) => {
                             println!("网页引用:");
@@ -356,7 +371,7 @@ mod tests {
                             }
                         }
                         StreamMessage::Debug(prompt) => {
-                            println!("调试信息: {}", prompt);
+                            println!("调试信息: {prompt}");
                         }
                         StreamMessage::ContentStart => {
                             println!("流开始");
@@ -424,15 +439,18 @@ mod tests {
                     for message in messages {
                         match message {
                             StreamMessage::StreamEnd => {
-                                println!("流结束 [hex: {}]", hex_str);
+                                println!("流结束 [hex: {hex_str}]");
                                 should_break = true;
                                 break;
                             }
+                            StreamMessage::Usage(msg) => {
+                                println!("额度uuid: {msg}");
+                            }
                             StreamMessage::Content(msg) => {
-                                println!("消息内容 [hex: {}]: {}", hex_str, msg);
+                                println!("消息内容 [hex: {hex_str}]: {msg}");
                             }
                             StreamMessage::WebReference(refs) => {
-                                println!("网页引用 [hex: {}]:", hex_str);
+                                println!("网页引用 [hex: {hex_str}]:");
                                 for (i, web_ref) in refs.iter().enumerate() {
                                     println!(
                                         "{}. {} - {} - {}",
@@ -441,10 +459,10 @@ mod tests {
                                 }
                             }
                             StreamMessage::Debug(prompt) => {
-                                println!("调试信息 [hex: {}]: {}", hex_str, prompt);
+                                println!("调试信息 [hex: {hex_str}]: {prompt}");
                             }
                             StreamMessage::ContentStart => {
-                                println!("流开始 [hex: {}]", hex_str);
+                                println!("流开始 [hex: {hex_str}]");
                             }
                         }
                     }

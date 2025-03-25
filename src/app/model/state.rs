@@ -7,6 +7,7 @@ use std::{collections::HashSet, fs::OpenOptions};
 use super::{
     super::lazy::{LOGS_FILE_PATH, TOKENS_FILE_PATH},
     LogStatus, RequestLog, TokenInfo,
+    log::RequestLogHelper,
     proxy_pool::Proxies,
 };
 
@@ -51,7 +52,6 @@ pub struct TokenManager {
 }
 
 // 请求统计管理器
-#[derive(Clone, Archive, RkyvDeserialize, RkyvSerialize)]
 pub struct RequestStatsManager {
     pub total_requests: u64,
     pub active_requests: u64,
@@ -59,7 +59,6 @@ pub struct RequestStatsManager {
     pub request_logs: Vec<RequestLog>,
 }
 
-#[derive(Clone, Archive, RkyvDeserialize, RkyvSerialize)]
 pub struct AppState {
     pub token_manager: TokenManager,
     pub request_manager: RequestStatsManager,
@@ -78,11 +77,13 @@ impl TokenManager {
         Self { tokens, tags }
     }
 
+    #[inline(always)]
     pub fn update_global_tags(&mut self, new_tags: &[String]) {
         // 将新标签添加到全局标签集合中
         self.tags.extend(new_tags.iter().cloned());
     }
 
+    #[inline(always)]
     pub fn update_tokens_tags(
         &mut self,
         tokens: Vec<String>,
@@ -109,17 +110,24 @@ impl TokenManager {
         Ok(())
     }
 
-    pub fn get_tokens_by_tag(&self, tag: &str) -> Vec<&TokenInfo> {
-        self.tokens
+    #[inline(always)]
+    pub fn get_tokens_by_tag(&self, tag: &str) -> Result<Vec<&TokenInfo>, &'static str> {
+        if !self.tags.contains(tag) {
+            return Err("Tag does not exist");
+        }
+
+        Ok(self
+            .tokens
             .iter()
             .filter(|t| {
                 t.tags
                     .as_ref()
-                    .is_some_and(|tags| tags.contains(&tag.to_string()))
+                    .is_some_and(|tags| tags.iter().any(|t| t == tag))
             })
-            .collect()
+            .collect())
     }
 
+    #[inline(always)]
     pub fn update_checksum(&mut self) {
         for token_info in self.tokens.iter_mut() {
             token_info.checksum = generate_checksum_with_repair(&token_info.checksum);
@@ -182,7 +190,13 @@ impl RequestStatsManager {
     }
 
     pub async fn save_logs(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let bytes = rkyv::to_bytes::<_, 256>(&self.request_logs)?;
+        let bytes = rkyv::to_bytes::<_, 256>(
+            &self
+                .request_logs
+                .iter()
+                .map(RequestLogHelper::from)
+                .collect::<Vec<_>>(),
+        )?;
 
         let file = OpenOptions::new()
             .read(true)
@@ -217,45 +231,23 @@ impl RequestStatsManager {
         }
 
         let mmap = unsafe { MmapOptions::new().map(&file)? };
-        let archived = unsafe { rkyv::archived_root::<Vec<RequestLog>>(&mmap) };
-        Ok(archived.deserialize(&mut rkyv::Infallible)?)
-    }
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self::new()
+        let archived = unsafe { rkyv::archived_root::<Vec<RequestLogHelper>>(&mmap) };
+        let helper: Vec<RequestLogHelper> = archived.deserialize(&mut rkyv::Infallible)?;
+        Ok(helper
+            .into_iter()
+            .map(RequestLogHelper::into_request_log)
+            .collect())
     }
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         // 尝试加载保存的数据
-        let (request_logs, token_manager, mut proxies) = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let logs = RequestStatsManager::load_logs().await.unwrap_or_default();
-                let token_manager = TokenManager::load_tokens()
-                    .await
-                    .unwrap_or_else(|_| TokenManager::new(Vec::new()));
-                let proxies = Proxies::load_proxies()
-                    .await
-                    .unwrap_or_else(|_| Proxies::new());
-                (logs, token_manager, proxies)
-            })
-        });
-
-        // 查询缺失的 token profiles
-        // tokio::task::block_in_place(|| {
-        //     tokio::runtime::Handle::current().block_on(async {
-        //         for token_info in token_manager.tokens.iter_mut() {
-        //             if let Some(profile) =
-        //                 get_token_profile(token_info.get_client(), &token_info.token).await
-        //             {
-        //                 token_info.profile = Some(profile);
-        //             }
-        //         }
-        //     })
-        // });
+        let logs = RequestStatsManager::load_logs().await.unwrap_or_default();
+        let token_manager = TokenManager::load_tokens()
+            .await
+            .unwrap_or(TokenManager::new(Vec::new()));
+        let mut proxies = Proxies::load_proxies().await.unwrap_or(Proxies::new());
 
         // 更新全局代理池
         if let Err(e) = proxies.update_global_pool() {
@@ -264,7 +256,7 @@ impl AppState {
 
         Self {
             token_manager,
-            request_manager: RequestStatsManager::new(request_logs),
+            request_manager: RequestStatsManager::new(logs),
             proxies,
         }
     }

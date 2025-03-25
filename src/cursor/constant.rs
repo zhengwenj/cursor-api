@@ -7,12 +7,6 @@ use std::{
 use super::model::Model;
 
 macro_rules! def_pub_const {
-    // 单个常量定义分支
-    // ($name:ident, $value:expr) => {
-    //     pub const $name: &'static str = $value;
-    // };
-
-    // 批量定义分支
     ($($name:ident => $value:expr),+ $(,)?) => {
         $(
             pub const $name: &'static str = $value;
@@ -52,6 +46,8 @@ def_pub_const!(
     CLAUDE_3_5_HAIKU => "claude-3.5-haiku",
     CLAUDE_3_7_SONNET => "claude-3.7-sonnet",
     CLAUDE_3_7_SONNET_THINKING => "claude-3.7-sonnet-thinking",
+    CLAUDE_3_7_SONNET_MAX => "claude-3.7-sonnet-max",
+    CLAUDE_3_7_SONNET_THINKING_MAX => "claude-3.7-sonnet-thinking-max",
 
     // OpenAI 模型
     GPT_4 => "gpt-4",
@@ -95,7 +91,7 @@ macro_rules! create_models {
                 models: Arc::new(vec![
                     $(
                         Model {
-                            id: $model.into(),
+                            id: $model,
                             created: CREATED,
                             object: MODEL_OBJECT,
                             owned_by: $owner,
@@ -130,22 +126,22 @@ impl Models {
     // }
 
     // 检查模型是否存在
-    pub fn exists(model_id: &str) -> bool {
-        Self::read().models.iter().any(|m| m.id == model_id)
-    }
+    // pub fn exists(model_id: &str) -> bool {
+    //     Self::read().models.iter().any(|m| m.id == model_id)
+    // }
 
     // 查找模型并返回其 ID
-    pub fn find_id(model: &str) -> Option<String> {
+    pub fn find_id(model: &str) -> Option<&'static str> {
         Self::read()
             .models
             .iter()
             .find(|m| m.id == model)
-            .map(|m| m.id.clone())
+            .map(|m| m.id)
     }
 
     // 返回所有模型 ID 的列表
-    pub fn ids() -> Vec<String> {
-        Self::read().models.iter().map(|m| m.id.clone()).collect()
+    pub fn ids() -> Vec<&'static str> {
+        Self::read().models.iter().map(|m| m.id).collect()
     }
 
     // 写入方法
@@ -180,9 +176,12 @@ impl Models {
 // }
 
 create_models!(
+    DEFAULT => UNKNOWN,
     CLAUDE_3_5_SONNET => ANTHROPIC,
     CLAUDE_3_7_SONNET => ANTHROPIC,
     CLAUDE_3_7_SONNET_THINKING => ANTHROPIC,
+    CLAUDE_3_7_SONNET_MAX => ANTHROPIC,
+    CLAUDE_3_7_SONNET_THINKING_MAX => ANTHROPIC,
     GPT_4 => OPENAI,
     GPT_4O => OPENAI,
     GPT_4_5_PREVIEW => OPENAI,
@@ -207,7 +206,6 @@ create_models!(
     DEEPSEEK_R1 => DEEPSEEK,
     O3_MINI => OPENAI,
     GROK_2 => XAI,
-    DEFAULT => UNKNOWN,
 );
 
 pub const USAGE_CHECK_MODELS: [&str; 13] = [

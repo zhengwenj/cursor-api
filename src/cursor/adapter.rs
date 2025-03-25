@@ -89,7 +89,7 @@ fn parse_web_references(text: &str) -> Vec<WebReference> {
 async fn process_chat_inputs(
     inputs: Vec<Message>,
     disable_vision: bool,
-    model_name: &str,
+    model: &str,
 ) -> (String, Vec<ConversationMessage>, Vec<String>) {
     // 收集 system 指令
     let instructions = inputs
@@ -100,7 +100,7 @@ async fn process_chat_inputs(
             MessageContent::Vision(contents) => contents
                 .iter()
                 .filter_map(|content| {
-                    if content.content_type == "text" {
+                    if content.rtype == "text" {
                         content.text.clone()
                     } else {
                         None
@@ -113,9 +113,9 @@ async fn process_chat_inputs(
         .join("\n\n");
 
     // 使用默认指令或收集到的指令
-    let image_support = !disable_vision && SUPPORTED_IMAGE_MODELS.contains(&model_name);
+    let image_support = !disable_vision && SUPPORTED_IMAGE_MODELS.contains(&model);
     let instructions = if instructions.is_empty() {
-        get_default_instructions(model_name, image_support)
+        get_default_instructions(model, image_support)
     } else {
         instructions
     };
@@ -174,6 +174,15 @@ async fn process_chat_inputs(
                 attached_human_changes: false,
                 summarized_composers: vec![],
                 cursor_rules: vec![],
+                context_pieces: vec![],
+                thinking: None,
+                all_thinking_blocks: vec![],
+                unified_mode: None,
+                diffs_since_last_apply: vec![],
+                deleted_files: vec![],
+                usage_uuid: None,
+                supported_tools: vec![],
+                current_file_location_data: None,
             }],
             vec![],
         );
@@ -229,7 +238,7 @@ async fn process_chat_inputs(
                 let mut images = Vec::new();
 
                 for content in contents {
-                    match content.content_type.as_str() {
+                    match content.rtype.as_str() {
                         "text" => {
                             if let Some(text) = content.text {
                                 text_parts.push(text);
@@ -322,6 +331,15 @@ async fn process_chat_inputs(
             attached_human_changes: false,
             summarized_composers: vec![],
             cursor_rules: vec![],
+            context_pieces: vec![],
+            thinking: None,
+            all_thinking_blocks: vec![],
+            unified_mode: None,
+            diffs_since_last_apply: vec![],
+            deleted_files: vec![],
+            usage_uuid: None,
+            supported_tools: vec![],
+            current_file_location_data: None,
         });
     }
 
@@ -473,7 +491,7 @@ async fn process_http_image(
 
 pub async fn encode_chat_message(
     inputs: Vec<Message>,
-    model_name: &str,
+    model: &str,
     disable_vision: bool,
     enable_slow_pool: bool,
     is_search: bool,
@@ -481,20 +499,20 @@ pub async fn encode_chat_message(
     // 在进入异步操作前获取并释放锁
     let enable_slow_pool = { if enable_slow_pool { Some(true) } else { None } };
 
-    let (instructions, messages, urls) =
-        process_chat_inputs(inputs, disable_vision, model_name).await;
+    let (instructions, messages, urls) = process_chat_inputs(inputs, disable_vision, model).await;
 
     let explicit_context = if !instructions.trim().is_empty() {
         Some(ExplicitContext {
             context: instructions,
             repo_context: None,
             rules: vec![],
+            mode_specific_context: None,
         })
     } else {
         None
     };
 
-    let base_uuid = rand::rng().random::<u16>();
+    let base_uuid = rand::rng().random_range(256u16..512);
     let external_links = urls
         .into_iter()
         .enumerate()
@@ -515,7 +533,7 @@ pub async fn encode_chat_message(
         workspace_root_path: None,
         code_blocks: vec![],
         model_details: Some(ModelDetails {
-            model_name: Some(model_name.to_string()),
+            model_name: Some(model.to_string()),
             api_key: None,
             enable_ghost_mode: Some(true),
             azure_state: Some(AzureState {
@@ -546,7 +564,9 @@ pub async fn encode_chat_message(
         workspace_id: None,
         external_links,
         commit_notes: vec![],
-        long_context_mode: Some(LONG_CONTEXT_MODELS.contains(&model_name)),
+        long_context_mode: Some(
+            AppConfig::get_long_context() || LONG_CONTEXT_MODELS.contains(&model),
+        ),
         is_eval: Some(false),
         desired_max_tokens: None,
         context_ast: None,

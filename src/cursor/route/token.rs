@@ -4,7 +4,7 @@ use crate::{
         lazy::{AUTH_TOKEN, KEY_PREFIX},
         model::{AppConfig, BuildKeyRequest, BuildKeyResponse, UsageCheckModelType},
     },
-    chat::config::{KeyConfig, key_config},
+    cursor::config::{KeyConfig, key_config},
     common::{
         model::ApiStatus,
         utils::{

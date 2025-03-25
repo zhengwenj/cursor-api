@@ -1,7 +1,13 @@
-use crate::common::{
-    model::{ApiStatus, userinfo::TokenProfile},
-    utils::generate_hash,
+use std::sync::LazyLock;
+
+use crate::{
+    common::{
+        model::{ApiStatus, userinfo::TokenProfile},
+        utils::{TrimNewlines as _, generate_hash},
+    },
+    cursor::model::Role,
 };
+use lasso::{LargeSpur, ThreadedRodeo};
 use proxy_pool::ProxyPool;
 use reqwest::Client;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
@@ -20,10 +26,11 @@ mod state;
 pub use state::*;
 mod proxy;
 pub use proxy::*;
+mod log;
 
-use super::constant::{STATUS_FAILURE, STATUS_PENDING, STATUS_SUCCESS};
+use super::constant::{EMPTY_STRING, STATUS_FAILURE, STATUS_PENDING, STATUS_SUCCESS};
 
-#[derive(Clone, PartialEq, Archive, RkyvDeserialize, RkyvSerialize)]
+#[derive(Clone, Copy, PartialEq, Archive, RkyvDeserialize, RkyvSerialize)]
 pub enum LogStatus {
     Pending,
     Success,
@@ -59,32 +66,209 @@ impl LogStatus {
 }
 
 // 请求日志
-#[derive(Serialize, Clone, Archive, RkyvDeserialize, RkyvSerialize)]
+#[derive(Serialize, Clone)]
 pub struct RequestLog {
     pub id: u64,
     pub timestamp: chrono::DateTime<chrono::Local>,
-    pub model: String,
+    pub model: &'static str,
     pub token_info: TokenInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chain: Option<Chain>,
     pub timing: TimingInfo,
     pub stream: bool,
     pub status: LogStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
+    pub error: ErrorInfo,
 }
 
-#[derive(Serialize, Clone, Archive, RkyvDeserialize, RkyvSerialize)]
+#[derive(Serialize, Clone)]
 pub struct Chain {
-    pub prompt: String,
+    #[serde(skip_serializing_if = "Prompt::is_none")]
+    pub prompt: Prompt,
     pub delays: Vec<(String, f64)>,
+    #[serde(skip_serializing_if = "OptionUsage::is_none")]
+    pub usage: OptionUsage,
 }
 
 #[derive(Serialize, Clone, Archive, RkyvDeserialize, RkyvSerialize)]
+pub enum OptionUsage {
+    None,
+    Uasge { input: i32, output: i32 },
+}
+
+impl OptionUsage {
+    #[inline(always)]
+    pub const fn is_none(&self) -> bool {
+        matches!(*self, Self::None)
+    }
+}
+
+#[derive(Serialize, Clone)]
+#[serde(untagged)]
+pub enum Prompt {
+    None,
+    Origin(String),
+    Parsed(Vec<PromptMessage>),
+}
+
+#[derive(Serialize, Clone)]
+pub struct PromptMessage {
+    role: Role,
+    content: PromptContent,
+}
+
+static RODEO: LazyLock<ThreadedRodeo<LargeSpur>> = LazyLock::new(ThreadedRodeo::new);
+
+#[derive(Debug, Clone)]
+pub enum PromptContent {
+    Leaked(&'static str),
+    Shared(LargeSpur),
+}
+
+impl Serialize for PromptContent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Leaked(s) => serializer.serialize_str(s),
+            Self::Shared(key) => serializer.serialize_str(RODEO.resolve(key)),
+        }
+    }
+}
+
+impl PromptContent {
+    pub fn into_owned(self) -> String {
+        match self {
+            Self::Leaked(s) => s.to_string(),
+            Self::Shared(key) => RODEO.resolve(&key).to_string(),
+        }
+    }
+}
+
+impl Prompt {
+    pub fn new(input: String) -> Self {
+        let mut messages = Vec::new();
+        let mut remaining = input.as_str();
+
+        while !remaining.is_empty() {
+            // 检查是否以任一开始标记开头
+            let (role, start_tag) = if remaining.starts_with("<|BEGIN_SYSTEM|>\n") {
+                (Role::System, "<|BEGIN_SYSTEM|>\n")
+            } else if remaining.starts_with("<|BEGIN_USER|>\n") {
+                (Role::User, "<|BEGIN_USER|>\n")
+            } else if remaining.starts_with("<|BEGIN_ASSISTANT|>\n") {
+                (Role::Assistant, "<|BEGIN_ASSISTANT|>\n")
+            } else {
+                return Self::Origin(input);
+            };
+
+            // 确定相应的结束标记
+            let end_tag = match role {
+                Role::System => "\n<|END_SYSTEM|>\n",
+                Role::User => "\n<|END_USER|>\n",
+                Role::Assistant => "\n<|END_ASSISTANT|>\n",
+            };
+
+            // 移除起始标记
+            remaining = &remaining[start_tag.len()..];
+
+            // 查找结束标记
+            if let Some(end_index) = remaining.find(end_tag) {
+                // 提取内容
+                let content = if role == Role::System {
+                    PromptContent::Leaked(crate::leak::intern_string(&remaining[..end_index]))
+                } else {
+                    PromptContent::Shared(RODEO.get_or_intern(remaining[..end_index].trim_leading_newlines()))
+                };
+                println!("{content:?}");
+                messages.push(PromptMessage { role, content });
+
+                // 移除当前消息（包括结束标记）
+                remaining = &remaining[end_index + end_tag.len()..];
+
+                // 如果消息之间有额外的换行符，将其跳过
+                if remaining.as_bytes().first().copied() == Some(b'\n') {
+                    remaining = &remaining[1..];
+                }
+            } else {
+                return Self::Origin(input);
+            }
+        }
+
+        Self::Parsed(messages)
+    }
+
+    #[inline(always)]
+    pub const fn is_none(&self) -> bool {
+        matches!(*self, Self::None)
+    }
+
+    #[inline(always)]
+    pub const fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+}
+
+#[derive(Serialize, Clone, Copy, Archive, RkyvDeserialize, RkyvSerialize)]
 pub struct TimingInfo {
     pub total: f64, // 总用时(秒)
-                    // #[serde(skip_serializing_if = "Option::is_none")]
-                    // pub first: Option<f64>, // 首字时间(秒)
+}
+
+#[derive(Serialize, Clone, Copy)]
+#[serde(untagged)]
+pub enum ErrorInfo {
+    None,
+    Error(&'static str),
+    Details {
+        error: &'static str,
+        details: &'static str,
+    },
+}
+
+impl ErrorInfo {
+    #[inline]
+    pub fn new(e: &str) -> Self {
+        Self::Error(crate::leak::intern_string(e))
+    }
+
+    #[inline]
+    pub fn new_details(e: &str, detail: &str) -> Self {
+        Self::Details {
+            error: crate::leak::intern_string(e),
+            details: crate::leak::intern_string(detail),
+        }
+    }
+
+    #[inline]
+    pub fn add_detail(&mut self, detail: &str) {
+        match self {
+            ErrorInfo::None => {
+                *self = Self::Details {
+                    error: crate::leak::intern_string(EMPTY_STRING),
+                    details: crate::leak::intern_string(detail),
+                }
+            }
+            ErrorInfo::Error(error) => {
+                *self = Self::Details {
+                    error,
+                    details: crate::leak::intern_string(detail),
+                }
+            }
+            ErrorInfo::Details { details, .. } => {
+                *details = crate::leak::intern_string(detail);
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub const fn is_none(&self) -> bool {
+        matches!(*self, Self::None)
+    }
+
+    #[inline(always)]
+    pub const fn is_some(&self) -> bool {
+        !self.is_none()
+    }
 }
 
 // 用于存储 token 信息
@@ -92,10 +276,7 @@ pub struct TimingInfo {
 pub struct TokenInfo {
     pub token: String,
     pub checksum: String,
-    #[serde(
-        skip_serializing,
-        default = "generate_client_key"
-    )]
+    #[serde(skip_serializing, default = "generate_client_key")]
     pub client_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile: Option<TokenProfile>,
@@ -138,7 +319,7 @@ impl TokenInfo {
     pub fn timezone_name(&self) -> &'static str {
         use std::str::FromStr as _;
         if let Some(Some(Ok(tz))) = self.tags.as_ref().map(|tags| {
-            tags.get(0)
+            tags.first()
                 .filter(|s| !s.is_empty())
                 .map(|s| chrono_tz::Tz::from_str(s.as_str()))
         }) {
@@ -247,3 +428,13 @@ pub struct CommonResponse {
     pub status: ApiStatus,
     pub message: Option<String>,
 }
+
+// impl CommonResponse {
+//     pub fn into_normal_response(self) -> NormalResponse<()> {
+//         NormalResponse {
+//             status: self.status,
+//             data: None,
+//             message: self.message,
+//         }
+//     }
+// }

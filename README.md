@@ -9,7 +9,7 @@
 * 本程序拥有堪比客户端原本的速度，甚至可能更快。
 * 本程序的性能是非常厉害的。
 * 根据本项目开源协议，Fork的项目不能以作者的名义进行任何形式的宣传、推广或声明。
-* 目前暂停更新（已更新超2.5个月,求赞助:），做不下去了都，截至当前版本(v0.1.3-rc.5.2.2)，有事联系 nav@wisdgod.com (因为有人说很难联系到作者..从v0.1.3-rc.5.2.1起添加)。
+* 目前暂停更新（已更新约3个月,求赞助:），做不下去了都，截至当前版本(v0.1.3-rc.5.2.3)，有事联系 nav@wisdgod.com (因为有人说很难联系到作者..从v0.1.3-rc.5.2.1起添加)。
 * 推荐自部署，[官方网站](https://cc.wisdgod.com) 仅用于作者测试，不保证稳定性。
 
 ## 获取key
@@ -48,9 +48,12 @@ token2,checksum2
 写死了，后续也不会会支持自定义模型列表，因为本身就支持动态更新，详见[更新模型列表说明](#更新模型列表说明)
 
 ```
+default
 claude-3.5-sonnet
 claude-3.7-sonnet
 claude-3.7-sonnet-thinking
+claude-3.7-sonnet-max
+claude-3.7-sonnet-thinking-max
 gpt-4
 gpt-4o
 gpt-4.5-preview
@@ -893,13 +896,22 @@ string
         }
       },
       "chain": {
-        "prompt": "string",
+        "prompt": [ // array or string
+          {
+            "role": "string",
+            "content": "string"
+          }
+        ],
         "delays": [
           [
             "string",
             number
           ]
-        ]
+        ],
+        "usage": { // optional
+          "input": number,
+          "output": number,
+        }
       },
       "timing": {
         "total": number

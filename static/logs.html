@@ -1066,7 +1066,7 @@
           <td>${new Date(log.timestamp).toLocaleString()}</td>
           <td>${log.model}</td>
           <td><div class="token-info-tooltip"><button class="info-button" onclick='showTokenModal(${JSON.stringify(log.token_info)})'>查看详情<div class="tooltip-content">${formatSimpleTokenInfo(log.token_info)}</div></button></div></td>
-          <td>${log.chain ? `<div class="token-info-tooltip prompt-preview"><button class="info-button view-conversation" data-prompt="${encodeURIComponent(log.chain.prompt)}" data-delays='${delaysData}'>查看对话<div class="tooltip-content">${formatDialogPreview(log.chain.prompt)}</div></button></div>` : '-'}</td>
+          <td>${log.chain ? `<div class="token-info-tooltip prompt-preview"><button class="info-button view-conversation" data-prompt="${encodeURIComponent(JSON.stringify(log.chain.prompt))}" data-delays='${delaysData}'>查看对话<div class="tooltip-content">${formatDialogPreview(JSON.stringify(log.chain.prompt))}</div></button></div>` : '-'}</td>
           <td>${formatTiming(log.timing.total)}</td>
           <td>${log.stream ? '是' : '否'}</td>
           <td>${log.status}</td>
@@ -1309,6 +1309,21 @@
     function parsePrompt(promptStr) {
       if (!promptStr) return [];
 
+      // 尝试解析JSON格式的prompt
+      try {
+        const parsed = JSON.parse(promptStr);
+
+        // 如果是已解析的格式
+        if (Array.isArray(parsed)) {
+          return parsed.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }));
+        }
+      } catch (e) {
+        // 如果解析JSON失败，说明是原始字符串格式，使用原来的解析逻辑
+      }
+
       const messages = [];
       const lines = promptStr.split('\n');
       let currentRole = '';
@@ -1383,13 +1398,12 @@
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#039;');
-
-        // 将HTML标签文本用引号包裹，使其更易读
-        // return escaped.replace(/&lt;(\/?[^>]+)&gt;/g, '"<$1>"');
         return escaped;
       }
 
-      return `<table class="message-table"><thead><tr><th>角色</th><th>内容</th></tr></thead><tbody>${messages.map(msg => `<tr><td>${roleLabels[msg.role] || msg.role}</td><td>${escapeHtml(msg.content).replace(/\n/g, '<br>')}</td></tr>`).join('')}</tbody></table>`;
+      return `<table class="message-table"><thead><tr><th>角色</th><th>内容</th></tr></thead><tbody>${messages.map(msg =>
+        `<tr><td>${roleLabels[msg.role] || msg.role}</td><td>${escapeHtml(msg.content).replace(/\n/g, '<br>')}</td></tr>`
+      ).join('')}</tbody></table>`;
     }
 
     /**

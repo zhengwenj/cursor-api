@@ -22,7 +22,7 @@ use super::{PageContent, Pages, UsageCheck, VisionAbility};
 pub struct AppConfig {
     vision_ability: VisionAbility,
     slow_pool: bool,
-    allow_claude: bool,
+    long_context: bool,
     pages: Pages,
     usage_check: UsageCheck,
     dynamic_key: bool,
@@ -113,7 +113,7 @@ impl AppConfig {
         config.vision_ability =
             VisionAbility::from_str(&parse_string_from_env("VISION_ABILITY", EMPTY_STRING));
         config.slow_pool = parse_bool_from_env("ENABLE_SLOW_POOL", false);
-        config.allow_claude = parse_bool_from_env("PASS_ANY_CLAUDE", false);
+        config.long_context = parse_bool_from_env("ENABLE_LONG_CONTEXT", false);
         config.usage_check =
             UsageCheck::from_str(&parse_string_from_env("USAGE_CHECK", EMPTY_STRING));
         config.dynamic_key = parse_bool_from_env("DYNAMIC_KEY", false);
@@ -124,7 +124,7 @@ impl AppConfig {
 
     config_methods! {
         slow_pool: bool, false;
-        allow_claude: bool, false;
+        long_context: bool, false;
         dynamic_key: bool, false;
         web_refs: bool, false;
     }

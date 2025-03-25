@@ -13,6 +13,7 @@ COPY . .
 RUN case "$TARGETARCH" in amd64) TARGET_CPU="x86-64-v2" ;; arm64) TARGET_CPU="neoverse-n1" ;; *) echo "Unsupported architecture: $TARGETARCH" && exit 1 ;; esac && RUSTFLAGS="-C link-arg=-s -C target-cpu=$TARGET_CPU" cargo build --release && cp target/release/cursor-api /app/cursor-api
 
 # 运行阶段
+ARG TARGETARCH
 FROM --platform=linux/${TARGETARCH} debian:bookworm-slim
 
 WORKDIR /app

@@ -7,7 +7,7 @@ pub struct ConfigData {
     pub page_content: Option<PageContent>,
     pub vision_ability: VisionAbility,
     pub enable_slow_pool: bool,
-    pub enable_all_claude: bool,
+    pub enable_long_context: bool,
     pub usage_check_models: UsageCheck,
     pub enable_dynamic_key: bool,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -23,7 +23,7 @@ pub struct ConfigUpdateRequest {
     pub content: Option<PageContent>, // "default", "text", "html"
     pub vision_ability: Option<VisionAbility>,
     pub enable_slow_pool: Option<bool>,
-    pub enable_all_claude: Option<bool>,
+    pub enable_long_context: Option<bool>,
     pub usage_check_models: Option<UsageCheck>,
     pub enable_dynamic_key: Option<bool>,
     pub share_token: Option<String>,

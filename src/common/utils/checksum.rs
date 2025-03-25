@@ -1,9 +1,9 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD as BASE64};
-use rand::Rng as _;
 use sha2::{Digest, Sha256};
 
 #[inline]
 pub fn generate_hash() -> String {
+    use rand::Rng as _;
     hex::encode(
         Sha256::new()
             .chain_update(rand::rng().random::<[u8; 32]>())

@@ -1,6 +1,6 @@
 use crate::{
     app::constant::{COMMA, COMMA_STRING},
-    chat::{config::key_config, constant::Models},
+    cursor::{config::key_config, constant::Models},
 };
 use serde::{Deserialize, Serialize};
 // use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
@@ -10,7 +10,7 @@ pub enum UsageCheck {
     None,
     Default,
     All,
-    Custom(Vec<String>),
+    Custom(Vec<&'static str>),
 }
 
 impl UsageCheck {

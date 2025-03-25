@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{app::constant::COMMA, chat::constant::Models};
+use crate::{app::constant::COMMA, cursor::constant::Models};
 
 #[derive(Deserialize)]
 pub struct BuildKeyRequest {
@@ -19,7 +19,7 @@ pub struct BuildKeyRequest {
 
 pub struct UsageCheckModelConfig {
     pub model_type: UsageCheckModelType,
-    pub model_ids: Vec<String>,
+    pub model_ids: Vec<&'static str>,
 }
 
 impl<'de> Deserialize<'de> for UsageCheckModelConfig {
