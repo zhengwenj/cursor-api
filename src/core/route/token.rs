@@ -4,7 +4,6 @@ use crate::{
         lazy::{AUTH_TOKEN, KEY_PREFIX},
         model::{AppConfig, BuildKeyRequest, BuildKeyResponse, UsageCheckModelType},
     },
-    cursor::config::{KeyConfig, key_config},
     common::{
         model::ApiStatus,
         utils::{
@@ -12,6 +11,7 @@ use crate::{
             validate_token_and_checksum,
         },
     },
+    core::config::{KeyConfig, key_config},
 };
 use axum::{
     Json,

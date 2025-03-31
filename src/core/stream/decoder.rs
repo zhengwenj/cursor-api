@@ -1,5 +1,5 @@
 use crate::common::utils::InstantExt as _;
-use crate::cursor::{
+use crate::core::{
     aiserver::v1::{StreamChatResponse, WebReference},
     error::{ChatError, StreamError},
 };
@@ -143,6 +143,12 @@ impl StreamDecoder {
 
     pub fn take_content_delays(&mut self) -> Vec<(String, f64)> {
         std::mem::take(&mut self.content_delays)
+    }
+
+    pub fn no_first_cache(mut self) -> Self {
+        self.first_result_ready = true;
+        self.first_result_taken = true;
+        self
     }
 
     pub fn decode(
@@ -345,7 +351,7 @@ mod tests {
             .collect();
 
         // 创建解码器
-        let mut decoder = StreamDecoder::new();
+        let mut decoder = StreamDecoder::new().no_first_cache();
 
         match decoder.decode(&bytes, false) {
             Ok(messages) => {
@@ -380,7 +386,7 @@ mod tests {
                 }
             }
             Err(e) => {
-                println!("解析错误: {}", e);
+                println!("解析错误: {e}");
             }
         }
         if decoder.is_incomplete() {
@@ -404,7 +410,7 @@ mod tests {
             .collect();
 
         // 创建解码器
-        let mut decoder = StreamDecoder::new();
+        let mut decoder = StreamDecoder::new().no_first_cache();
 
         // 辅助函数：找到下一个消息边界
         fn find_next_message_boundary(bytes: &[u8]) -> usize {

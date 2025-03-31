@@ -1,8 +1,10 @@
 use crate::{
-    app::model::proxy_pool::ProxyPool, cursor::constant::ERR_NODATA, common::{
+    app::model::proxy_pool::ProxyPool,
+    common::{
         model::userinfo::GetUserInfo,
         utils::{extract_token, get_token_profile},
-    }
+    },
+    core::constant::ERR_NODATA,
 };
 use axum::Json;
 

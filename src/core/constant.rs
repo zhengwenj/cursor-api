@@ -70,6 +70,7 @@ def_pub_const!(
     GEMINI_1_5_FLASH_500K => "gemini-1.5-flash-500k",
     GEMINI_EXP_1206 => "gemini-exp-1206",
     GEMINI_2_0_PRO_EXP => "gemini-2.0-pro-exp",
+    GEMINI_2_5_PRO_EXP_03_25 => "gemini-2.5-pro-exp-03-25",
     GEMINI_2_0_FLASH_THINKING_EXP => "gemini-2.0-flash-thinking-exp",
     GEMINI_2_0_FLASH => "gemini-2.0-flash",
 
@@ -200,6 +201,7 @@ create_models!(
     O1 => OPENAI,
     CLAUDE_3_5_HAIKU => ANTHROPIC,
     GEMINI_2_0_PRO_EXP => GOOGLE,
+    GEMINI_2_5_PRO_EXP_03_25 => GOOGLE,
     GEMINI_2_0_FLASH_THINKING_EXP => GOOGLE,
     GEMINI_2_0_FLASH => GOOGLE,
     DEEPSEEK_V3 => DEEPSEEK,

@@ -32,7 +32,16 @@ pub struct Message {
     pub content: MessageContent,
 }
 
-#[derive(Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Copy, PartialEq)]
+#[derive(
+    Serialize,
+    Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    Clone,
+    Copy,
+    PartialEq,
+)]
 #[repr(u8)]
 pub enum Role {
     #[serde(rename = "system", alias = "developer")]
@@ -83,7 +92,11 @@ pub struct Usage {
 
 impl Default for Usage {
     fn default() -> Self {
-        Self { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+        Self {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+        }
     }
 }
 

@@ -23,7 +23,7 @@ use crate::{
         },
         model::proxy_pool::ProxyPool,
     },
-    cursor::{
+    core::{
         aiserver::v1::{
             AvailableModelsRequest, AvailableModelsResponse, GetTokenUsageRequest,
             GetTokenUsageResponse,
@@ -81,9 +81,7 @@ impl TrimNewlines for &str {
     fn trim_leading_newlines(self) -> Self {
         let bytes = self.as_bytes();
         if bytes.len() >= 2 && bytes[0] == b'\n' && bytes[1] == b'\n' {
-            unsafe {
-                return self.get_unchecked(2..)
-            }
+            unsafe { return self.get_unchecked(2..) }
         }
         self
     }

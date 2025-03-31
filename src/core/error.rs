@@ -109,9 +109,7 @@ impl ErrorResponse {
     }
 
     pub fn details(&self) -> Option<String> {
-        self.error.as_ref().map(
-            |error| error.details.clone(),
-        )
+        self.error.as_ref().map(|error| error.details.clone())
     }
 
     pub fn into_common(mut self) -> CommonErrorResponse {

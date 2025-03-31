@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{app::constant::COMMA, cursor::constant::Models};
+use crate::{app::constant::COMMA, core::constant::Models};
 
 #[derive(Deserialize)]
 pub struct BuildKeyRequest {

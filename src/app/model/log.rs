@@ -1,4 +1,4 @@
-use crate::cursor::model::Role;
+use crate::core::model::Role;
 
 #[derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 enum ErrorInfoHelper {

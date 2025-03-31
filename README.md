@@ -72,6 +72,7 @@ o1-preview
 o1
 claude-3.5-haiku
 gemini-2.0-pro-exp
+gemini-2.5-pro-exp-03-25
 gemini-2.0-flash-thinking-exp
 gemini-2.0-flash
 deepseek-v3

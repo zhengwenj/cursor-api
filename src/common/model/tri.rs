@@ -1,7 +1,6 @@
 use serde::Serialize;
 
-#[derive(Clone, Debug, PartialEq)]
-#[derive(Default)]
+#[derive(Clone, PartialEq, Default)]
 pub enum TriState<T> {
     #[default]
     None,
@@ -23,7 +22,6 @@ impl<T> TriState<T> {
         matches!(*self, TriState::None)
     }
 }
-
 
 impl<T> Serialize for TriState<T>
 where

@@ -54,7 +54,11 @@ pub struct StripeProfile {
 
 #[derive(Deserialize, Serialize, Clone, Archive, RkyvDeserialize, RkyvSerialize)]
 pub struct ModelUsage {
-    #[serde(alias = "numRequests", alias = "requests", rename(serialize = "requests"))]
+    #[serde(
+        alias = "numRequests",
+        alias = "requests",
+        rename(serialize = "requests")
+    )]
     pub num_requests: u32,
     #[serde(
         alias = "numRequestsTotal",
@@ -87,7 +91,7 @@ pub struct UserProfile {
     pub email: String,
     // pub email_verified: bool,
     pub name: String,
-    #[serde(alias = "id",rename(serialize = "id"))]
+    #[serde(alias = "id", rename(serialize = "id"))]
     pub sub: String,
     pub updated_at: DateTime<Local>,
     // Image link, rendered in /logs?

@@ -2,8 +2,8 @@ pub mod config;
 pub mod error;
 pub mod health;
 pub mod token;
-pub mod userinfo;
 pub mod tri;
+pub mod userinfo;
 
 use config::ConfigData;
 

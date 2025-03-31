@@ -230,8 +230,8 @@ fn main() -> Result<()> {
     update_version()?;
 
     // Proto 文件处理
-    // println!("cargo:rerun-if-changed=src/cursor/aiserver/v1/lite.proto");
-    println!("cargo:rerun-if-changed=src/cursor/config/key.proto");
+    // println!("cargo:rerun-if-changed=src/core/aiserver/v1/lite.proto");
+    println!("cargo:rerun-if-changed=src/core/config/key.proto");
     // 获取环境变量 PROTOC
     let protoc_path = match std::env::var_os("PROTOC") {
         Some(path) => PathBuf::from(path),
@@ -250,12 +250,12 @@ fn main() -> Result<()> {
     // config.enum_attribute(".aiserver.v1", "#[allow(clippy::enum_variant_names)]");
     // config
     //     .compile_protos(
-    //         &["src/cursor/aiserver/v1/lite.proto"],
-    //         &["src/cursor/aiserver/v1/"],
+    //         &["src/core/aiserver/v1/lite.proto"],
+    //         &["src/core/aiserver/v1/"],
     //     )
     //     .unwrap();
     config
-        .compile_protos(&["src/cursor/config/key.proto"], &["src/cursor/config/"])
+        .compile_protos(&["src/core/config/key.proto"], &["src/core/config/"])
         .unwrap();
 
     // 静态资源文件处理

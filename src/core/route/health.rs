@@ -16,11 +16,11 @@ use crate::{
         lazy::{AUTH_TOKEN, ROUTE_CHAT_PATH, ROUTE_MODELS_PATH, get_start_time},
         model::{AppConfig, AppState, PageContent},
     },
-    cursor::constant::Models,
     common::model::{
         ApiStatus,
         health::{CpuInfo, HealthCheckResponse, MemoryInfo, SystemInfo, SystemStats},
     },
+    core::constant::Models,
 };
 use axum::{
     Json,

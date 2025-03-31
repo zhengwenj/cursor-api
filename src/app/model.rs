@@ -5,7 +5,7 @@ use crate::{
         model::{ApiStatus, userinfo::TokenProfile},
         utils::{TrimNewlines as _, generate_hash},
     },
-    cursor::model::Role,
+    core::model::Role,
 };
 use lasso::{LargeSpur, ThreadedRodeo};
 use proxy_pool::ProxyPool;
@@ -178,9 +178,10 @@ impl Prompt {
                 let content = if role == Role::System {
                     PromptContent::Leaked(crate::leak::intern_string(&remaining[..end_index]))
                 } else {
-                    PromptContent::Shared(RODEO.get_or_intern(remaining[..end_index].trim_leading_newlines()))
+                    PromptContent::Shared(
+                        RODEO.get_or_intern(remaining[..end_index].trim_leading_newlines()),
+                    )
                 };
-                println!("{content:?}");
                 messages.push(PromptMessage { role, content });
 
                 // 移除当前消息（包括结束标记）

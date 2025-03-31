@@ -24,7 +24,7 @@ use crate::{
             get_token_profile, get_token_usage, tokeninfo_to_token, validate_token_and_checksum,
         },
     },
-    cursor::{
+    core::{
         config::KeyConfig,
         constant::{Models, USAGE_CHECK_MODELS},
         error::StreamError,
@@ -965,7 +965,7 @@ pub async fn handle_chat(
     } else {
         // 非流式响应
         let start_time = std::time::Instant::now();
-        let mut decoder = StreamDecoder::new();
+        let mut decoder = StreamDecoder::new().no_first_cache();
         let mut full_text = String::with_capacity(1024);
         let mut stream = response.bytes_stream();
         let mut prompt = Prompt::None;

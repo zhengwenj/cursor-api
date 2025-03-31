@@ -1,6 +1,6 @@
 mod app;
 mod common;
-mod cursor;
+mod core;
 mod leak;
 
 use app::{
@@ -24,7 +24,7 @@ use axum::{
     routing::{get, post},
 };
 use common::utils::{parse_string_from_env, parse_usize_from_env};
-use cursor::{
+use core::{
     middleware::admin_auth_middleware,
     route::{
         handle_about, handle_add_proxy, handle_add_tokens, handle_api_page,

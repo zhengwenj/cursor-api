@@ -1,6 +1,6 @@
 use crate::{
     app::constant::{COMMA, COMMA_STRING},
-    cursor::{config::key_config, constant::Models},
+    core::{config::key_config, constant::Models},
 };
 use serde::{Deserialize, Serialize};
 // use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
