@@ -43,18 +43,20 @@ def_pub_const!(
     ROUTE_CONFIG_PATH => "/config",
     ROUTE_TOKENS_PATH => "/tokens",
     ROUTE_TOKENS_GET_PATH => "/tokens/get",
-    ROUTE_TOKENS_UPDATE_PATH => "/tokens/update",
+    ROUTE_TOKENS_SET_PATH => "/tokens/set",
     ROUTE_TOKENS_ADD_PATH => "/tokens/add",
-    ROUTE_TOKENS_DELETE_PATH => "/tokens/delete",
+    ROUTE_TOKENS_DELETE_PATH => "/tokens/del",
     ROUTE_TOKENS_TAGS_GET_PATH => "/tokens/tags/get",
-    ROUTE_TOKENS_TAGS_UPDATE_PATH => "/tokens/tags/update",
+    ROUTE_TOKENS_TAGS_SET_PATH => "/tokens/tags/set",
     ROUTE_TOKENS_BY_TAG_GET_PATH => "/tokens/by-tag/get",
     ROUTE_TOKENS_PROFILE_UPDATE_PATH => "/tokens/profile/update",
+    ROUTE_TOKENS_UPGRADE_PATH => "/tokens/upgrade",
+    ROUTE_TOKENS_STATUS_SET_PATH => "/tokens/status/set",
     ROUTE_PROXIES_PATH => "/proxies",
     ROUTE_PROXIES_GET_PATH => "/proxies/get",
-    ROUTE_PROXIES_UPDATE_PATH => "/proxies/update",
+    ROUTE_PROXIES_SET_PATH => "/proxies/set",
     ROUTE_PROXIES_ADD_PATH => "/proxies/add",
-    ROUTE_PROXIES_DELETE_PATH => "/proxies/delete",
+    ROUTE_PROXIES_DELETE_PATH => "/proxies/del",
     ROUTE_PROXIES_SET_GENERAL_PATH => "/proxies/set-general",
     ROUTE_ENV_EXAMPLE_PATH => "/env-example",
     ROUTE_STATIC_PATH => "/static/{path}",
@@ -63,7 +65,8 @@ def_pub_const!(
     ROUTE_ABOUT_PATH => "/about",
     ROUTE_README_PATH => "/readme",
     ROUTE_BASIC_CALIBRATION_PATH => "/basic-calibration",
-    ROUTE_BUILD_KEY_PATH => "/build-key"
+    ROUTE_BUILD_KEY_PATH => "/build-key",
+    ROUTE_TOKEN_UPGRADE_PATH => "/token-upgrade"
 );
 
 // def_pub_const!(DEFAULT_TOKEN_LIST_FILE_NAME => ".tokens");

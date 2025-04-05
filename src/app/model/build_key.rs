@@ -70,5 +70,5 @@ pub enum UsageCheckModelType {
 #[serde(rename_all = "lowercase")]
 pub enum BuildKeyResponse {
     Key(String),
-    Error(String),
+    Error(&'static str),
 }

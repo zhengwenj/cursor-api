@@ -48,6 +48,7 @@ def_pub_static!(
     format!("{}/v1/chat/completions", *ROUTE_PREFIX),
     _
 );
+def_pub_static!(ROUTE_MESSAGES_PATH, format!("{}/v1/messages", *ROUTE_PREFIX), _);
 
 static START_TIME: OnceLock<chrono::DateTime<chrono::Local>> = OnceLock::new();
 
@@ -84,7 +85,11 @@ def_pub_static!(DEFAULT_INSTRUCTIONS, env: "DEFAULT_INSTRUCTIONS", default: "Res
 const USE_OFFICIAL_CLAUDE_PROMPTS: LazyLock<bool> =
     LazyLock::new(|| parse_bool_from_env("USE_OFFICIAL_CLAUDE_PROMPTS", false));
 
-pub fn get_default_instructions(model: &str, image_support: bool) -> String {
+pub fn get_default_instructions(
+    now_with_tz: Option<chrono::DateTime<chrono_tz::Tz>>,
+    model: &str,
+    image_support: bool,
+) -> String {
     let mut instructions = "";
     if *USE_OFFICIAL_CLAUDE_PROMPTS {
         if let Some(rest) = model.strip_prefix("claude-3") {
@@ -111,7 +116,12 @@ pub fn get_default_instructions(model: &str, image_support: bool) -> String {
     }
     instructions.replace(
         "{{currentDateTime}}",
-        &now_in_general_timezone().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        &if let Some(now) = now_with_tz {
+            now
+        } else {
+            now_in_general_timezone()
+        }
+        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
     )
 }
 
@@ -225,6 +235,14 @@ def_cursor_api_url!(
 def_cursor_api_url!(cursor_usage_api_url, CURSOR_HOST, "/api/usage");
 
 def_cursor_api_url!(cursor_user_api_url, CURSOR_HOST, "/api/auth/me");
+
+def_cursor_api_url!(
+    cursor_token_upgrade_url,
+    CURSOR_HOST,
+    "/api/auth/loginDeepCallbackControl"
+);
+
+def_cursor_api_url!(cursor_token_poll_url, CURSOR_API2_HOST, "/auth/poll");
 
 static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let data_dir = parse_string_from_env("DATA_DIR", "data");

@@ -1,8 +1,13 @@
+mod display_name;
+pub use display_name::calculate_display_name_v3;
+
 use parking_lot::RwLock;
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+
+use crate::app::lazy::get_start_time;
 
 use super::model::Model;
 
@@ -71,6 +76,7 @@ def_pub_const!(
     GEMINI_EXP_1206 => "gemini-exp-1206",
     GEMINI_2_0_PRO_EXP => "gemini-2.0-pro-exp",
     GEMINI_2_5_PRO_EXP_03_25 => "gemini-2.5-pro-exp-03-25",
+    GEMINI_2_5_PRO_MAX => "gemini-2.5-pro-max",
     GEMINI_2_0_FLASH_THINKING_EXP => "gemini-2.0-flash-thinking-exp",
     GEMINI_2_0_FLASH => "gemini-2.0-flash",
 
@@ -93,13 +99,14 @@ macro_rules! create_models {
                     $(
                         Model {
                             id: $model,
+                            display_name: $crate::leak::intern_string(calculate_display_name_v3($model)),
                             created: CREATED,
                             object: MODEL_OBJECT,
                             owned_by: $owner,
                         },
                     )*
                 ]),
-                last_update: Instant::now() - Duration::from_secs(30 * 60),
+                last_update: Instant::now(),
             })
         });
     };
@@ -154,7 +161,19 @@ impl Models {
         let mut data = INSTANCE.write();
 
         // 检查时间间隔（30分钟）
-        if data.last_update.elapsed() < Duration::from_secs(30 * 60) {
+        if data.last_update.elapsed() < Duration::from_secs(30 * 60) && {
+            static ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+            if ONCE.get().is_some() {
+                true
+            } else {
+                let result =
+                    chrono::Local::now() - get_start_time() >= chrono::TimeDelta::minutes(30);
+                if result {
+                    let _ = ONCE.set(());
+                }
+                result
+            }
+        } {
             return Ok(());
         }
 
@@ -202,6 +221,7 @@ create_models!(
     CLAUDE_3_5_HAIKU => ANTHROPIC,
     GEMINI_2_0_PRO_EXP => GOOGLE,
     GEMINI_2_5_PRO_EXP_03_25 => GOOGLE,
+    GEMINI_2_5_PRO_MAX => GOOGLE,
     GEMINI_2_0_FLASH_THINKING_EXP => GOOGLE,
     GEMINI_2_0_FLASH => GOOGLE,
     DEEPSEEK_V3 => DEEPSEEK,

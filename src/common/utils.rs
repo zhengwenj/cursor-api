@@ -31,6 +31,7 @@ use crate::{
         config::key_config,
         constant::{
             ANTHROPIC, CREATED, CURSOR, DEEPSEEK, GOOGLE, MODEL_OBJECT, OPENAI, UNKNOWN, XAI,
+            calculate_display_name_v3,
         },
         model::{Model, Usage},
     },
@@ -70,6 +71,13 @@ pub fn parse_usize_from_env(key: &str, default: usize) -> usize {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
+}
+
+pub fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time before Unix epoch")
+        .as_secs()
 }
 
 pub trait TrimNewlines {
@@ -231,7 +239,7 @@ pub async fn get_available_models(
                         Some('g') => match chars.next() {
                             Some('p') => OPENAI, // g + p → "gp" (gpt)
                             Some('e') => GOOGLE, // g + e → "ge" (gemini)
-                            Some('r') => XAI,    // g + r → "ge" (grok)
+                            Some('r') => XAI,    // g + r → "gr" (grok)
                             _ => UNKNOWN,
                         },
                         Some('o') => match chars.next() {
@@ -252,9 +260,11 @@ pub async fn get_available_models(
                         _ => UNKNOWN,
                     }
                 };
+                let display_name = calculate_display_name_v3(&model.name);
 
                 Model {
                     id: crate::leak::intern_string(model.name),
+                    display_name: crate::leak::intern_string(display_name),
                     created: CREATED,
                     object: MODEL_OBJECT,
                     owned_by,
@@ -425,7 +435,11 @@ pub fn token_to_tokeninfo(
     // 构建 TokenInfo
     Some(key_config::TokenInfo {
         sub: payload.sub,
-        exp: payload.exp,
+        start: match payload.time.parse::<i64>() {
+            Ok(n) => n,
+            Err(_) => return None,
+        },
+        end: payload.exp,
         randomness: payload.randomness,
         signature: parts[2].to_string(),
         machine_id: machine_id_hash,
@@ -439,9 +453,9 @@ pub fn tokeninfo_to_token(mut info: key_config::TokenInfo) -> Option<(String, St
     // 构建 payload
     let payload = TokenPayload {
         sub: std::mem::take(&mut info.sub),
-        exp: info.exp,
+        exp: info.end,
         randomness: std::mem::take(&mut info.randomness),
-        time: (info.exp - 2592000000).to_string(), // exp - 30000天
+        time: info.start.to_string(), // exp - 30000天
         iss: ISSUER.to_string(),
         scope: SCOPE.to_string(),
         aud: AUDIENCE.to_string(),
@@ -466,7 +480,7 @@ pub fn tokeninfo_to_token(mut info: key_config::TokenInfo) -> Option<(String, St
 
     // 组合 token
     Some((
-        format!("{}.{}.{}", HEADER_B64, payload_b64, info.signature),
+        format!("{HEADER_B64}.{payload_b64}.{}", info.signature),
         generate_checksum(&device_id, mac_addr.as_deref()),
         client,
     ))
@@ -496,4 +510,75 @@ pub fn encode_message(
     result.extend(encoded);
 
     Ok(result)
+}
+
+/// 生成 PKCE code_verifier 和对应的 code_challenge (S256 method).
+/// 返回一个包含 (verifier, challenge) 的元组。
+fn generate_pkce_pair() -> (String, String) {
+    use rand::TryRngCore as _;
+    use sha2::Digest as _;
+
+    // 1. 生成 code_verifier 的原始随机字节 (32 bytes is recommended)
+    let mut verifier_bytes = [0u8; 32];
+
+    // 使用 OsRng 填充字节。如果失败（极其罕见），则直接 panic
+    rand::rngs::OsRng
+        .try_fill_bytes(&mut verifier_bytes)
+        .expect("获取系统安全随机数失败，这是一个严重错误！");
+
+    // 2. 将随机字节编码为 URL 安全 Base64 字符串，这就是 code_verifier
+    let code_verifier = URL_SAFE_NO_PAD.encode(verifier_bytes);
+
+    // 3. 计算 code_verifier 字符串的 SHA-256 哈希值
+    let hash_result = sha2::Sha256::digest(code_verifier.as_bytes());
+
+    // 4. 将哈希结果编码为 URL 安全 Base64 字符串，这就是 code_challenge
+    let code_challenge = URL_SAFE_NO_PAD.encode(hash_result);
+
+    // 5. 同时返回 verifier 和 challenge
+    (code_verifier, code_challenge)
+}
+
+pub async fn get_new_token(client: Client, auth_token: &str, is_pri: bool) -> Option<String> {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct PollResponse {
+        pub access_token: String,
+        // pub refresh_token: String,
+        // pub challenge: String,
+        // pub auth_id: String,
+        // pub uuid: String,
+    }
+
+    let (verifier, challenge) = generate_pkce_pair();
+    let user_id = extract_user_id(auth_token)?;
+    let uuid = uuid::Uuid::new_v4().to_string();
+
+    let request = super::client::build_token_upgrade_request(
+        &client, &uuid, &challenge, &user_id, auth_token, is_pri,
+    );
+
+    let response = request.send().await.ok()?;
+    if response.status() != reqwest::StatusCode::OK {
+        return None;
+    }
+
+    for _ in 0..5 {
+        let request = super::client::build_token_poll_request(&client, &uuid, &verifier, is_pri);
+        let response = request.send().await.ok()?;
+
+        match response.status() {
+            reqwest::StatusCode::OK => {
+                let poll_response = response.json::<PollResponse>().await.ok()?;
+                return Some(poll_response.access_token);
+            }
+            reqwest::StatusCode::NOT_FOUND => {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                continue;
+            }
+            _ => return None,
+        }
+    }
+
+    None
 }

@@ -123,10 +123,10 @@ pub fn validate_token(token: &str) -> bool {
     }
 
     // 验证过期时间
-    let current_time = chrono::Utc::now().timestamp();
-    if current_time > payload.exp {
-        return false;
-    }
+    // let current_time = chrono::Utc::now().timestamp();
+    // if current_time > payload.exp {
+    //     return false;
+    // }
 
     // 验证发行者
     if payload.iss != ISSUER {
@@ -183,8 +183,14 @@ pub fn extract_user_id(token: &str) -> Option<String> {
     )
 }
 
+#[derive(serde::Serialize)]
+pub struct JwtTime {
+    pub iat: DateTime<Local>,
+    pub exp: DateTime<Local>,
+}
+
 // 从 JWT token 中提取 time 字段
-pub fn extract_time(token: &str) -> Option<DateTime<Local>> {
+pub fn extract_time(token: &str) -> Option<JwtTime> {
     // JWT token 由3部分组成，用 . 分隔
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() != 3 {
@@ -196,6 +202,8 @@ pub fn extract_time(token: &str) -> Option<DateTime<Local>> {
         Ok(decoded) => decoded,
         Err(_) => return None,
     };
+
+    drop(parts);
 
     // 将 payload 转换为字符串
     let payload_str = match String::from_utf8(payload) {
@@ -209,10 +217,12 @@ pub fn extract_time(token: &str) -> Option<DateTime<Local>> {
         Err(_) => return None,
     };
 
-    // 提取时间戳并转换为本地时间
-    payload
+    let iat = payload
         .time
         .parse::<i64>()
         .ok()
-        .and_then(|timestamp| Local.timestamp_opt(timestamp, 0).single())
+        .and_then(|ts| Local.timestamp_opt(ts, 0).single())?;
+    let exp = Local.timestamp_opt(payload.exp, 0).single()?;
+
+    Some(JwtTime { iat, exp })
 }

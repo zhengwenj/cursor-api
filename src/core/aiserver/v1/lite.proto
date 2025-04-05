@@ -1268,6 +1268,8 @@ message AvailableModelsResponse { // aiserver.v1.AvailableModelsResponse
 		optional DegradationStatus degradation_status = 6;
 		optional double price = 7;
 		optional TooltipData tooltip_data = 8;
+		optional bool supports_thinking = 9;
+		optional bool supports_images = 10;
 	}
 	repeated AvailableModel models = 2;
 	repeated string model_names = 1;

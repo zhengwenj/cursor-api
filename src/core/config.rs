@@ -1,6 +1,7 @@
 use crate::AppConfig;
 
-include!(concat!(env!("OUT_DIR"), "/key.rs"));
+// include!(concat!(env!("OUT_DIR"), "/key.rs"));
+include!("config/key.rs");
 
 impl KeyConfig {
     pub fn new_with_global() -> Self {

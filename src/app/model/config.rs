@@ -127,10 +127,10 @@ impl AppConfig {
         long_context: bool, false;
         dynamic_key: bool, false;
         web_refs: bool, false;
+        vision_ability: VisionAbility, VisionAbility::default();
     }
 
     config_methods_clone! {
-        vision_ability: VisionAbility, VisionAbility::default();
         usage_check: UsageCheck, UsageCheck::default();
     }
 
@@ -138,9 +138,12 @@ impl AppConfig {
         APP_CONFIG.read().share_token.clone()
     }
 
+    pub fn share_token_eq(s: &str) -> bool {
+        APP_CONFIG.read().share_token == s
+    }
+
     pub fn update_share_token(value: String) {
-        let current = Self::get_share_token();
-        if current != value {
+        if Self::share_token_eq(&value) {
             let mut config = APP_CONFIG.write();
             config.share_token = value;
             config.is_share = !config.share_token.is_empty();
@@ -148,8 +151,7 @@ impl AppConfig {
     }
 
     pub fn reset_share_token() {
-        let current = Self::get_share_token();
-        if !current.is_empty() {
+        if !APP_CONFIG.read().share_token.is_empty() {
             let mut config = APP_CONFIG.write();
             config.share_token = String::new();
             config.is_share = false;

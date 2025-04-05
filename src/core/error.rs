@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::{aiserver::v1::ErrorDetails, constant::UNKNOWN};
 use crate::common::model::{ApiStatus, ErrorResponse as CommonErrorResponse};
 use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
@@ -120,11 +122,13 @@ impl ErrorResponse {
                 .error
                 .as_mut()
                 .map(|error| std::mem::take(&mut error.message))
-                .or(Some(self.code)),
+                .or(Some(self.code.clone()))
+                .map(Cow::from),
             message: self
                 .error
                 .as_mut()
-                .map(|error| std::mem::take(&mut error.details)),
+                .map(|error| std::mem::take(&mut error.details))
+                .map(Cow::from),
         }
     }
 }

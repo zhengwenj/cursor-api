@@ -51,7 +51,7 @@ use axum::{
 use bytes::Bytes;
 use futures::StreamExt;
 use prost::Message as _;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{borrow::Cow, sync::atomic::{AtomicUsize, Ordering}};
 use std::{
     convert::Infallible,
     sync::{Arc, atomic::AtomicBool},
@@ -62,6 +62,8 @@ use super::model::{ChatRequest, Model};
 
 const NO_CACHE: &str = "no-cache, must-revalidate";
 const KEEP_ALIVE: &str = "keep-alive";
+
+static CURRENT_KEY_INDEX: AtomicUsize = AtomicUsize::new(0);
 
 pub async fn handle_models(
     State(state): State<Arc<Mutex<AppState>>>,
@@ -87,10 +89,15 @@ pub async fn handle_models(
         // 管理员Token
         token
             if token == AUTH_TOKEN.as_str()
-                || (AppConfig::is_share() && token == AppConfig::get_share_token().as_str()) =>
+                || (AppConfig::is_share() && AppConfig::share_token_eq(token)) =>
         {
             let state_guard = state.lock().await;
-            let token_infos = &state_guard.token_manager.tokens;
+            let token_infos: Vec<_> = state_guard
+                .token_manager
+                .tokens
+                .iter()
+                .filter(|t| t.is_enabled())
+                .collect();
 
             if token_infos.is_empty() {
                 return Err((
@@ -99,7 +106,6 @@ pub async fn handle_models(
                 ));
             }
 
-            static CURRENT_KEY_INDEX: AtomicUsize = AtomicUsize::new(0);
             let index = CURRENT_KEY_INDEX.fetch_add(1, Ordering::SeqCst) % token_infos.len();
             let token_info = &token_infos[index];
             is_pri = true;
@@ -152,8 +158,8 @@ pub async fn handle_models(
             Json(ErrorResponse {
                 status: ApiStatus::Failure,
                 code: Some(StatusCode::INTERNAL_SERVER_ERROR.as_u16()),
-                error: Some("Failed to fetch available models".to_string()),
-                message: Some("Unable to get available models".to_string()),
+                error: Some(Cow::Borrowed("Failed to fetch available models")),
+                message: Some(Cow::Borrowed("Unable to get available models")),
             }),
         ))?;
 
@@ -164,8 +170,8 @@ pub async fn handle_models(
             Json(ErrorResponse {
                 status: ApiStatus::Failure,
                 code: Some(StatusCode::INTERNAL_SERVER_ERROR.as_u16()),
-                error: Some("Failed to update models".to_string()),
-                message: Some(e.to_string()),
+                error: Some(Cow::Borrowed("Failed to update models")),
+                message: Some(Cow::Borrowed(e)),
             }),
         )
     })?;
@@ -223,15 +229,20 @@ pub async fn handle_chat(
     let mut is_pri = false;
 
     // 验证认证token并获取token信息
+    let mut now_with_tz = None;
     let (auth_token, checksum, client_key, client, timezone) = match auth_header {
         // 管理员Token验证逻辑
         token
             if token == AUTH_TOKEN.as_str()
-                || (AppConfig::is_share() && token == AppConfig::get_share_token().as_str()) =>
+                || (AppConfig::is_share() && AppConfig::share_token_eq(token)) =>
         {
-            static CURRENT_KEY_INDEX: AtomicUsize = AtomicUsize::new(0);
             let state_guard = state.lock().await;
-            let token_infos = &state_guard.token_manager.tokens;
+            let token_infos: Vec<_> = state_guard
+                .token_manager
+                .tokens
+                .iter()
+                .filter(|t| t.is_enabled())
+                .collect();
 
             // 检查是否存在可用的token
             if token_infos.is_empty() {
@@ -245,6 +256,7 @@ pub async fn handle_chat(
             let index = CURRENT_KEY_INDEX.fetch_add(1, Ordering::SeqCst) % token_infos.len();
             let token_info = &token_infos[index];
             is_pri = true;
+            now_with_tz = Some(token_info.now());
             (
                 token_info.token.clone(),
                 token_info.checksum.clone(),
@@ -393,6 +405,7 @@ pub async fn handle_chat(
             token_info: TokenInfo {
                 token: auth_token.clone(),
                 checksum: checksum.clone(),
+                status: Default::default(),
                 client_key: None,
                 profile: None,
                 tags: None,
@@ -416,6 +429,7 @@ pub async fn handle_chat(
     // 将消息转换为hex格式
     let hex_data = match super::adapter::encode_chat_message(
         request.messages,
+        now_with_tz,
         model,
         current_config.disable_vision(),
         current_config.enable_slow_pool(),
@@ -1048,7 +1062,7 @@ pub async fn handle_chat(
                     let error_response = ErrorResponse {
                         status: ApiStatus::Error,
                         code: Some(500),
-                        error: Some(e.to_string()),
+                        error: Some(Cow::Owned(e.to_string())),
                         message: None,
                     };
                     return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)));

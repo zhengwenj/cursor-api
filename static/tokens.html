@@ -649,6 +649,74 @@
     .proxy-name:hover::after {
       opacity: 1;
     }
+
+    /* 状态指示标样式 */
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+
+    .status-enabled {
+      background-color: #4CAF50;
+      /* 绿色 */
+    }
+
+    .status-disabled {
+      background-color: #F44336;
+      /* 红色 */
+    }
+
+    .status-other {
+      background-color: #FFC107;
+      /* 黄色 */
+    }
+
+    /* 状态子菜单样式 */
+    .status-menu {
+      position: relative;
+    }
+
+    .status-submenu {
+      position: absolute;
+      left: 100%;
+      top: 0;
+      background: var(--card-background);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      padding: 4px 0;
+      min-width: 150px;
+      z-index: 1001;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+
+    .status-menu:hover .status-submenu {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* 添加向上和向左打开的样式 */
+    .status-menu.open-upward .status-submenu {
+      top: auto;
+      bottom: 0;
+    }
+
+    .status-menu.open-leftward .status-submenu {
+      left: auto;
+      right: 100%;
+    }
+
+    /* 添加状态计数样式 */
+    .status-count {
+      color: var(--text-secondary);
+      font-size: 12px;
+      margin-left: 8px;
+    }
   </style>
 </head>
 
@@ -774,6 +842,21 @@
 
   <!-- 右键菜单 -->
   <div id="contextMenu" class="context-menu">
+    <div class="context-menu-item status-menu">
+      <span>切换状态</span>
+      <div class="status-submenu" id="statusSubmenu">
+        <div class="context-menu-item" onclick="setTokenStatus('enabled')">
+          <span>启用</span>
+          <span class="status-count">0</span>
+          <span class="check-mark"></span>
+        </div>
+        <div class="context-menu-item" onclick="setTokenStatus('disabled')">
+          <span>禁用</span>
+          <span class="status-count">0</span>
+          <span class="check-mark"></span>
+        </div>
+      </div>
+    </div>
     <div class="context-menu-item" onclick="viewDetails()">
       <span>查看详情</span>
       <span class="context-menu-shortcut">Enter</span>
@@ -781,6 +864,10 @@
     <div class="context-menu-item" onclick="refreshSelectedProfiles()">
       <span>刷新Profile</span>
       <span class="context-menu-shortcut">F5</span>
+    </div>
+    <div class="context-menu-item" onclick="upgradeSelectedTokens()">
+      <span>升级Token</span>
+      <span class="context-menu-shortcut">Ctrl+U</span>
     </div>
     <div class="context-menu-item" onclick="generateKey()">
       <span>生成Key</span>
@@ -924,6 +1011,13 @@
       <div class="form-group">
         <label>添加Token:</label>
         <textarea id="addTokensInput" placeholder="每行输入一个token，格式为token或token,checksum" rows="8"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Token状态:</label>
+        <select id="addTokensStatus">
+          <option value="enabled">启用</option>
+          <option value="disabled">禁用</option>
+        </select>
       </div>
     </div>
     <div class="modal-footer">
@@ -1146,6 +1240,12 @@
               getTokenInfo();
             }
             break;
+          case 'u':
+            if (modifierKey) {
+              e.preventDefault();
+              upgradeSelectedTokens();
+            }
+            break;
           case 'g':
             if (modifierKey) {
               e.preventDefault();
@@ -1290,14 +1390,21 @@
         // 更新代理子菜单
         updateProxySubmenu();
 
+        // 更新状态子菜单
+        updateStatusSubmenu();
+
         // 更新多选时的菜单项文本
         if (selectedTokens.size > 1) {
           document.querySelector('.context-menu-item[onclick="viewDetails()"] span:first-child').textContent = "查看详情(单个)";
+          document.querySelector('.context-menu-item[onclick="refreshSelectedProfiles()"] span:first-child').textContent = `刷新Profile(已选${selectedTokens.size}个)`;
+          document.querySelector('.context-menu-item[onclick="upgradeSelectedTokens()"] span:first-child').textContent = `升级Token(已选${selectedTokens.size}个)`;
           document.querySelector('.context-menu-item[onclick="openTimezoneSelector()"] span:first-child').textContent = `设置时区(已选${selectedTokens.size}个)`;
           document.querySelector('.context-menu-item.proxy-menu span:first-child').textContent = `设置代理(已选${selectedTokens.size}个)`;
           document.querySelector('.context-menu-item[onclick="deleteSelectedTokens()"] span:first-child').textContent = `删除(已选${selectedTokens.size}个)`;
         } else {
           document.querySelector('.context-menu-item[onclick="viewDetails()"] span:first-child').textContent = "查看详情";
+          document.querySelector('.context-menu-item[onclick="refreshSelectedProfiles()"] span:first-child').textContent = "刷新Profile";
+          document.querySelector('.context-menu-item[onclick="upgradeSelectedTokens()"] span:first-child').textContent = "升级Token";
           document.querySelector('.context-menu-item[onclick="openTimezoneSelector()"] span:first-child').textContent = "设置时区";
           document.querySelector('.context-menu-item.proxy-menu span:first-child').textContent = "设置代理";
           document.querySelector('.context-menu-item[onclick="deleteSelectedTokens()"] span:first-child').textContent = "删除";
@@ -1400,43 +1507,44 @@
 
     // 更新代理子菜单
     function updateProxySubmenu() {
-
       const submenu = document.getElementById('proxySubmenu');
+      if (!submenu) return;
 
-      if (!submenu) {
-        return;
-      }
-
-      // 获取选中token的代理信息
-      const proxyUsage = {};
+      // 获取选中的token对象
       const selectedTokenObjs = allTokens.filter(t => selectedTokens.has(t.token));
+      const selectionSize = selectedTokenObjs.length;
 
-      allTokens.forEach(token => {
-        const tags = token.tags || [];
-        const proxy = tags[1] || '';
-        proxyUsage[proxy] = (proxyUsage[proxy] || 0) + 1;
+      // 计算选中项中的代理使用情况
+      const selectedProxyUsage = { '': 0 }; // 初始化 "未指定" 计数
+      proxyList.forEach(proxy => { selectedProxyUsage[proxy] = 0; }); // 初始化已知代理计数
+
+      selectedTokenObjs.forEach(token => {
+        const proxy = token.tags?.proxy || ''; // 获取选中 token 的代理
+        // 确保计数对象里有这个key
+        if (!(proxy in selectedProxyUsage)) {
+          selectedProxyUsage[proxy] = 0;
+        }
+        selectedProxyUsage[proxy]++; // 增加对应代理的计数
       });
 
-      // 确保"未指定"选项始终存在
+      // 构建 "未指定" 选项
+      const isUnspecifiedActive = selectionSize > 0 && selectedProxyUsage[''] === selectionSize;
       let html = `
-        <div class="context-menu-item ${selectedTokenObjs.length > 0 && proxyUsage[''] === selectedTokenObjs.length ? 'active' : ''}" onclick="setProxy('')">
+        <div class="context-menu-item ${isUnspecifiedActive ? 'active' : ''}" onclick="setProxy('')">
           <span>未指定</span>
-          <span class="proxy-count">${proxyUsage[''] || 0}</span>
+          <span class="proxy-count">${selectedProxyUsage['']}</span>
           <span class="check-mark"></span>
         </div>
         <div class="context-menu-divider"></div>
       `;
 
-      // 添加所有可用代理
+      // 添加所有可用代理选项
       if (proxyList.length > 0) {
         proxyList.forEach(proxy => {
-          const count = proxyUsage[proxy] || 0;
-
-          // 检查所有选中的token是否都使用了这个相同的代理
-          const isActive = selectedTokenObjs.length > 0 &&
-            selectedTokenObjs.every(token =>
-              (token.tags || [])[1] === proxy
-            );
+          if (!proxy) return; // 跳过空代理名
+          const count = selectedProxyUsage[proxy] || 0; // 获取选中项中使用这个代理的数量
+          // 检查是否所有选中的 Token 都使用了此代理
+          const isActive = selectionSize > 0 && count === selectionSize && proxy !== '';
 
           html += `
             <div class="context-menu-item ${isActive ? 'active' : ''}" onclick="setProxy('${proxy}')">
@@ -1447,23 +1555,16 @@
           `;
         });
       } else {
-        html += `<div class="context-menu-item disabled">
-                  <span>无可用代理</span>
-                </div>
-        `;
+        html += `<div class="context-menu-item disabled"><span>无可用代理</span></div>`;
       }
 
       submenu.innerHTML = html;
 
-      // 修改代理菜单项添加has-submenu类
+      // 添加 has-submenu 类以便显示箭头
       const proxyMenuEl = document.querySelector('.proxy-menu');
       if (proxyMenuEl) {
         proxyMenuEl.classList.add('has-submenu');
       }
-
-      // 关闭右键菜单
-      const contextMenu = document.getElementById('contextMenu');
-      contextMenu.style.display = 'none';
     }
 
     // 获取Token信息
@@ -1491,6 +1592,7 @@
         updateStatusBar();
         updateProxyFilter(); // 更新代理筛选下拉框
         updateTimezoneFilter(); // 更新时区筛选下拉框
+        updateStatusSubmenu(); // 更新状态子菜单
 
         // 恢复筛选条件
         document.getElementById('searchInput').value = searchTerm;
@@ -1546,14 +1648,20 @@
       const tokensData = tokensToUpdate.map(token => {
         // 获取当前token的时区设置
         const tokenObj = allTokens.find(t => t.token === token);
-        const timezone = tokenObj?.tags?.[0] || '';
-        // 保留时区设置，更新代理设置
-        return { token, tags: [timezone, proxyName] };
+        const timezone = tokenObj.tags?.timezone || '';
+        // 构建新的tags对象
+        return {
+          token,
+          tags: {
+            timezone: timezone || undefined,
+            proxy: proxyName
+          }
+        };
       });
 
       showToast('正在更新代理设置...', 'info');
       const promises = tokensData.map(data =>
-        makeAuthenticatedRequest('/tokens/tags/update', {
+        makeAuthenticatedRequest('/tokens/tags/set', {
           method: 'POST',
           body: JSON.stringify({
             tokens: [data.token],
@@ -1612,11 +1720,12 @@
 
         const email = user.email || '';
         const displayName = email || token.token.substring(0, 15) + '...';
-        const timezone = token.tags?.[0] || ''; // 获取时区
+        const timezone = token.tags?.timezone || ''; // 获取时区
 
         return `
           <tr data-token="${token.token}" data-checksum="${token.checksum}" data-index="${index}" class="${selectedTokens.has(token.token) ? 'selected' : ''}">
             <td>
+              <span class="status-indicator ${token.status === 'disabled' ? 'status-disabled' : token.status === undefined ? 'status-enabled' : 'status-' + token.status}"></span>
               <span class="file-icon">🔑</span>
               ${displayName}
             </td>
@@ -1624,7 +1733,7 @@
             <td>${premium.requests || 0}/${premium.max_requests || '∞'}</td>
             <td>${stripe.days_remaining_on_trial > 0 ? `${stripe.days_remaining_on_trial}天` : '-'}</td>
             <td><span class="timezone-name" onclick="openTimezoneSelectorForToken('${token.token}', event)">${timezone || '未指定'}</span></td>
-            <td><span class="proxy-name" onclick="openProxySelector('${displayName}','${token.token}', event)">${token.tags ? token.tags[1] || '未指定' : '未指定'}</span></td>
+            <td><span class="proxy-name" onclick="openProxySelector('${displayName}','${token.token}', event)">${token.tags?.proxy || '未指定'}</span></td>
           </tr>
         `;
       }).join('');
@@ -1768,7 +1877,7 @@
         // 代理筛选
         let proxyMatch = true;
         if (proxyFilter !== 'all') {
-          const tokenProxy = token.tags?.[1] || '';
+          const tokenProxy = token.tags?.proxy || '';
           if (proxyFilter === 'none') {
             proxyMatch = tokenProxy === '';
           } else {
@@ -1779,7 +1888,7 @@
         // 时区筛选
         let timezoneMatch = true;
         if (timezoneFilter !== 'all') {
-          const tokenTimezone = token.tags?.[0] || '';
+          const tokenTimezone = token.tags?.timezone || '';
           if (timezoneFilter === 'none') {
             timezoneMatch = tokenTimezone === '';
           } else {
@@ -1910,8 +2019,8 @@
       const stripe = profile.stripe || {};
       const usage = profile.usage || {};
       const premium = usage.premium || {};
-      const timezone = tokenObj.tags?.[0] || '-';
-      const proxy = tokenObj.tags?.[1] || '-';
+      const timezone = tokenObj.tags?.timezone || '-';
+      const proxy = tokenObj.tags?.proxy || '-';
 
       document.getElementById('detailsTitle').textContent = user.email || '未知账户';
 
@@ -2079,7 +2188,7 @@
       closeModal('confirmModal');
       showToast('正在删除Token...', 'info');
 
-      const data = await makeAuthenticatedRequest('/tokens/delete', {
+      const data = await makeAuthenticatedRequest('/tokens/del', {
         body: JSON.stringify({
           tokens: tokensToDelete,
           expectation: 'failed_tokens'
@@ -2134,6 +2243,7 @@
     // 确认添加Token
     async function confirmAddTokens() {
       const tokensInput = document.getElementById('addTokensInput').value;
+      const status = document.getElementById('addTokensStatus').value;
 
       if (!tokensInput) {
         showToast('请输入要添加的Token', 'warning');
@@ -2151,14 +2261,16 @@
           const parts = line.includes(',') ? line.split(',') : [line];
           return {
             token: parts[0].trim(),
-            checksum: parts[1]?.trim() || null
+            checksum: parts[1]?.trim() || null,
+            status: status
           };
         });
 
       const data = await makeAuthenticatedRequest('/tokens/add', {
         body: JSON.stringify({
           tokens: tokenList,
-          tags: []
+          tags: {},
+          status: status
         })
       });
 
@@ -2230,7 +2342,7 @@
           closeModal('importModal');
           showToast('正在导入Token...', 'info');
 
-          const data = await makeAuthenticatedRequest('/tokens/update', {
+          const data = await makeAuthenticatedRequest('/tokens/set', {
             body: JSON.stringify(tokensJson)
           });
 
@@ -2316,8 +2428,8 @@
         requestBody.proxy_name = proxyName;
       } else {
         // 否则使用Token的tags中设置的代理
-        const tags = tokenObj.tags || [];
-        const tokenProxyName = tags[1] || '';
+        const tags = tokenObj.tags || {};
+        const tokenProxyName = tags.proxy || '';
         if (tokenProxyName) {
           requestBody.proxy_name = tokenProxyName;
         }
@@ -2557,7 +2669,7 @@
       });
 
       // 设置当前选中的代理
-      const currentProxy = tokenObj.tags?.[1] || '';
+      const currentProxy = tokenObj.tags?.proxy || '';
       proxySelect.value = currentProxy;
 
       // 显示模态框
@@ -2571,10 +2683,10 @@
       closeModal('proxySelectModal')
 
       const selectedProxy = document.getElementById('proxySelectDropdown').value;
-      const tags = selectedProxy ? ['', selectedProxy] : [];
+      const tags = { proxy: selectedProxy || undefined };
 
       showToast('正在更新代理设置...', 'info');
-      const data = await makeAuthenticatedRequest('/tokens/tags/update', {
+      const data = await makeAuthenticatedRequest('/tokens/tags/set', {
         method: 'POST',
         body: JSON.stringify({
           tokens: [currentEditingToken],
@@ -2595,7 +2707,7 @@
     function getProxyUsageStats() {
       const proxyUsage = {};
       allTokens.forEach(token => {
-        const proxy = token.tags?.[1] || '';
+        const proxy = token.tags?.proxy?.value || '';
         proxyUsage[proxy] = (proxyUsage[proxy] || 0) + 1;
       });
       return proxyUsage;
@@ -2631,7 +2743,7 @@
       initializeTimezoneList();
 
       // 设置当前选中的时区
-      const currentTimezone = tokenObj.tags?.[0] || '';
+      const currentTimezone = tokenObj.tags?.timezone || '';
       highlightSelectedTimezone(currentTimezone);
 
       // 显示模态框
@@ -2775,9 +2887,15 @@
         const tokenObj = allTokens.find(t => t.token === token);
         if (!tokenObj) return null;
 
-        // 保持原来的代理设置（在tags[1]中）
-        const proxyName = tokenObj.tags?.[1] || '';
-        return { token, tags: [selectedTimezone, proxyName] };
+        // 保持原来的代理设置
+        const proxyName = tokenObj.tags?.proxy || '';
+        return {
+          token,
+          tags: {
+            timezone: selectedTimezone || undefined,
+            proxy: proxyName || undefined
+          }
+        };
       }).filter(Boolean); // 过滤掉null值
 
       if (tokensData.length === 0) {
@@ -2789,7 +2907,7 @@
 
       // 使用Promise.all并行处理所有更新请求
       const promises = tokensData.map(data =>
-        makeAuthenticatedRequest('/tokens/tags/update', {
+        makeAuthenticatedRequest('/tokens/tags/set', {
           method: 'POST',
           body: JSON.stringify({
             tokens: [data.token],
@@ -2820,7 +2938,7 @@
       // 获取所有使用的时区并统计数量
       const timezoneUsage = {};
       allTokens.forEach(token => {
-        const timezone = token.tags?.[0] || '';
+        const timezone = token.tags?.timezone || '';
         if (timezone) { // 只统计非空时区
           timezoneUsage[timezone] = (timezoneUsage[timezone] || 0) + 1;
         }
@@ -2838,6 +2956,129 @@
         option.textContent = `${timezone} (${timezoneUsage[timezone]})`;
         timezoneFilterSelect.appendChild(option);
       });
+    }
+
+    // 设置Token状态
+    async function setTokenStatus(status) {
+      if (selectedTokens.size === 0) {
+        showToast('请先选择Token', 'info');
+        return;
+      }
+
+      const tokensArray = [...selectedTokens];
+
+      showToast('正在更新Token状态...', 'info');
+
+      try {
+        const result = await makeAuthenticatedRequest('/tokens/status/set', {
+          body: JSON.stringify({
+            tokens: tokensArray,
+            status: status
+          })
+        });
+
+        if (result && result.status === 'success') {
+          showToast(result.message || '状态更新成功', 'success');
+          getTokenInfo(); // 刷新Token列表
+        } else {
+          // 显示详细的错误信息
+          const errorMessage = result?.error || result?.message || '状态更新失败';
+          showToast(errorMessage, 'error');
+        }
+      } catch (error) {
+        // 显示详细的错误信息
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
+        showToast(`状态更新失败: ${errorMessage}`, 'error');
+      }
+
+      // 关闭上下文菜单
+      document.getElementById('contextMenu').style.display = 'none';
+      // 更新状态子菜单
+      updateStatusSubmenu();
+    }
+
+    // 更新状态子菜单
+    function updateStatusSubmenu() {
+      const submenu = document.getElementById('statusSubmenu');
+      if (!submenu) return;
+
+      // 获取选中的token对象
+      const selectedTokenObjs = allTokens.filter(t => selectedTokens.has(t.token));
+      const selectionSize = selectedTokenObjs.length;
+
+      // 计算选中项的状态统计
+      const selectedStatusStats = {
+        'enabled': 0,
+        'disabled': 0
+      };
+
+      selectedTokenObjs.forEach(token => {
+        // 将 undefined 或 'enabled' 状态视为 'enabled'
+        const status = token.status === 'disabled' ? 'disabled' : 'enabled';
+        selectedStatusStats[status]++; // 增加对应状态的计数
+      });
+
+      // 更新 "启用" 选项
+      const enabledItem = submenu.querySelector('.context-menu-item[onclick="setTokenStatus(\\"enabled\\")"]');
+      if (enabledItem) {
+        const enabledCountSpan = enabledItem.querySelector('.status-count');
+        if (enabledCountSpan) {
+          // 显示选中项中启用的数量
+          enabledCountSpan.textContent = selectedStatusStats['enabled'];
+        }
+        // 检查是否所有选中的 Token 都处于启用状态
+        const isEnabledActive = selectionSize > 0 && selectedStatusStats['enabled'] === selectionSize;
+        enabledItem.classList.toggle('active', isEnabledActive); // 设置选中标记
+      }
+
+      // 更新 "禁用" 选项
+      const disabledItem = submenu.querySelector('.context-menu-item[onclick="setTokenStatus(\\"disabled\\")"]');
+      if (disabledItem) {
+        const disabledCountSpan = disabledItem.querySelector('.status-count');
+        if (disabledCountSpan) {
+          // 显示选中项中禁用的数量
+          disabledCountSpan.textContent = selectedStatusStats['disabled'];
+        }
+        // 检查是否所有选中的 Token 都处于禁用状态
+        const isDisabledActive = selectionSize > 0 && selectedStatusStats['disabled'] === selectionSize;
+        disabledItem.classList.toggle('active', isDisabledActive); // 设置选中标记
+      }
+
+      // 添加 has-submenu 类以便显示箭头
+      const statusMenuEl = document.querySelector('.status-menu');
+      if (statusMenuEl) {
+        statusMenuEl.classList.add('has-submenu');
+      }
+    }
+
+    // 升级选中的Token
+    async function upgradeSelectedTokens() {
+      if (selectedTokens.size === 0) {
+        showToast('请先选择要升级的Token', 'info');
+        return;
+      }
+
+      const tokensToUpgrade = [...selectedTokens];
+      showToast(`正在升级 ${tokensToUpgrade.length} 个Token...`, 'info');
+
+      // 关闭右键菜单
+      document.getElementById('contextMenu').style.display = 'none';
+
+      try {
+        const data = await makeAuthenticatedRequest('/tokens/upgrade', {
+          body: JSON.stringify(tokensToUpgrade)
+        });
+
+        if (data && data.status === 'success') {
+          showToast(data.message || '升级成功', 'success');
+          getTokenInfo();
+        } else {
+          showToast('升级失败: ' + (data.message || data.error || '未知错误'), 'error');
+        }
+      } catch (error) {
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
+        showToast(`升级失败: ${errorMessage}`, 'error');
+      }
     }
   </script>
 </body>

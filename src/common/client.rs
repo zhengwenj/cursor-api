@@ -5,14 +5,16 @@ use crate::app::{
     },
     lazy::{
         PRI_REVERSE_PROXY_HOST, PUB_REVERSE_PROXY_HOST, USE_PRI_REVERSE_PROXY,
-        USE_PUB_REVERSE_PROXY, cursor_api2_stripe_url, cursor_usage_api_url, cursor_user_api_url,
+        USE_PUB_REVERSE_PROXY, cursor_api2_stripe_url, cursor_token_poll_url,
+        cursor_token_upgrade_url, cursor_usage_api_url, cursor_user_api_url,
     },
 };
 use reqwest::{
     Client, RequestBuilder,
     header::{
-        ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, CACHE_CONTROL, CONNECTION, CONTENT_TYPE, COOKIE,
-        DNT, HOST, ORIGIN, PRAGMA, REFERER, TE, USER_AGENT,
+        ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, CACHE_CONTROL, CONNECTION, CONTENT_LENGTH,
+        CONTENT_TYPE, COOKIE, DNT, HOST, ORIGIN, PRAGMA, REFERER, TE, TRANSFER_ENCODING,
+        USER_AGENT,
     },
 };
 
@@ -43,8 +45,31 @@ def_const!(SAME_ORIGIN, "same-origin");
 def_const!(KEEP_ALIVE, "keep-alive");
 def_const!(TRAILERS, "trailers");
 def_const!(U_EQ_4, "u=4");
+def_const!(U_EQ_0, "u=0");
 
 def_const!(PROXY_HOST, "x-co");
+
+#[inline]
+fn get_client_and_host_post<'a>(
+    client: &Client,
+    url: &'a str,
+    is_pri: bool,
+    real_host: &'a str,
+) -> (RequestBuilder, &'a str) {
+    if is_pri && *USE_PRI_REVERSE_PROXY {
+        (
+            client.post(url).header(PROXY_HOST, real_host),
+            PRI_REVERSE_PROXY_HOST.as_str(),
+        )
+    } else if !is_pri && *USE_PUB_REVERSE_PROXY {
+        (
+            client.post(url).header(PROXY_HOST, real_host),
+            PUB_REVERSE_PROXY_HOST.as_str(),
+        )
+    } else {
+        (client.post(url), real_host)
+    }
+}
 
 pub(crate) struct AiServiceRequest<'a> {
     pub(crate) client: Client,
@@ -70,28 +95,8 @@ pub(crate) struct AiServiceRequest<'a> {
 ///
 /// * `reqwest::RequestBuilder` - 配置好的请求构建器
 pub fn build_request(req: AiServiceRequest) -> RequestBuilder {
-    #[inline]
-    fn get_client_and_host<'a>(
-        client: &Client,
-        url: &'a str,
-        is_pri: bool,
-        real_host: &'a str,
-    ) -> (RequestBuilder, &'a str) {
-        if is_pri && *USE_PRI_REVERSE_PROXY {
-            (
-                client.post(url).header(PROXY_HOST, real_host),
-                PRI_REVERSE_PROXY_HOST.as_str(),
-            )
-        } else if !is_pri && *USE_PUB_REVERSE_PROXY {
-            (
-                client.post(url).header(PROXY_HOST, real_host),
-                PUB_REVERSE_PROXY_HOST.as_str(),
-            )
-        } else {
-            (client.post(url), real_host)
-        }
-    }
-    let (client, host) = get_client_and_host(&req.client, req.url, req.is_pri, CURSOR_API2_HOST);
+    let (client, host) =
+        get_client_and_host_post(&req.client, req.url, req.is_pri, CURSOR_API2_HOST);
 
     client
         .header(
@@ -114,8 +119,8 @@ pub fn build_request(req: AiServiceRequest) -> RequestBuilder {
         .header(HEADER_NAME_GHOST_MODE, TRUE)
         .header("x-request-id", req.trace_id)
         .header(HOST, host)
-        .header("Connection", KEEP_ALIVE)
-        .header("Transfer-Encoding", "chunked")
+        .header(CONNECTION, KEEP_ALIVE)
+        .header(TRANSFER_ENCODING, "chunked")
 }
 
 #[inline]
@@ -194,8 +199,6 @@ pub fn build_usage_request(
     auth_token: &str,
     is_pri: bool,
 ) -> RequestBuilder {
-    let session_token = format!("{}%3A%3A{}", user_id, auth_token);
-
     let (client, host) =
         get_client_and_host(client, cursor_usage_api_url(is_pri), is_pri, CURSOR_HOST);
 
@@ -218,7 +221,7 @@ pub fn build_usage_request(
         .header(PRIORITY, U_EQ_4)
         .header(
             COOKIE,
-            &format!("WorkosCursorSessionToken={}", session_token),
+            format!("WorkosCursorSessionToken={user_id}%3A%3A{auth_token}"),
         )
         .query(&[("user", user_id)])
 }
@@ -239,8 +242,6 @@ pub fn build_userinfo_request(
     auth_token: &str,
     is_pri: bool,
 ) -> RequestBuilder {
-    let session_token = format!("{}%3A%3A{}", user_id, auth_token);
-
     let (client, host) =
         get_client_and_host(client, cursor_user_api_url(is_pri), is_pri, CURSOR_HOST);
 
@@ -263,7 +264,77 @@ pub fn build_userinfo_request(
         .header(PRIORITY, U_EQ_4)
         .header(
             COOKIE,
-            &format!("WorkosCursorSessionToken={}", session_token),
+            format!("WorkosCursorSessionToken={user_id}%3A%3A{auth_token}"),
         )
-        .query(&[("user", user_id)])
+}
+
+pub fn build_token_upgrade_request(
+    client: &Client,
+    uuid: &str,
+    challenge: &str,
+    user_id: &str,
+    auth_token: &str,
+    is_pri: bool,
+) -> RequestBuilder {
+    let (client, host) = get_client_and_host_post(
+        client,
+        cursor_token_upgrade_url(is_pri),
+        is_pri,
+        CURSOR_HOST,
+    );
+
+    let body = format!("{{\"uuid\":\"{uuid}\",\"challenge\":\"{challenge}\"}}");
+
+    client
+        .header(HOST, host)
+        .header(USER_AGENT, UA_WIN)
+        .header(ACCEPT, VALUE_ACCEPT)
+        .header(ACCEPT_LANGUAGE, VALUE_LANGUAGE)
+        .header(ACCEPT_ENCODING, ENCODINGS)
+        .header(
+            REFERER,
+            format!(
+                "https://cursor.com/loginDeepControl?challenge={challenge}&uuid={uuid}&mode=login"
+            ),
+        )
+        .header(CONTENT_TYPE, "application/json")
+        .header(CONTENT_LENGTH, body.len())
+        .header(DNT, ONE)
+        .header(SEC_GPC, ONE)
+        .header(SEC_FETCH_DEST, EMPTY)
+        .header(SEC_FETCH_MODE, CORS)
+        .header(SEC_FETCH_SITE, SAME_ORIGIN)
+        .header(CONNECTION, KEEP_ALIVE)
+        .header(PRAGMA, NO_CACHE)
+        .header(CACHE_CONTROL, NO_CACHE)
+        .header(TE, TRAILERS)
+        .header(PRIORITY, U_EQ_0)
+        .header(
+            COOKIE,
+            format!("WorkosCursorSessionToken={user_id}%3A%3A{auth_token}"),
+        )
+        .body(body)
+}
+
+pub fn build_token_poll_request(
+    client: &Client,
+    uuid: &str,
+    verifier: &str,
+    is_pri: bool,
+) -> RequestBuilder {
+    let (client, host) = get_client_and_host(
+        client,
+        cursor_token_poll_url(is_pri),
+        is_pri,
+        CURSOR_API2_HOST,
+    );
+    client
+        .header(HOST, host)
+        .header(ACCEPT_ENCODING, "gzip, deflate")
+        .header(ACCEPT_LANGUAGE, "en-US") 
+        .header(USER_AGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/0.48.2 Chrome/132.0.6834.210 Electron/34.3.4 Safari/537.36")
+        .header(ORIGIN, "vscode-file://vscode-app")
+        .header(HEADER_NAME_GHOST_MODE, TRUE)
+        .header(ACCEPT, "*/*")
+        .query(&[("uuid", uuid), ("verifier", verifier)])
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
+use serde::{ser::SerializeStruct as _, Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
@@ -117,12 +117,31 @@ pub struct StreamOptions {
 }
 
 // 模型定义
-#[derive(Serialize)]
 pub struct Model {
     pub id: &'static str,
+    pub display_name: &'static str,
     pub created: &'static i64,
     pub object: &'static str,
     pub owned_by: &'static str,
+}
+
+impl Serialize for Model {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Model", 7)?;
+
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("display_name", &self.display_name)?;
+        state.serialize_field("created", self.created)?;
+        state.serialize_field("created_at", self.created)?;
+        state.serialize_field("object", &self.object)?;
+        state.serialize_field("type", &self.object)?;
+        state.serialize_field("owned_by", &self.owned_by)?;
+
+        state.end()
+    }
 }
 
 impl PartialEq for Model {

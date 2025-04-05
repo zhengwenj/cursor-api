@@ -6,7 +6,7 @@ use crate::{
     common::model::{ApiStatus, ErrorResponse},
 };
 use axum::{Json, extract::State, http::StatusCode};
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 use tokio::sync::Mutex;
 
 // 获取所有代理配置
@@ -32,7 +32,7 @@ pub async fn handle_get_proxies(
 }
 
 // 更新代理配置
-pub async fn handle_update_proxies(
+pub async fn handle_set_proxies(
     State(state): State<Arc<Mutex<AppState>>>,
     Json(request): Json<ProxyUpdateRequest>,
 ) -> Result<Json<ProxyInfoResponse>, (StatusCode, Json<ErrorResponse>)> {
@@ -46,8 +46,10 @@ pub async fn handle_update_proxies(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(format!("Failed to save proxy configuration: {e}")),
-                message: Some("无法保存代理配置".to_string()),
+                error: Some(Cow::Owned(format!(
+                    "Failed to save proxy configuration: {e}"
+                ))),
+                message: Some(Cow::Borrowed("无法保存代理配置")),
             }),
         ));
     }
@@ -109,8 +111,10 @@ pub async fn handle_add_proxy(
                 Json(ErrorResponse {
                     status: ApiStatus::Error,
                     code: None,
-                    error: Some(format!("Failed to save proxy configuration: {e}")),
-                    message: Some("无法保存代理配置".to_string()),
+                    error: Some(Cow::Owned(format!(
+                        "Failed to save proxy configuration: {e}"
+                    ))),
+                    message: Some(Cow::Borrowed("无法保存代理配置")),
                 }),
             ));
         }
@@ -177,8 +181,10 @@ pub async fn handle_delete_proxies(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(format!("Failed to save proxy configuration: {e}")),
-                message: Some("无法保存代理配置".to_string()),
+                error: Some(Cow::Owned(format!(
+                    "Failed to save proxy configuration: {e}"
+                ))),
+                message: Some(Cow::Borrowed("无法保存代理配置")),
             }),
         ));
     }
@@ -225,8 +231,8 @@ pub async fn handle_set_general_proxy(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some("Proxy name not found".to_string()),
-                message: Some("代理名称不存在".to_string()),
+                error: Some(Cow::Borrowed("Proxy name not found")),
+                message: Some(Cow::Borrowed("代理名称不存在")),
             }),
         ));
     }
@@ -241,8 +247,10 @@ pub async fn handle_set_general_proxy(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(format!("Failed to save proxy configuration: {e}")),
-                message: Some("无法保存代理配置".to_string()),
+                error: Some(Cow::Owned(format!(
+                    "Failed to save proxy configuration: {e}"
+                ))),
+                message: Some(Cow::Borrowed("无法保存代理配置")),
             }),
         ));
     }

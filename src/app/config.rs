@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::{constant::AUTHORIZATION_BEARER_PREFIX, lazy::AUTH_TOKEN, model::AppConfig};
 use crate::common::model::{
     ApiStatus, ErrorResponse, NormalResponse,
@@ -43,7 +45,7 @@ pub async fn handle_config_update(
             Json(ErrorResponse {
                 status: ApiStatus::Failure,
                 code: Some(401),
-                error: Some("未提供认证令牌".to_string()),
+                error: Some(Cow::Borrowed("未提供认证令牌")),
                 message: None,
             }),
         ))?;
@@ -54,7 +56,7 @@ pub async fn handle_config_update(
             Json(ErrorResponse {
                 status: ApiStatus::Failure,
                 code: Some(401),
-                error: Some("无效的认证令牌".to_string()),
+                error: Some(Cow::Borrowed("无效的认证令牌")),
                 message: None,
             }),
         ));
@@ -86,7 +88,7 @@ pub async fn handle_config_update(
                             Json(ErrorResponse {
                                 status: ApiStatus::Failure,
                                 code: Some(500),
-                                error: Some(format!("更新页面内容失败: {e}")),
+                                error: Some(Cow::Owned(format!("更新页面内容失败: {e}"))),
                                 message: None,
                             }),
                         ));
@@ -107,7 +109,7 @@ pub async fn handle_config_update(
             Ok(Json(NormalResponse {
                 status: ApiStatus::Success,
                 data: None,
-                message: Some("配置已更新".to_string()),
+                message: Some(Cow::Borrowed("配置已更新")),
             }))
         }
 
@@ -120,7 +122,7 @@ pub async fn handle_config_update(
                         Json(ErrorResponse {
                             status: ApiStatus::Failure,
                             code: Some(500),
-                            error: Some(format!("重置页面内容失败: {e}")),
+                            error: Some(Cow::Owned(format!("重置页面内容失败: {e}"))),
                             message: None,
                         }),
                     ));
@@ -140,7 +142,7 @@ pub async fn handle_config_update(
             Ok(Json(NormalResponse {
                 status: ApiStatus::Success,
                 data: None,
-                message: Some("配置已重置".to_string()),
+                message: Some(Cow::Borrowed("配置已重置")),
             }))
         }
 
@@ -149,7 +151,7 @@ pub async fn handle_config_update(
             Json(ErrorResponse {
                 status: ApiStatus::Failure,
                 code: Some(400),
-                error: Some("无效的操作类型".to_string()),
+                error: Some(Cow::Borrowed("无效的操作类型")),
                 message: None,
             }),
         )),

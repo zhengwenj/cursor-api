@@ -32,11 +32,7 @@ fn deobfuscate_bytes(bytes: &mut [u8]) {
 }
 
 pub fn generate_timestamp_header() -> String {
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        / 1_000;
+    let timestamp = super::now_secs() / 1_000;
 
     let mut timestamp_bytes = vec![
         ((timestamp >> 8) & 0xFF) as u8,
@@ -55,8 +51,8 @@ pub fn generate_timestamp_header() -> String {
 pub fn generate_checksum(device_id: &str, mac_addr: Option<&str>) -> String {
     let encoded = generate_timestamp_header();
     match mac_addr {
-        Some(mac) => format!("{}{}/{}", encoded, device_id, mac),
-        None => format!("{}{}", encoded, device_id),
+        Some(mac) => format!("{encoded}{device_id}/{mac}"),
+        None => format!("{encoded}{device_id}"),
     }
 }
 
@@ -109,20 +105,20 @@ pub fn generate_checksum_with_repair(checksum: &str) -> String {
         72 => format!(
             "{}{}/{}",
             generate_timestamp_header(),
-            unsafe { std::str::from_utf8_unchecked(&bytes[8..]) },
+            unsafe { std::str::from_utf8_unchecked(bytes.get_unchecked(8..)) },
             generate_hash()
         ),
         129 => format!(
             "{}{}/{}",
             generate_timestamp_header(),
-            unsafe { std::str::from_utf8_unchecked(&bytes[..64]) },
-            unsafe { std::str::from_utf8_unchecked(&bytes[65..]) }
+            unsafe { std::str::from_utf8_unchecked(bytes.get_unchecked(..64)) },
+            unsafe { std::str::from_utf8_unchecked(bytes.get_unchecked(65..)) }
         ),
         137 => format!(
             "{}{}/{}",
             generate_timestamp_header(),
-            unsafe { std::str::from_utf8_unchecked(&bytes[8..72]) },
-            unsafe { std::str::from_utf8_unchecked(&bytes[73..]) }
+            unsafe { std::str::from_utf8_unchecked(bytes.get_unchecked(8..72)) },
+            unsafe { std::str::from_utf8_unchecked(bytes.get_unchecked(73..)) }
         ),
         _ => unreachable!(),
     }
@@ -137,17 +133,21 @@ pub fn extract_time_ks(timestamp_base64: &str) -> Option<u64> {
 
     deobfuscate_bytes(&mut timestamp_bytes);
 
-    if timestamp_bytes[0] != timestamp_bytes[4] || timestamp_bytes[1] != timestamp_bytes[5] {
-        return None;
-    }
+    unsafe {
+        if timestamp_bytes.get_unchecked(0) != timestamp_bytes.get_unchecked(4)
+            || timestamp_bytes.get_unchecked(1) != timestamp_bytes.get_unchecked(5)
+        {
+            return None;
+        }
 
-    // 使用后四位还原 timestamp
-    Some(
-        ((timestamp_bytes[2] as u64) << 24)
-            | ((timestamp_bytes[3] as u64) << 16)
-            | ((timestamp_bytes[4] as u64) << 8)
-            | (timestamp_bytes[5] as u64),
-    )
+        // 使用后四位还原 timestamp
+        Some(
+            ((*timestamp_bytes.get_unchecked(2) as u64) << 24)
+                | ((*timestamp_bytes.get_unchecked(3) as u64) << 16)
+                | ((*timestamp_bytes.get_unchecked(4) as u64) << 8)
+                | (*timestamp_bytes.get_unchecked(5) as u64),
+        )
+    }
 }
 
 pub fn validate_checksum(checksum: &str) -> bool {
@@ -183,16 +183,9 @@ pub fn validate_checksum(checksum: &str) -> bool {
     }
 
     // 统一时间戳验证（无需分层）
-    let time_valid = extract_time_ks(&checksum[..8]).is_some();
+    let time_valid = extract_time_ks(unsafe { checksum.get_unchecked(..8) }).is_some();
 
-    // 附加MAC哈希长度校验（仅137字符需要）
-    let mac_hash_valid = if len == 137 {
-        checksum[73..].len() == 64 // 确保MAC哈希长度为64
-    } else {
-        true // 72字符无需此检查
-    };
-
-    time_valid && mac_hash_valid
+    time_valid
 }
 
 /// 从校验通过的checksum中提取哈希值（需先通过validate_checksum验证）
@@ -207,14 +200,14 @@ pub fn extract_hashes(checksum: &str) -> Option<(Vec<u8>, Vec<u8>)> {
     match checksum.len() {
         72 => {
             // 格式：8字节时间戳 + 64字节设备哈希
-            let device_hash = hex::decode(&checksum[8..]).ok()?; // 8..72
+            let device_hash = hex::decode(unsafe { checksum.get_unchecked(8..) }).ok()?; // 8..72
             Some((device_hash, Vec::new()))
         }
         137 => {
             // 格式：8时间戳 + 64设备哈希 + '/' + 64MAC哈希
             // 直接按固定位置切割（validate_checksum已确保索引72是'/'）
-            let device_hash = hex::decode(&checksum[8..72]).ok()?;
-            let mac_hash = hex::decode(&checksum[73..]).ok()?; // 73..137
+            let device_hash = hex::decode(unsafe { checksum.get_unchecked(8..72) }).ok()?;
+            let mac_hash = hex::decode(unsafe { checksum.get_unchecked(73..) }).ok()?; // 73..137
             Some((device_hash, mac_hash))
         }
         // validate_checksum已过滤其他长度，此处应为不可达代码

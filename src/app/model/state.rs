@@ -2,7 +2,10 @@ use crate::common::utils::{generate_checksum_with_repair, generate_hash};
 use memmap2::{MmapMut, MmapOptions};
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fs::OpenOptions};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::OpenOptions,
+};
 
 use super::{
     super::lazy::{LOGS_FILE_PATH, TOKENS_FILE_PATH},
@@ -70,7 +73,7 @@ impl TokenManager {
         let mut tags = HashSet::new();
         for token in &tokens {
             if let Some(token_tags) = &token.tags {
-                tags.extend(token_tags.iter().cloned());
+                tags.extend(token_tags.keys().cloned());
             }
         }
 
@@ -78,16 +81,16 @@ impl TokenManager {
     }
 
     #[inline(always)]
-    pub fn update_global_tags(&mut self, new_tags: &[String]) {
+    pub fn update_global_tags(&mut self, new_tags: &HashMap<String, Option<String>>) {
         // 将新标签添加到全局标签集合中
-        self.tags.extend(new_tags.iter().cloned());
+        self.tags.extend(new_tags.keys().cloned());
     }
 
     #[inline(always)]
     pub fn update_tokens_tags(
         &mut self,
-        tokens: Vec<String>,
-        new_tags: Vec<String>,
+        tokens: &[String],
+        new_tags: Option<HashMap<String, Option<String>>>,
     ) -> Result<(), &'static str> {
         // 创建tokens的HashSet用于快速查找
         let tokens_set: HashSet<_> = tokens.iter().collect();
@@ -95,7 +98,7 @@ impl TokenManager {
         // 更新指定tokens的标签
         for token_info in &mut self.tokens {
             if tokens_set.contains(&token_info.token) {
-                token_info.tags = Some(new_tags.clone());
+                token_info.tags = new_tags.clone();
             }
         }
 
@@ -103,8 +106,8 @@ impl TokenManager {
         self.tags = self
             .tokens
             .iter()
-            .filter_map(|t| t.tags.clone())
-            .flatten()
+            .filter_map(|t| t.tags.as_ref())
+            .flat_map(|tags| tags.keys().cloned())
             .collect();
 
         Ok(())
@@ -122,7 +125,7 @@ impl TokenManager {
             .filter(|t| {
                 t.tags
                     .as_ref()
-                    .is_some_and(|tags| tags.iter().any(|t| t == tag))
+                    .is_some_and(|tags| tags.keys().any(|t| t == tag))
             })
             .collect())
     }

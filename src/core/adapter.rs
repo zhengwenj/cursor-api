@@ -88,6 +88,7 @@ fn parse_web_references(text: &str) -> Vec<WebReference> {
 
 async fn process_chat_inputs(
     inputs: Vec<Message>,
+    now_with_tz: Option<chrono::DateTime<chrono_tz::Tz>>,
     disable_vision: bool,
     model: &str,
 ) -> (String, Vec<ConversationMessage>, Vec<String>) {
@@ -115,7 +116,7 @@ async fn process_chat_inputs(
     // 使用默认指令或收集到的指令
     let image_support = !disable_vision && SUPPORTED_IMAGE_MODELS.contains(&model);
     let instructions = if instructions.is_empty() {
-        get_default_instructions(model, image_support)
+        get_default_instructions(now_with_tz, model, image_support)
     } else {
         instructions
     };
@@ -491,15 +492,14 @@ async fn process_http_image(
 
 pub async fn encode_chat_message(
     inputs: Vec<Message>,
+    now_with_tz: Option<chrono::DateTime<chrono_tz::Tz>>,
     model: &str,
     disable_vision: bool,
     enable_slow_pool: bool,
     is_search: bool,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-    // 在进入异步操作前获取并释放锁
-    let enable_slow_pool = { if enable_slow_pool { Some(true) } else { None } };
-
-    let (instructions, messages, urls) = process_chat_inputs(inputs, disable_vision, model).await;
+    let (instructions, messages, urls) =
+        process_chat_inputs(inputs, now_with_tz, disable_vision, model).await;
 
     let explicit_context = if !instructions.trim().is_empty() {
         Some(ExplicitContext {
@@ -525,6 +525,8 @@ pub async fn encode_chat_message(
         })
         .collect();
 
+    let long_context = AppConfig::get_long_context() || LONG_CONTEXT_MODELS.contains(&model);
+
     let chat = GetChatRequest {
         current_file: None,
         conversation: messages,
@@ -542,7 +544,7 @@ pub async fn encode_chat_message(
                 deployment: String::new(),
                 use_azure: false,
             }),
-            enable_slow_pool,
+            enable_slow_pool: if enable_slow_pool { Some(true) } else { None },
             openai_api_base_url: None,
         }),
         documentation_identifiers: vec![],
@@ -564,11 +566,9 @@ pub async fn encode_chat_message(
         workspace_id: None,
         external_links,
         commit_notes: vec![],
-        long_context_mode: Some(
-            AppConfig::get_long_context() || LONG_CONTEXT_MODELS.contains(&model),
-        ),
+        long_context_mode: Some(long_context),
         is_eval: Some(false),
-        desired_max_tokens: None,
+        desired_max_tokens: if long_context { Some(200_000) } else { None },
         context_ast: None,
         is_composer: None,
         runnable_code_blocks: Some(false),

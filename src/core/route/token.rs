@@ -7,7 +7,7 @@ use crate::{
     common::{
         model::ApiStatus,
         utils::{
-            extract_time, extract_time_ks, extract_user_id, to_base64, token_to_tokeninfo,
+            JwtTime, extract_time, extract_time_ks, extract_user_id, to_base64, token_to_tokeninfo,
             validate_token_and_checksum,
         },
     },
@@ -28,11 +28,11 @@ pub struct TokenRequest {
 #[derive(Serialize)]
 pub struct BasicCalibrationResponse {
     pub status: ApiStatus,
-    pub message: Option<String>,
+    pub message: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub create_at: Option<String>,
+    pub time: Option<JwtTime>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checksum_time: Option<u64>,
 }
@@ -46,9 +46,9 @@ pub async fn handle_basic_calibration(
         None => {
             return Json(BasicCalibrationResponse {
                 status: ApiStatus::Error,
-                message: Some("未提供授权令牌".to_string()),
+                message: "未提供授权令牌",
                 user_id: None,
-                create_at: None,
+                time: None,
                 checksum_time: None,
             });
         }
@@ -60,9 +60,9 @@ pub async fn handle_basic_calibration(
         None => {
             return Json(BasicCalibrationResponse {
                 status: ApiStatus::Error,
-                message: Some("无效令牌或无效校验和".to_string()),
+                message: "无效令牌或无效校验和",
                 user_id: None,
-                create_at: None,
+                time: None,
                 checksum_time: None,
             });
         }
@@ -70,15 +70,15 @@ pub async fn handle_basic_calibration(
 
     // 提取用户ID和创建时间
     let user_id = extract_user_id(&token);
-    let create_at = extract_time(&token).map(|dt| dt.to_string());
+    let time = extract_time(&token);
     let checksum_time = extract_time_ks(&checksum[..8]);
 
     // 返回校验结果
     Json(BasicCalibrationResponse {
         status: ApiStatus::Success,
-        message: Some("校验成功".to_string()),
+        message: "校验成功",
         user_id,
-        create_at,
+        time,
         checksum_time,
     })
 }
@@ -94,12 +94,10 @@ pub async fn handle_build_key(
             .and_then(|h| h.to_str().ok())
             .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX));
 
-        if auth_header
-            .is_none_or(|h| h != AppConfig::get_share_token().as_str() && h != AUTH_TOKEN.as_str())
-        {
+        if auth_header.is_none_or(|h| !AppConfig::share_token_eq(h) && h != AUTH_TOKEN.as_str()) {
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(BuildKeyResponse::Error("Unauthorized".to_owned())),
+                Json(BuildKeyResponse::Error("Unauthorized")),
             );
         }
     }
@@ -110,7 +108,7 @@ pub async fn handle_build_key(
         None => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(BuildKeyResponse::Error("Invalid auth token".to_owned())),
+                Json(BuildKeyResponse::Error("Invalid auth token")),
             );
         }
     };

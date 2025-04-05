@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::{collections::HashMap, sync::LazyLock};
 
 use crate::{
     common::{
@@ -277,12 +277,30 @@ impl ErrorInfo {
 pub struct TokenInfo {
     pub token: String,
     pub checksum: String,
+    #[serde(default)]
+    pub status: TokenStatus,
     #[serde(skip_serializing, default = "generate_client_key")]
     pub client_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile: Option<TokenProfile>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Vec<String>>,
+    pub tags: Option<HashMap<String, Option<String>>>,
+}
+
+#[derive(Default, Clone, Copy, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize)]
+#[serde(rename_all = "lowercase")]
+#[repr(u8)]
+pub enum TokenStatus {
+    #[default]
+    Enabled,
+    Disabled,
+}
+
+impl TokenInfo {
+    #[inline(always)]
+    pub fn is_enabled(&self) -> bool {
+        matches!(self.status, TokenStatus::Enabled)
+    }
 }
 
 #[inline(always)]
@@ -293,56 +311,50 @@ fn generate_client_key() -> Option<String> {
 impl TokenInfo {
     /// 获取适用于此 token 的 HTTP 客户端
     ///
-    /// 如果 tags 中包含 "proxy" 标签，会尝试使用其后一个标签作为代理 URL
-    /// 例如: tags = ["proxy", "http://localhost:8080"] 将使用 http://localhost:8080 作为代理
+    /// 如果 tags 中包含 "proxy" 键值对对象，会使用其值作为代理 URL
+    /// 例如: tags = ["a", {"proxy": "http://localhost:8080"}, "d"] 将使用 http://localhost:8080 作为代理
     ///
     /// 如果没有找到有效的代理配置，将返回默认客户端
     pub fn get_client(&self) -> Client {
-        // if let Some(tags) = &self.tags {
-        //     // 查找 "proxy" 标签的位置
-        //     if let Some(proxy_index) = tags.iter().position(|tag| tag == "proxy") {
-        //         // 检查是否存在下一个标签作为代理 URL
-        //         if proxy_index + 1 < tags.len() {
-        //             // 获取代理 URL 并尝试创建对应的客户端
-        //             return ProxyPool::get_client(&tags[proxy_index + 1]);
-        //         }
-        //     }
-        // }
-        // // 如果没有找到有效的代理配置，返回默认客户端
-        // ProxyPool::get_general_client()
         if let Some(tags) = &self.tags {
-            ProxyPool::get_client_or_general(tags.get(1).map(|s| s.as_str()))
+            ProxyPool::get_client_or_general(
+                tags.get("proxy")
+                    .and_then(|v| v.as_ref().map(String::as_str)),
+            )
         } else {
             ProxyPool::get_general_client()
         }
     }
 
-    pub fn timezone_name(&self) -> &'static str {
+    /// 获取此 token 关联的时区
+    ///
+    /// 如果 tags 中包含 "timezone" 键值对对象，会尝试使用其值作为时区标识
+    /// 例如: tags = ["a", {"timezone": "Asia/Shanghai"}, "d"] 将使用上海时区
+    /// 如果无法解析时区或未设置，将返回系统默认时区
+    #[inline]
+    fn get_timezone(&self) -> chrono_tz::Tz {
         use std::str::FromStr as _;
-        if let Some(Some(Ok(tz))) = self.tags.as_ref().map(|tags| {
-            tags.first()
-                .filter(|s| !s.is_empty())
-                .map(|s| chrono_tz::Tz::from_str(s.as_str()))
-        }) {
-            tz.name()
-        } else {
-            super::lazy::GENERAL_TIMEZONE.name()
+        if let Some(tags) = self.tags.as_ref() {
+            if let Some(Some(tz_str)) = tags.get("timezone") {
+                if let Ok(tz) = chrono_tz::Tz::from_str(tz_str) {
+                    return tz;
+                }
+            }
         }
+        *super::lazy::GENERAL_TIMEZONE
     }
 
-    // pub fn now(&self) -> chrono::DateTime<chrono_tz::Tz> {
-    //     use std::str::FromStr as _;
-    //     if let Some(Some(Ok(tz))) = self.tags.as_ref().map(|tags| {
-    //         tags.get(0)
-    //             .filter(|s| !s.is_empty())
-    //             .map(|s| chrono_tz::Tz::from_str(s.as_str()))
-    //     }) {
-    //         use chrono::TimeZone as _;
-    //         tz.from_utc_datetime(&chrono::Utc::now().naive_utc())
-    //     } else {
-    //         super::lazy::now_in_general_timezone()
-    //     }
-    // }
+    /// 返回关联的时区名称
+    pub fn timezone_name(&self) -> &'static str {
+        self.get_timezone().name()
+    }
+
+    /// 获取当前时区的当前时间
+    pub fn now(&self) -> chrono::DateTime<chrono_tz::Tz> {
+        use chrono::TimeZone as _;
+        self.get_timezone()
+            .from_utc_datetime(&chrono::Utc::now().naive_utc())
+    }
 }
 
 // TokenUpdateRequest 结构体
@@ -352,7 +364,9 @@ pub type TokenUpdateRequest = Vec<TokenInfo>;
 pub struct TokenAddRequest {
     pub tokens: Vec<TokenAddRequestTokenInfo>,
     #[serde(default)]
-    pub tags: Option<Vec<String>>,
+    pub tags: Option<HashMap<String, Option<String>>>,
+    #[serde(default)]
+    pub status: TokenStatus,
 }
 
 #[derive(Deserialize)]
@@ -421,7 +435,7 @@ pub struct TokenInfoResponse {
 #[derive(Deserialize)]
 pub struct TokenTagsUpdateRequest {
     pub tokens: Vec<String>,
-    pub tags: Vec<String>,
+    pub tags: Option<HashMap<String, Option<String>>>,
 }
 
 #[derive(Serialize)]
@@ -430,12 +444,8 @@ pub struct CommonResponse {
     pub message: Option<String>,
 }
 
-// impl CommonResponse {
-//     pub fn into_normal_response(self) -> NormalResponse<()> {
-//         NormalResponse {
-//             status: self.status,
-//             data: None,
-//             message: self.message,
-//         }
-//     }
-// }
+#[derive(Deserialize)]
+pub struct TokenStatusSetRequest {
+    pub tokens: Vec<String>,
+    pub status: TokenStatus,
+}

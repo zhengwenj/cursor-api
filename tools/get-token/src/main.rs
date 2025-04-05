@@ -63,7 +63,7 @@ fn obfuscate_bytes(bytes: &mut [u8]) {
 fn generate_timestamp_header() -> String {
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .expect("system time before Unix epoch")
         .as_secs()
         / 1_000;
 

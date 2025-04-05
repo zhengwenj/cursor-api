@@ -9,7 +9,6 @@
 node_modules
 .DS_Store
 /.vscode
-/.cargo
 /.token
 /.token-list
 /.tokens
@@ -25,3 +24,4 @@ node_modules
 /result.txt
 tools/tokenizer/
 /diff
+/Cargo.lock

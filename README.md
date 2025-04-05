@@ -73,6 +73,7 @@ o1
 claude-3.5-haiku
 gemini-2.0-pro-exp
 gemini-2.5-pro-exp-03-25
+gemini-2.5-pro-max
 gemini-2.0-flash-thinking-exp
 gemini-2.0-flash
 deepseek-v3
@@ -209,6 +210,7 @@ data: [DONE]
     {
       "token": "string",
       "checksum": "string",
+      "status": "enabled" | "disabled",
       "profile": { // 可能存在
         "usage": {
           "premium": {
@@ -246,16 +248,18 @@ data: [DONE]
           "days_remaining_on_trial": number
         }
       },
-      "tags": ["string"]
+      "tags": {
+        "string": null | "string"
+      }
     }
   ],
   "tokens_count": number
 }
 ```
 
-#### 更新Token信息
+#### 设置Token信息
 
-* 接口地址: `/tokens/update`
+* 接口地址: `/tokens/set`
 * 请求方法: POST
 * 认证方式: Bearer Token
 * 请求格式:
@@ -265,6 +269,7 @@ data: [DONE]
   {
     "token": "string",
     "checksum": "string",
+    "status": "enabled" | "disabled",
     "profile": {
       "usage": {
         "premium": {
@@ -302,7 +307,9 @@ data: [DONE]
         "days_remaining_on_trial": number
       }
     },
-    "tags": ["string"]
+    "tags": {
+      "string": null | "string"
+    }
   }
 ]
 ```
@@ -332,7 +339,10 @@ data: [DONE]
       "checksum": "string"  // 可选，如果不提供将自动生成
     }
   ],
-  "tags": ["string"]
+  "tags": {
+    "string": null | "string"
+  },
+  "status": "enabled" | "disabled"
 }
 ```
 
@@ -348,7 +358,7 @@ data: [DONE]
 
 #### 删除Token
 
-* 接口地址: `/tokens/delete`
+* 接口地址: `/tokens/del`
 * 请求方法: POST
 * 认证方式: Bearer Token
 * 请求格式:
@@ -376,9 +386,9 @@ data: [DONE]
   - failed_tokens: 返回未找到的token列表
   - detailed: 返回完整信息（包括updated_tokens和failed_tokens）
 
-#### 更新Tokens标签
+#### 设置Tokens标签
 
-* 接口地址: `/tokens/tags/update`
+* 接口地址: `/tokens/tags/set`
 * 请求方法: POST
 * 认证方式: Bearer Token
 * 请求格式:
@@ -386,7 +396,9 @@ data: [DONE]
 ```json
 {
   "tokens": ["string"],
-  "tags": ["string"] // index 0: 时区标识符(独有); index 1: 代理名称
+  "tags": {
+    "string": null | "string" // 键可以为 timezone: 时区标识符 或 proxy: 代理名称
+  }
 }
 ```
 
@@ -418,6 +430,51 @@ data: [DONE]
 {
   "status": "success",
   "message": "string"  // "已更新?个令牌配置, ?个令牌更新失败"
+}
+```
+
+#### 升级Tokens
+
+* 接口地址: `/tokens/upgrade`
+* 请求方法: POST
+* 认证方式: Bearer Token
+* 请求格式:
+
+```json
+[
+  "string" // tokens
+]
+```
+
+* 响应格式:
+
+```json
+{
+  "status": "success",
+  "message": "string"  // "已升级?个令牌, ?个令牌升级失败"
+}
+```
+
+#### 设置Tokens Status
+
+* 接口地址: `/tokens/status/set`
+* 请求方法: POST
+* 认证方式: Bearer Token
+* 请求格式:
+
+```json
+{
+  "tokens": ["string"],
+  "status": "enabled" | "disabled"
+}
+```
+
+* 响应格式:
+
+```json
+{
+  "status": "success",
+  "message": "string"  // "已设置?个令牌状态, ?个令牌设置失败"
 }
 ```
 
@@ -512,9 +569,9 @@ data: [DONE]
 }
 ```
 
-#### 更新代理配置
+#### 设置代理配置
 
-* 接口地址: `/proxies/update`
+* 接口地址: `/proxies/set`
 * 请求方法: POST
 * 请求格式:
 
@@ -565,7 +622,7 @@ data: [DONE]
 
 #### 删除代理
 
-* 接口地址: `/proxies/delete`
+* 接口地址: `/proxies/del`
 * 请求方法: POST
 * 请求格式:
 
@@ -994,6 +1051,29 @@ string
 ```json
 {
   "error": "string"
+}
+```
+
+#### 获取更新令牌
+
+* 接口地址: `/token-upgrade`
+* 请求方法: POST
+* 认证方式: 请求体中包含token
+* 请求格式:
+
+```json
+{
+  "token": "string"
+}
+```
+
+* 响应格式:
+
+```json
+{
+  "status": "success" | "failure" | "error",
+  "message": "string",
+  "result": "string" // optional
 }
 ```
 

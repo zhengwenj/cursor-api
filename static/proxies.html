@@ -1020,7 +1020,7 @@
       closeModal('confirmModal');
       showToast('正在删除代理...', 'info');
 
-      const data = await makeAuthenticatedRequest('/proxies/delete', {
+      const data = await makeAuthenticatedRequest('/proxies/del', {
         body: JSON.stringify({
           names: proxiesToDelete,
           expectation: 'detailed'
@@ -1185,7 +1185,7 @@
           closeModal('importModal');
           showToast('正在导入代理配置...', 'info');
 
-          const data = await makeAuthenticatedRequest('/proxies/update', {
+          const data = await makeAuthenticatedRequest('/proxies/set', {
             body: JSON.stringify({
               proxies: config
             })

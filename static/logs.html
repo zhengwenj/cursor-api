@@ -846,7 +846,7 @@
           return;
         }
 
-        const data = await makeAuthenticatedRequest('/tokens/delete', {
+        const data = await makeAuthenticatedRequest('/tokens/del', {
           method: 'POST',
           body: JSON.stringify({
             tokens: [currentToken],
@@ -861,8 +861,6 @@
             message = 'Token删除失败：未找到该Token';
           }
           showGlobalMessage(message);
-          // 刷新日志列表
-          fetchLogs();
         }
       };
 
@@ -1070,7 +1068,7 @@
           <td>${formatTiming(log.timing.total)}</td>
           <td>${log.stream ? '是' : '否'}</td>
           <td>${log.status}</td>
-          <td>${log.error || '-'}</td>
+          <td>${log.error.details || log.error || '-'}</td>
         </tr>`;
       }).join('');
 

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::ErrorResponse;
 
 pub enum ChatError {
@@ -27,8 +29,8 @@ impl ChatError {
         ErrorResponse {
             status: super::ApiStatus::Error,
             code: None,
-            error: Some(error.to_string()),
-            message: Some(message),
+            error: Some(Cow::Borrowed(error)),
+            message: Some(Cow::Owned(message)),
         }
     }
 }

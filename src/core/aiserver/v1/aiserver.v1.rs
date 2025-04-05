@@ -25,17 +25,7 @@ pub struct GitDiff {
 /// Nested message and enum types in `GitDiff`.
 pub mod git_diff {
     /// aiserver.v1.GitDiff.DiffType
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum DiffType {
         Unspecified = 0,
@@ -182,17 +172,7 @@ pub mod diagnostic {
         pub range: ::core::option::Option<super::CursorRange>,
     }
     /// aiserver.v1.Diagnostic.DiagnosticSeverity
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum DiagnosticSeverity {
         Unspecified = 0,
@@ -410,17 +390,7 @@ pub struct ErrorDetails {
 /// Nested message and enum types in `ErrorDetails`.
 pub mod error_details {
     /// aiserver.v1.ErrorDetails.Error
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Error {
         Unspecified = 0,
@@ -509,9 +479,7 @@ pub mod error_details {
                 Self::GenericRateLimitExceeded => "ERROR_GENERIC_RATE_LIMIT_EXCEEDED",
                 Self::SlashEditFileTooLong => "ERROR_SLASH_EDIT_FILE_TOO_LONG",
                 Self::FileUnsupported => "ERROR_FILE_UNSUPPORTED",
-                Self::Gpt4VisionPreviewRateLimit => {
-                    "ERROR_GPT_4_VISION_PREVIEW_RATE_LIMIT"
-                }
+                Self::Gpt4VisionPreviewRateLimit => "ERROR_GPT_4_VISION_PREVIEW_RATE_LIMIT",
                 Self::CustomMessage => "ERROR_CUSTOM_MESSAGE",
                 Self::OutdatedClient => "ERROR_OUTDATED_CLIENT",
                 Self::ClaudeImageTooLarge => "ERROR_CLAUDE_IMAGE_TOO_LARGE",
@@ -526,9 +494,7 @@ pub mod error_details {
                 Self::Unauthorized => "ERROR_UNAUTHORIZED",
                 Self::ConversationTooLong => "ERROR_CONVERSATION_TOO_LONG",
                 Self::UsagePricingRequired => "ERROR_USAGE_PRICING_REQUIRED",
-                Self::UsagePricingRequiredChangeable => {
-                    "ERROR_USAGE_PRICING_REQUIRED_CHANGEABLE"
-                }
+                Self::UsagePricingRequiredChangeable => "ERROR_USAGE_PRICING_REQUIRED_CHANGEABLE",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -539,20 +505,14 @@ pub mod error_details {
                 "ERROR_BAD_USER_API_KEY" => Some(Self::BadUserApiKey),
                 "ERROR_NOT_LOGGED_IN" => Some(Self::NotLoggedIn),
                 "ERROR_INVALID_AUTH_ID" => Some(Self::InvalidAuthId),
-                "ERROR_NOT_HIGH_ENOUGH_PERMISSIONS" => {
-                    Some(Self::NotHighEnoughPermissions)
-                }
+                "ERROR_NOT_HIGH_ENOUGH_PERMISSIONS" => Some(Self::NotHighEnoughPermissions),
                 "ERROR_AGENT_REQUIRES_LOGIN" => Some(Self::AgentRequiresLogin),
                 "ERROR_BAD_MODEL_NAME" => Some(Self::BadModelName),
                 "ERROR_NOT_FOUND" => Some(Self::NotFound),
                 "ERROR_DEPRECATED" => Some(Self::Deprecated),
                 "ERROR_USER_NOT_FOUND" => Some(Self::UserNotFound),
-                "ERROR_FREE_USER_RATE_LIMIT_EXCEEDED" => {
-                    Some(Self::FreeUserRateLimitExceeded)
-                }
-                "ERROR_PRO_USER_RATE_LIMIT_EXCEEDED" => {
-                    Some(Self::ProUserRateLimitExceeded)
-                }
+                "ERROR_FREE_USER_RATE_LIMIT_EXCEEDED" => Some(Self::FreeUserRateLimitExceeded),
+                "ERROR_PRO_USER_RATE_LIMIT_EXCEEDED" => Some(Self::ProUserRateLimitExceeded),
                 "ERROR_FREE_USER_USAGE_LIMIT" => Some(Self::FreeUserUsageLimit),
                 "ERROR_PRO_USER_USAGE_LIMIT" => Some(Self::ProUserUsageLimit),
                 "ERROR_RESOURCE_EXHAUSTED" => Some(Self::ResourceExhausted),
@@ -560,9 +520,7 @@ pub mod error_details {
                 "ERROR_AUTH_TOKEN_EXPIRED" => Some(Self::AuthTokenExpired),
                 "ERROR_OPENAI" => Some(Self::Openai),
                 "ERROR_OPENAI_RATE_LIMIT_EXCEEDED" => Some(Self::OpenaiRateLimitExceeded),
-                "ERROR_OPENAI_ACCOUNT_LIMIT_EXCEEDED" => {
-                    Some(Self::OpenaiAccountLimitExceeded)
-                }
+                "ERROR_OPENAI_ACCOUNT_LIMIT_EXCEEDED" => Some(Self::OpenaiAccountLimitExceeded),
                 "ERROR_TASK_UUID_NOT_FOUND" => Some(Self::TaskUuidNotFound),
                 "ERROR_TASK_NO_PERMISSIONS" => Some(Self::TaskNoPermissions),
                 "ERROR_AGENT_ENGINE_NOT_FOUND" => Some(Self::AgentEngineNotFound),
@@ -571,14 +529,10 @@ pub mod error_details {
                 "ERROR_API_KEY_NOT_SUPPORTED" => Some(Self::ApiKeyNotSupported),
                 "ERROR_USER_ABORTED_REQUEST" => Some(Self::UserAbortedRequest),
                 "ERROR_TIMEOUT" => Some(Self::Timeout),
-                "ERROR_GENERIC_RATE_LIMIT_EXCEEDED" => {
-                    Some(Self::GenericRateLimitExceeded)
-                }
+                "ERROR_GENERIC_RATE_LIMIT_EXCEEDED" => Some(Self::GenericRateLimitExceeded),
                 "ERROR_SLASH_EDIT_FILE_TOO_LONG" => Some(Self::SlashEditFileTooLong),
                 "ERROR_FILE_UNSUPPORTED" => Some(Self::FileUnsupported),
-                "ERROR_GPT_4_VISION_PREVIEW_RATE_LIMIT" => {
-                    Some(Self::Gpt4VisionPreviewRateLimit)
-                }
+                "ERROR_GPT_4_VISION_PREVIEW_RATE_LIMIT" => Some(Self::Gpt4VisionPreviewRateLimit),
                 "ERROR_CUSTOM_MESSAGE" => Some(Self::CustomMessage),
                 "ERROR_OUTDATED_CLIENT" => Some(Self::OutdatedClient),
                 "ERROR_CLAUDE_IMAGE_TOO_LARGE" => Some(Self::ClaudeImageTooLarge),
@@ -609,9 +563,8 @@ pub struct CustomErrorDetails {
     #[prost(string, tag = "2")]
     pub detail: ::prost::alloc::string::String,
     #[prost(bool, optional, tag = "3")]
-    pub allow_command_links_potentially_unsafe_please_only_use_for_handwritten_trusted_markdown: ::core::option::Option<
-        bool,
-    >,
+    pub allow_command_links_potentially_unsafe_please_only_use_for_handwritten_trusted_markdown:
+        ::core::option::Option<bool>,
     #[prost(bool, optional, tag = "4")]
     pub is_retryable: ::core::option::Option<bool>,
     #[prost(bool, optional, tag = "5")]
@@ -687,17 +640,7 @@ pub struct CodeChunk {
 /// Nested message and enum types in `CodeChunk`.
 pub mod code_chunk {
     /// aiserver.v1.CodeChunk.Intent
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Intent {
         Unspecified = 0,
@@ -727,17 +670,7 @@ pub mod code_chunk {
         }
     }
     /// aiserver.v1.CodeChunk.SummarizationStrategy
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum SummarizationStrategy {
         NoneUnspecified = 0,
@@ -852,9 +785,8 @@ pub struct ToolResultError {
     #[prost(string, tag = "2")]
     pub model_visible_error_message: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "3")]
-    pub actual_error_message_only_send_from_client_to_server_never_the_other_way_around_because_that_may_be_a_security_risk: ::core::option::Option<
-        ::prost::alloc::string::String,
-    >,
+    pub actual_error_message_only_send_from_client_to_server_never_the_other_way_around_because_that_may_be_a_security_risk:
+        ::core::option::Option<::prost::alloc::string::String>,
 }
 /// aiserver.v1.ClientSideToolV2Result
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -971,15 +903,7 @@ pub mod edit_file_result {
         }
         /// aiserver.v1.EditFileResult.FileDiff.Editor
         #[derive(
-            Clone,
-            Copy,
-            Debug,
-            PartialEq,
-            Eq,
-            Hash,
-            PartialOrd,
-            Ord,
-            ::prost::Enumeration
+            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
         )]
         #[repr(i32)]
         pub enum Editor {
@@ -1101,9 +1025,8 @@ pub struct RipgrepSearchResultInternal {
     #[prost(bool, optional, tag = "3")]
     pub limit_hit: ::core::option::Option<bool>,
     #[prost(message, repeated, tag = "4")]
-    pub messages: ::prost::alloc::vec::Vec<
-        ripgrep_search_result_internal::ITextSearchCompleteMessage,
-    >,
+    pub messages:
+        ::prost::alloc::vec::Vec<ripgrep_search_result_internal::ITextSearchCompleteMessage>,
     #[prost(oneof = "ripgrep_search_result_internal::Stats", tags = "5, 6")]
     pub stats: ::core::option::Option<ripgrep_search_result_internal::Stats>,
 }
@@ -1205,15 +1128,7 @@ pub mod ripgrep_search_result_internal {
     pub mod i_file_search_stats {
         /// aiserver.v1.RipgrepSearchResultInternal.IFileSearchStats.FileSearchProviderType
         #[derive(
-            Clone,
-            Copy,
-            Debug,
-            PartialEq,
-            Eq,
-            Hash,
-            PartialOrd,
-            Ord,
-            ::prost::Enumeration
+            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
         )]
         #[repr(i32)]
         pub enum FileSearchProviderType {
@@ -1229,9 +1144,7 @@ pub mod ripgrep_search_result_internal {
             pub fn as_str_name(&self) -> &'static str {
                 match self {
                     Self::Unspecified => "FILE_SEARCH_PROVIDER_TYPE_UNSPECIFIED",
-                    Self::FileSearchProvider => {
-                        "FILE_SEARCH_PROVIDER_TYPE_FILE_SEARCH_PROVIDER"
-                    }
+                    Self::FileSearchProvider => "FILE_SEARCH_PROVIDER_TYPE_FILE_SEARCH_PROVIDER",
                     Self::SearchProcess => "FILE_SEARCH_PROVIDER_TYPE_SEARCH_PROCESS",
                 }
             }
@@ -1242,9 +1155,7 @@ pub mod ripgrep_search_result_internal {
                     "FILE_SEARCH_PROVIDER_TYPE_FILE_SEARCH_PROVIDER" => {
                         Some(Self::FileSearchProvider)
                     }
-                    "FILE_SEARCH_PROVIDER_TYPE_SEARCH_PROCESS" => {
-                        Some(Self::SearchProcess)
-                    }
+                    "FILE_SEARCH_PROVIDER_TYPE_SEARCH_PROCESS" => Some(Self::SearchProcess),
                     _ => None,
                 }
             }
@@ -1269,15 +1180,7 @@ pub mod ripgrep_search_result_internal {
     pub mod i_text_search_stats {
         /// aiserver.v1.RipgrepSearchResultInternal.ITextSearchStats.TextSearchProviderType
         #[derive(
-            Clone,
-            Copy,
-            Debug,
-            PartialEq,
-            Eq,
-            Hash,
-            PartialOrd,
-            Ord,
-            ::prost::Enumeration
+            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
         )]
         #[repr(i32)]
         pub enum TextSearchProviderType {
@@ -1294,9 +1197,7 @@ pub mod ripgrep_search_result_internal {
             pub fn as_str_name(&self) -> &'static str {
                 match self {
                     Self::Unspecified => "TEXT_SEARCH_PROVIDER_TYPE_UNSPECIFIED",
-                    Self::TextSearchProvider => {
-                        "TEXT_SEARCH_PROVIDER_TYPE_TEXT_SEARCH_PROVIDER"
-                    }
+                    Self::TextSearchProvider => "TEXT_SEARCH_PROVIDER_TYPE_TEXT_SEARCH_PROVIDER",
                     Self::SearchProcess => "TEXT_SEARCH_PROVIDER_TYPE_SEARCH_PROCESS",
                     Self::AiTextSearchProvider => {
                         "TEXT_SEARCH_PROVIDER_TYPE_AI_TEXT_SEARCH_PROVIDER"
@@ -1310,9 +1211,7 @@ pub mod ripgrep_search_result_internal {
                     "TEXT_SEARCH_PROVIDER_TYPE_TEXT_SEARCH_PROVIDER" => {
                         Some(Self::TextSearchProvider)
                     }
-                    "TEXT_SEARCH_PROVIDER_TYPE_SEARCH_PROCESS" => {
-                        Some(Self::SearchProcess)
-                    }
+                    "TEXT_SEARCH_PROVIDER_TYPE_SEARCH_PROCESS" => Some(Self::SearchProcess),
                     "TEXT_SEARCH_PROVIDER_TYPE_AI_TEXT_SEARCH_PROVIDER" => {
                         Some(Self::AiTextSearchProvider)
                     }
@@ -1356,17 +1255,7 @@ pub mod ripgrep_search_result_internal {
         pub post_process_time: i32,
     }
     /// aiserver.v1.RipgrepSearchResultInternal.TextSearchCompleteMessageType
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum TextSearchCompleteMessageType {
         Unspecified = 0,
@@ -1388,29 +1277,15 @@ pub mod ripgrep_search_result_internal {
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
-                "TEXT_SEARCH_COMPLETE_MESSAGE_TYPE_UNSPECIFIED" => {
-                    Some(Self::Unspecified)
-                }
-                "TEXT_SEARCH_COMPLETE_MESSAGE_TYPE_INFORMATION" => {
-                    Some(Self::Information)
-                }
+                "TEXT_SEARCH_COMPLETE_MESSAGE_TYPE_UNSPECIFIED" => Some(Self::Unspecified),
+                "TEXT_SEARCH_COMPLETE_MESSAGE_TYPE_INFORMATION" => Some(Self::Information),
                 "TEXT_SEARCH_COMPLETE_MESSAGE_TYPE_WARNING" => Some(Self::Warning),
                 _ => None,
             }
         }
     }
     /// aiserver.v1.RipgrepSearchResultInternal.SearchCompletionExitCode
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum SearchCompletionExitCode {
         Unspecified = 0,
@@ -1426,9 +1301,7 @@ pub mod ripgrep_search_result_internal {
             match self {
                 Self::Unspecified => "SEARCH_COMPLETION_EXIT_CODE_UNSPECIFIED",
                 Self::Normal => "SEARCH_COMPLETION_EXIT_CODE_NORMAL",
-                Self::NewSearchStarted => {
-                    "SEARCH_COMPLETION_EXIT_CODE_NEW_SEARCH_STARTED"
-                }
+                Self::NewSearchStarted => "SEARCH_COMPLETION_EXIT_CODE_NEW_SEARCH_STARTED",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -1436,9 +1309,7 @@ pub mod ripgrep_search_result_internal {
             match value {
                 "SEARCH_COMPLETION_EXIT_CODE_UNSPECIFIED" => Some(Self::Unspecified),
                 "SEARCH_COMPLETION_EXIT_CODE_NORMAL" => Some(Self::Normal),
-                "SEARCH_COMPLETION_EXIT_CODE_NEW_SEARCH_STARTED" => {
-                    Some(Self::NewSearchStarted)
-                }
+                "SEARCH_COMPLETION_EXIT_CODE_NEW_SEARCH_STARTED" => Some(Self::NewSearchStarted),
                 _ => None,
             }
         }
@@ -1464,17 +1335,7 @@ pub struct MissingFile {
 /// Nested message and enum types in `MissingFile`.
 pub mod missing_file {
     /// aiserver.v1.MissingFile.MissingReason
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum MissingReason {
         Unspecified = 0,
@@ -1705,17 +1566,13 @@ pub mod diff_history_result {
         #[prost(int32, tag = "2")]
         pub end_line_number_exclusive: i32,
         #[prost(string, repeated, tag = "3")]
-        pub before_context_lines: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub before_context_lines: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "4")]
         pub removed_lines: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "5")]
         pub added_lines: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "6")]
-        pub after_context_lines: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub after_context_lines: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     }
     /// aiserver.v1.DiffHistoryResult.HumanChange
     #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1772,15 +1629,7 @@ pub mod implementer_result {
         }
         /// aiserver.v1.ImplementerResult.FileDiff.Editor
         #[derive(
-            Clone,
-            Copy,
-            Debug,
-            PartialEq,
-            Eq,
-            Hash,
-            PartialOrd,
-            Ord,
-            ::prost::Enumeration
+            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
         )]
         #[repr(i32)]
         pub enum Editor {
@@ -1950,10 +1799,7 @@ pub mod composer_capability_request {
         #[prost(string, tag = "2")]
         pub name: ::prost::alloc::string::String,
         #[prost(map = "string, message", tag = "3")]
-        pub properties: ::std::collections::HashMap<
-            ::prost::alloc::string::String,
-            SchemaProperty,
-        >,
+        pub properties: ::std::collections::HashMap<::prost::alloc::string::String, SchemaProperty>,
         #[prost(string, repeated, tag = "4")]
         pub required: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     }
@@ -2011,9 +1857,7 @@ pub mod composer_capability_request {
         #[prost(string, repeated, tag = "4")]
         pub files_in_context: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "5")]
-        pub semantic_search_files: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub semantic_search_files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     }
     /// aiserver.v1.ComposerCapabilityRequest.DiffReviewCapability
     #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2061,9 +1905,7 @@ pub mod composer_capability_request {
         #[prost(string, optional, tag = "1")]
         pub custom_instructions: ::core::option::Option<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "2")]
-        pub potential_context_files: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub potential_context_files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(message, repeated, tag = "3")]
         pub potential_context_code_chunks: ::prost::alloc::vec::Vec<super::CodeChunk>,
         #[prost(string, repeated, tag = "4")]
@@ -2106,17 +1948,7 @@ pub mod composer_capability_request {
         pub custom_instructions: ::core::option::Option<::prost::alloc::string::String>,
     }
     /// aiserver.v1.ComposerCapabilityRequest.ComposerCapabilityType
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum ComposerCapabilityType {
         Unspecified = 0,
@@ -2171,9 +2003,7 @@ pub mod composer_capability_request {
                 Self::UsageData => "COMPOSER_CAPABILITY_TYPE_USAGE_DATA",
                 Self::Chimes => "COMPOSER_CAPABILITY_TYPE_CHIMES",
                 Self::CodeDecayTracker => "COMPOSER_CAPABILITY_TYPE_CODE_DECAY_TRACKER",
-                Self::BackgroundComposer => {
-                    "COMPOSER_CAPABILITY_TYPE_BACKGROUND_COMPOSER"
-                }
+                Self::BackgroundComposer => "COMPOSER_CAPABILITY_TYPE_BACKGROUND_COMPOSER",
                 Self::Summarization => "COMPOSER_CAPABILITY_TYPE_SUMMARIZATION",
             }
         }
@@ -2200,29 +2030,15 @@ pub mod composer_capability_request {
                 "COMPOSER_CAPABILITY_TYPE_TOKEN_COUNTER" => Some(Self::TokenCounter),
                 "COMPOSER_CAPABILITY_TYPE_USAGE_DATA" => Some(Self::UsageData),
                 "COMPOSER_CAPABILITY_TYPE_CHIMES" => Some(Self::Chimes),
-                "COMPOSER_CAPABILITY_TYPE_CODE_DECAY_TRACKER" => {
-                    Some(Self::CodeDecayTracker)
-                }
-                "COMPOSER_CAPABILITY_TYPE_BACKGROUND_COMPOSER" => {
-                    Some(Self::BackgroundComposer)
-                }
+                "COMPOSER_CAPABILITY_TYPE_CODE_DECAY_TRACKER" => Some(Self::CodeDecayTracker),
+                "COMPOSER_CAPABILITY_TYPE_BACKGROUND_COMPOSER" => Some(Self::BackgroundComposer),
                 "COMPOSER_CAPABILITY_TYPE_SUMMARIZATION" => Some(Self::Summarization),
                 _ => None,
             }
         }
     }
     /// aiserver.v1.ComposerCapabilityRequest.ToolType
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum ToolType {
         Unspecified = 0,
@@ -2255,9 +2071,7 @@ pub mod composer_capability_request {
                 "TOOL_TYPE_RUN_TERMINAL_COMMAND" => Some(Self::RunTerminalCommand),
                 "TOOL_TYPE_ITERATE" => Some(Self::Iterate),
                 "TOOL_TYPE_REMOVE_FILE_FROM_CONTEXT" => Some(Self::RemoveFileFromContext),
-                "TOOL_TYPE_SEMANTIC_SEARCH_CODEBASE" => {
-                    Some(Self::SemanticSearchCodebase)
-                }
+                "TOOL_TYPE_SEMANTIC_SEARCH_CODEBASE" => Some(Self::SemanticSearchCodebase),
                 _ => None,
             }
         }
@@ -2370,17 +2184,7 @@ pub struct StreamUnifiedChatRequest {}
 /// Nested message and enum types in `StreamUnifiedChatRequest`.
 pub mod stream_unified_chat_request {
     /// aiserver.v1.StreamUnifiedChatRequest.UnifiedMode
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum UnifiedMode {
         Unspecified = 0,
@@ -2434,13 +2238,10 @@ pub struct ServiceStatusUpdate {
     #[prost(string, tag = "2")]
     pub codicon: ::prost::alloc::string::String,
     #[prost(bool, optional, tag = "3")]
-    pub allow_command_links_potentially_unsafe_please_only_use_for_handwritten_trusted_markdown: ::core::option::Option<
-        bool,
-    >,
+    pub allow_command_links_potentially_unsafe_please_only_use_for_handwritten_trusted_markdown:
+        ::core::option::Option<bool>,
     #[prost(string, optional, tag = "4")]
-    pub action_to_run_on_status_update: ::core::option::Option<
-        ::prost::alloc::string::String,
-    >,
+    pub action_to_run_on_status_update: ::core::option::Option<::prost::alloc::string::String>,
 }
 /// aiserver.v1.SymbolLink
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2548,9 +2349,8 @@ pub struct ConversationMessage {
     #[prost(string, repeated, tag = "11")]
     pub attached_folders: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(message, repeated, tag = "12")]
-    pub approximate_lint_errors: ::prost::alloc::vec::Vec<
-        conversation_message::ApproximateLintError,
-    >,
+    pub approximate_lint_errors:
+        ::prost::alloc::vec::Vec<conversation_message::ApproximateLintError>,
     #[prost(string, tag = "13")]
     pub bubble_id: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "32")]
@@ -2560,9 +2360,8 @@ pub struct ConversationMessage {
     #[prost(message, repeated, tag = "15")]
     pub lints: ::prost::alloc::vec::Vec<conversation_message::Lints>,
     #[prost(message, repeated, tag = "16")]
-    pub user_responses_to_suggested_code_blocks: ::prost::alloc::vec::Vec<
-        UserResponseToSuggestedCodeBlock,
-    >,
+    pub user_responses_to_suggested_code_blocks:
+        ::prost::alloc::vec::Vec<UserResponseToSuggestedCodeBlock>,
     #[prost(string, repeated, tag = "17")]
     pub relevant_files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(message, repeated, tag = "18")]
@@ -2574,25 +2373,19 @@ pub struct ConversationMessage {
     #[prost(message, repeated, tag = "21")]
     pub capabilities: ::prost::alloc::vec::Vec<ComposerCapabilityRequest>,
     #[prost(message, repeated, tag = "22")]
-    pub edit_trail_contexts: ::prost::alloc::vec::Vec<
-        conversation_message::EditTrailContext,
-    >,
+    pub edit_trail_contexts: ::prost::alloc::vec::Vec<conversation_message::EditTrailContext>,
     #[prost(message, repeated, tag = "23")]
     pub suggested_code_blocks: ::prost::alloc::vec::Vec<SuggestedCodeBlock>,
     #[prost(message, repeated, tag = "24")]
     pub diffs_for_compressing_files: ::prost::alloc::vec::Vec<RedDiff>,
     #[prost(message, repeated, tag = "25")]
-    pub multi_file_linter_errors: ::prost::alloc::vec::Vec<
-        LinterErrorsWithoutFileContents,
-    >,
+    pub multi_file_linter_errors: ::prost::alloc::vec::Vec<LinterErrorsWithoutFileContents>,
     #[prost(message, repeated, tag = "26")]
     pub diff_histories: ::prost::alloc::vec::Vec<DiffHistoryData>,
     #[prost(message, repeated, tag = "27")]
     pub recently_viewed_files: ::prost::alloc::vec::Vec<conversation_message::CodeChunk>,
     #[prost(message, repeated, tag = "28")]
-    pub recent_locations_history: ::prost::alloc::vec::Vec<
-        conversation_message::RecentLocation,
-    >,
+    pub recent_locations_history: ::prost::alloc::vec::Vec<conversation_message::RecentLocation>,
     #[prost(bool, tag = "29")]
     pub is_agentic: bool,
     #[prost(message, repeated, tag = "30")]
@@ -2618,9 +2411,7 @@ pub struct ConversationMessage {
     #[prost(bool, tag = "41")]
     pub attached_human_changes: bool,
     #[prost(message, repeated, tag = "42")]
-    pub summarized_composers: ::prost::alloc::vec::Vec<
-        conversation_message::ComposerContext,
-    >,
+    pub summarized_composers: ::prost::alloc::vec::Vec<conversation_message::ComposerContext>,
     #[prost(message, repeated, tag = "43")]
     pub cursor_rules: ::prost::alloc::vec::Vec<CursorRule>,
     #[prost(message, repeated, tag = "44")]
@@ -2636,9 +2427,7 @@ pub struct ConversationMessage {
     )]
     pub unified_mode: ::core::option::Option<i32>,
     #[prost(message, repeated, tag = "48")]
-    pub diffs_since_last_apply: ::prost::alloc::vec::Vec<
-        conversation_message::DiffSinceLastApply,
-    >,
+    pub diffs_since_last_apply: ::prost::alloc::vec::Vec<conversation_message::DiffSinceLastApply>,
     #[prost(message, repeated, tag = "49")]
     pub deleted_files: ::prost::alloc::vec::Vec<conversation_message::DeletedFile>,
     #[prost(string, optional, tag = "50")]
@@ -2676,15 +2465,7 @@ pub mod conversation_message {
     pub mod code_chunk {
         /// aiserver.v1.ConversationMessage.CodeChunk.Intent
         #[derive(
-            Clone,
-            Copy,
-            Debug,
-            PartialEq,
-            Eq,
-            Hash,
-            PartialOrd,
-            Ord,
-            ::prost::Enumeration
+            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
         )]
         #[repr(i32)]
         pub enum Intent {
@@ -2717,9 +2498,7 @@ pub mod conversation_message {
                 match value {
                     "INTENT_UNSPECIFIED" => Some(Self::Unspecified),
                     "INTENT_COMPOSER_FILE" => Some(Self::ComposerFile),
-                    "INTENT_COMPRESSED_COMPOSER_FILE" => {
-                        Some(Self::CompressedComposerFile)
-                    }
+                    "INTENT_COMPRESSED_COMPOSER_FILE" => Some(Self::CompressedComposerFile),
                     "INTENT_RECENTLY_VIEWED_FILE" => Some(Self::RecentlyViewedFile),
                     "INTENT_OUTLINE" => Some(Self::Outline),
                     "INTENT_MENTIONED_FILE" => Some(Self::MentionedFile),
@@ -2730,15 +2509,7 @@ pub mod conversation_message {
         }
         /// aiserver.v1.ConversationMessage.CodeChunk.SummarizationStrategy
         #[derive(
-            Clone,
-            Copy,
-            Debug,
-            PartialEq,
-            Eq,
-            Hash,
-            PartialOrd,
-            Ord,
-            ::prost::Enumeration
+            Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration,
         )]
         #[repr(i32)]
         pub enum SummarizationStrategy {
@@ -2761,9 +2532,7 @@ pub mod conversation_message {
             /// Creates an enum from field names used in the ProtoBuf definition.
             pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
                 match value {
-                    "SUMMARIZATION_STRATEGY_NONE_UNSPECIFIED" => {
-                        Some(Self::NoneUnspecified)
-                    }
+                    "SUMMARIZATION_STRATEGY_NONE_UNSPECIFIED" => Some(Self::NoneUnspecified),
                     "SUMMARIZATION_STRATEGY_SUMMARIZED" => Some(Self::Summarized),
                     "SUMMARIZATION_STRATEGY_EMBEDDED" => Some(Self::Embedded),
                     _ => None,
@@ -2908,17 +2677,13 @@ pub mod conversation_message {
         #[prost(int32, tag = "2")]
         pub end_line_number_exclusive: i32,
         #[prost(string, repeated, tag = "3")]
-        pub before_context_lines: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub before_context_lines: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "4")]
         pub removed_lines: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "5")]
         pub added_lines: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "6")]
-        pub after_context_lines: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub after_context_lines: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     }
     /// aiserver.v1.ConversationMessage.HumanChange
     #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2959,17 +2724,7 @@ pub mod conversation_message {
         pub relative_workspace_path: ::prost::alloc::string::String,
     }
     /// aiserver.v1.ConversationMessage.MessageType
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum MessageType {
         Unspecified = 0,
@@ -3108,17 +2863,7 @@ pub struct UserResponseToSuggestedCodeBlock {
 /// Nested message and enum types in `UserResponseToSuggestedCodeBlock`.
 pub mod user_response_to_suggested_code_block {
     /// aiserver.v1.UserResponseToSuggestedCodeBlock.UserResponseType
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum UserResponseType {
         Unspecified = 0,
@@ -3182,17 +2927,7 @@ pub mod composer_file_diff {
         pub lines_added: i32,
     }
     /// aiserver.v1.ComposerFileDiff.Editor
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Editor {
         Unspecified = 0,
@@ -3359,19 +3094,13 @@ pub mod available_models_response {
         pub price: ::core::option::Option<f64>,
         #[prost(message, optional, tag = "8")]
         pub tooltip_data: ::core::option::Option<TooltipData>,
+        #[prost(bool, optional, tag = "9")]
+        pub supports_thinking: ::core::option::Option<bool>,
+        #[prost(bool, optional, tag = "10")]
+        pub supports_images: ::core::option::Option<bool>,
     }
     /// aiserver.v1.AvailableModelsResponse.DegradationStatus
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum DegradationStatus {
         Unspecified = 0,
@@ -3451,13 +3180,9 @@ pub mod debug_info {
         #[prost(int32, tag = "2")]
         pub line_number: i32,
         #[prost(string, repeated, tag = "3")]
-        pub lines_before_breakpoint: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub lines_before_breakpoint: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "4")]
-        pub lines_after_breakpoint: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub lines_after_breakpoint: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
         #[prost(string, optional, tag = "5")]
         pub exception_info: ::core::option::Option<::prost::alloc::string::String>,
     }
@@ -3480,9 +3205,7 @@ pub struct GetChatRequest {
     #[prost(message, optional, tag = "7")]
     pub model_details: ::core::option::Option<ModelDetails>,
     #[prost(string, repeated, tag = "8")]
-    pub documentation_identifiers: ::prost::alloc::vec::Vec<
-        ::prost::alloc::string::String,
-    >,
+    pub documentation_identifiers: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, tag = "9")]
     pub request_id: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "10")]
@@ -3550,9 +3273,7 @@ pub struct StreamChatResponse {
     #[prost(string, optional, tag = "22")]
     pub server_bubble_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "2")]
-    pub debugging_only_chat_prompt: ::core::option::Option<
-        ::prost::alloc::string::String,
-    >,
+    pub debugging_only_chat_prompt: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(int32, optional, tag = "3")]
     pub debugging_only_token_count: ::core::option::Option<i32>,
     #[prost(message, optional, tag = "4")]
@@ -3721,9 +3442,7 @@ impl ClientSideToolV2 {
             Self::DiffHistory => "CLIENT_SIDE_TOOL_V2_DIFF_HISTORY",
             Self::Implementer => "CLIENT_SIDE_TOOL_V2_IMPLEMENTER",
             Self::SearchSymbols => "CLIENT_SIDE_TOOL_V2_SEARCH_SYMBOLS",
-            Self::BackgroundComposerFollowup => {
-                "CLIENT_SIDE_TOOL_V2_BACKGROUND_COMPOSER_FOLLOWUP"
-            }
+            Self::BackgroundComposerFollowup => "CLIENT_SIDE_TOOL_V2_BACKGROUND_COMPOSER_FOLLOWUP",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -3744,9 +3463,7 @@ impl ClientSideToolV2 {
             "CLIENT_SIDE_TOOL_V2_REAPPLY" => Some(Self::Reapply),
             "CLIENT_SIDE_TOOL_V2_GET_RELATED_FILES" => Some(Self::GetRelatedFiles),
             "CLIENT_SIDE_TOOL_V2_PARALLEL_APPLY" => Some(Self::ParallelApply),
-            "CLIENT_SIDE_TOOL_V2_RUN_TERMINAL_COMMAND_V2" => {
-                Some(Self::RunTerminalCommandV2)
-            }
+            "CLIENT_SIDE_TOOL_V2_RUN_TERMINAL_COMMAND_V2" => Some(Self::RunTerminalCommandV2),
             "CLIENT_SIDE_TOOL_V2_FETCH_RULES" => Some(Self::FetchRules),
             "CLIENT_SIDE_TOOL_V2_PLANNER" => Some(Self::Planner),
             "CLIENT_SIDE_TOOL_V2_WEB_SEARCH" => Some(Self::WebSearch),
@@ -3780,12 +3497,8 @@ impl RunTerminalCommandEndedReason {
     pub fn as_str_name(&self) -> &'static str {
         match self {
             Self::Unspecified => "RUN_TERMINAL_COMMAND_ENDED_REASON_UNSPECIFIED",
-            Self::ExecutionCompleted => {
-                "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_COMPLETED"
-            }
-            Self::ExecutionAborted => {
-                "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_ABORTED"
-            }
+            Self::ExecutionCompleted => "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_COMPLETED",
+            Self::ExecutionAborted => "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_ABORTED",
             Self::ExecutionFailed => "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_FAILED",
             Self::ErrorOccurredCheckingReason => {
                 "RUN_TERMINAL_COMMAND_ENDED_REASON_ERROR_OCCURRED_CHECKING_REASON"
@@ -3799,12 +3512,8 @@ impl RunTerminalCommandEndedReason {
             "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_COMPLETED" => {
                 Some(Self::ExecutionCompleted)
             }
-            "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_ABORTED" => {
-                Some(Self::ExecutionAborted)
-            }
-            "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_FAILED" => {
-                Some(Self::ExecutionFailed)
-            }
+            "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_ABORTED" => Some(Self::ExecutionAborted),
+            "RUN_TERMINAL_COMMAND_ENDED_REASON_EXECUTION_FAILED" => Some(Self::ExecutionFailed),
             "RUN_TERMINAL_COMMAND_ENDED_REASON_ERROR_OCCURRED_CHECKING_REASON" => {
                 Some(Self::ErrorOccurredCheckingReason)
             }

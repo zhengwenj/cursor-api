@@ -1,7 +1,8 @@
 use crate::{
     app::model::{
         AppState, CommonResponse, TokenAddRequest, TokenInfo, TokenInfoResponse, TokenManager,
-        TokenTagsUpdateRequest, TokenUpdateRequest, TokensDeleteRequest, TokensDeleteResponse,
+        TokenStatusSetRequest, TokenTagsUpdateRequest, TokenUpdateRequest, TokensDeleteRequest,
+        TokensDeleteResponse,
     },
     common::{
         model::{ApiStatus, ErrorResponse, NormalResponse},
@@ -12,7 +13,7 @@ use crate::{
     },
 };
 use axum::{Json, extract::State, http::StatusCode};
-use std::sync::Arc;
+use std::{borrow::Cow, collections::HashSet, sync::Arc};
 use tokio::sync::Mutex;
 
 pub async fn handle_get_tokens(
@@ -30,7 +31,7 @@ pub async fn handle_get_tokens(
     }))
 }
 
-pub async fn handle_update_tokens(
+pub async fn handle_set_tokens(
     State(state): State<Arc<Mutex<AppState>>>,
     Json(tokens): Json<TokenUpdateRequest>,
 ) -> Result<Json<TokenInfoResponse>, StatusCode> {
@@ -44,7 +45,7 @@ pub async fn handle_update_tokens(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // 更新应用状态
+    // 设置应用状态
     {
         let mut state = state.lock().await;
         state.token_manager = token_manager;
@@ -87,6 +88,7 @@ pub async fn handle_add_tokens(
                     .as_deref()
                     .map(generate_checksum_with_repair)
                     .unwrap_or_else(generate_checksum_with_default),
+                status: request.status,
                 client_key: Some(generate_hash()),
                 profile: None,
                 tags: request.tags.clone(),
@@ -100,7 +102,7 @@ pub async fn handle_add_tokens(
         token_manager.tokens.extend(new_tokens);
         let tokens_count = token_manager.tokens.len();
 
-        // 更新全局标签
+        // 设置全局标签
         if let Some(ref tags) = request.tags {
             token_manager.update_global_tags(tags);
         }
@@ -112,13 +114,13 @@ pub async fn handle_add_tokens(
                 Json(ErrorResponse {
                     status: ApiStatus::Error,
                     code: None,
-                    error: Some("Failed to save token list".to_string()),
-                    message: Some("无法保存token list".to_string()),
+                    error: Some(Cow::Borrowed("Failed to save token list")),
+                    message: Some(Cow::Borrowed("无法保存token list")),
                 }),
             )
         })?;
 
-        // 更新应用状态
+        // 设置应用状态
         {
             let mut state = state.lock().await;
             state.token_manager = token_manager;
@@ -184,7 +186,7 @@ pub async fn handle_delete_tokens(
 
     let new_count: usize = token_manager.tokens.len();
 
-    // 如果有tokens被删除才进行更新操作
+    // 如果有tokens被删除才进行设置操作
     if new_count < original_count {
         // 保存到文件
         token_manager.save_tokens().await.map_err(|_| {
@@ -193,8 +195,8 @@ pub async fn handle_delete_tokens(
                 Json(ErrorResponse {
                     status: ApiStatus::Error,
                     code: None,
-                    error: Some("Failed to save token list".to_string()),
-                    message: Some("无法保存token list".to_string()),
+                    error: Some(Cow::Borrowed("Failed to save token list")),
+                    message: Some(Cow::Borrowed("无法保存token list")),
                 }),
             )
         })?;
@@ -212,7 +214,7 @@ pub async fn handle_delete_tokens(
             None
         };
 
-        // 更新状态
+        // 设置状态
         {
             let mut state = state.lock().await;
             state.token_manager = token_manager;
@@ -243,24 +245,24 @@ pub async fn handle_delete_tokens(
     }
 }
 
-pub async fn handle_update_token_tags(
+pub async fn handle_set_token_tags(
     State(state): State<Arc<Mutex<AppState>>>,
     Json(request): Json<TokenTagsUpdateRequest>,
 ) -> Result<Json<CommonResponse>, (StatusCode, Json<ErrorResponse>)> {
-    // 获取并更新 token_manager
+    // 获取并设置 token_manager
     {
         let mut state = state.lock().await;
         if let Err(e) = state
             .token_manager
-            .update_tokens_tags(request.tokens, request.tags)
+            .update_tokens_tags(&request.tokens, request.tags)
         {
             return Err((
                 StatusCode::BAD_REQUEST,
                 Json(ErrorResponse {
                     status: ApiStatus::Error,
                     code: None,
-                    error: Some(e.to_string()),
-                    message: Some("更新标签失败".to_string()),
+                    error: Some(Cow::Owned(e.to_string())),
+                    message: Some(Cow::Borrowed("设置标签失败")),
                 }),
             ));
         }
@@ -272,8 +274,8 @@ pub async fn handle_update_token_tags(
                 Json(ErrorResponse {
                     status: ApiStatus::Error,
                     code: None,
-                    error: Some("Failed to save token tags".to_string()),
-                    message: Some("无法保存标签信息".to_string()),
+                    error: Some(Cow::Borrowed("Failed to save token tags")),
+                    message: Some(Cow::Borrowed("无法保存标签信息")),
                 }),
             ));
         }
@@ -281,13 +283,13 @@ pub async fn handle_update_token_tags(
 
     Ok(Json(CommonResponse {
         status: ApiStatus::Success,
-        message: Some("标签更新成功".to_string()),
+        message: Some("标签设置成功".to_string()),
     }))
 }
 
 pub async fn handle_update_tokens_profile(
     State(state): State<Arc<Mutex<AppState>>>,
-    Json(tokens): Json<Vec<String>>,
+    Json(tokens): Json<HashSet<String>>,
 ) -> Result<Json<CommonResponse>, (StatusCode, Json<ErrorResponse>)> {
     // 验证请求
     if tokens.is_empty() {
@@ -296,8 +298,8 @@ pub async fn handle_update_tokens_profile(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some("No tokens provided".to_string()),
-                message: Some("未提供任何令牌".to_string()),
+                error: Some(Cow::Borrowed("No tokens provided")),
+                message: Some(Cow::Borrowed("未提供任何令牌")),
             }),
         ));
     }
@@ -306,7 +308,7 @@ pub async fn handle_update_tokens_profile(
     let mut state_guard = state.lock().await;
     let token_manager = &mut state_guard.token_manager;
 
-    // 批量更新tokens的profile
+    // 批量设置tokens的profile
     let mut updated_count: u32 = 0;
     let mut failed_count: u32 = 0;
 
@@ -325,7 +327,7 @@ pub async fn handle_update_tokens_profile(
             )
             .await
             {
-                // 更新profile
+                // 设置profile
                 token_manager.tokens[token_idx].profile = Some(profile);
                 updated_count += 1;
             } else {
@@ -343,13 +345,142 @@ pub async fn handle_update_tokens_profile(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some("Failed to save token profiles".to_string()),
-                message: Some("无法保存令牌配置数据".to_string()),
+                error: Some(Cow::Borrowed("Failed to save token profiles")),
+                message: Some(Cow::Borrowed("无法保存令牌配置数据")),
             }),
         ));
     }
 
     let message = format!("已更新{updated_count}个令牌配置, {failed_count}个令牌更新失败");
+
+    Ok(Json(CommonResponse {
+        status: ApiStatus::Success,
+        message: Some(message),
+    }))
+}
+
+pub async fn handle_upgrade_tokens(
+    State(state): State<Arc<Mutex<AppState>>>,
+    Json(tokens): Json<HashSet<String>>,
+) -> Result<Json<CommonResponse>, (StatusCode, Json<ErrorResponse>)> {
+    // 验证请求
+    if tokens.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                status: ApiStatus::Error,
+                code: None,
+                error: Some(Cow::Borrowed("No tokens provided")),
+                message: Some(Cow::Borrowed("未提供任何令牌")),
+            }),
+        ));
+    }
+
+    // 获取当前的 token_manager
+    let mut state_guard = state.lock().await;
+    let token_manager = &mut state_guard.token_manager;
+
+    // 批量设置tokens的profile
+    let mut updated_count: u32 = 0;
+    let mut failed_count: u32 = 0;
+
+    for token in &tokens {
+        if let Some(token_idx) = token_manager
+            .tokens
+            .iter()
+            .position(|info| info.token == *token)
+        {
+            if let Some(new_token) = crate::common::utils::get_new_token(
+                token_manager.tokens[token_idx].get_client(),
+                token,
+                true,
+            )
+            .await
+            {
+                token_manager.tokens[token_idx].token = new_token;
+                updated_count += 1;
+            } else {
+                failed_count += 1;
+            }
+        } else {
+            failed_count += 1;
+        }
+    }
+
+    // 保存更改
+    if updated_count > 0 && token_manager.save_tokens().await.is_err() {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                status: ApiStatus::Error,
+                code: None,
+                error: Some(Cow::Borrowed("Failed to save tokens")),
+                message: Some(Cow::Borrowed("无法保存令牌数据")),
+            }),
+        ));
+    }
+
+    let message = format!("已升级{updated_count}个令牌, {failed_count}个令牌升级失败");
+
+    Ok(Json(CommonResponse {
+        status: ApiStatus::Success,
+        message: Some(message),
+    }))
+}
+
+pub async fn handle_set_tokens_status(
+    State(state): State<Arc<Mutex<AppState>>>,
+    Json(request): Json<TokenStatusSetRequest>,
+) -> Result<Json<CommonResponse>, (StatusCode, Json<ErrorResponse>)> {
+    // 验证请求
+    if request.tokens.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                status: ApiStatus::Error,
+                code: None,
+                error: Some(Cow::Borrowed("No tokens provided")),
+                message: Some(Cow::Borrowed("未提供任何令牌")),
+            }),
+        ));
+    }
+
+    // 获取当前的 token_manager
+    let mut state_guard = state.lock().await;
+    let token_manager = &mut state_guard.token_manager;
+
+    // 批量设置tokens的profile
+    let mut updated_count: u32 = 0;
+    let mut failed_count: u32 = 0;
+
+    for token in &request.tokens {
+        // 验证token是否在token_manager中存在
+        if let Some(token_idx) = token_manager
+            .tokens
+            .iter()
+            .position(|info| info.token == *token)
+        {
+            token_manager.tokens[token_idx].status = request.status;
+            updated_count += 1;
+        } else {
+            failed_count += 1;
+        }
+    }
+
+    // 保存更改
+    if updated_count > 0 && token_manager.save_tokens().await.is_err() {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                status: ApiStatus::Error,
+                code: None,
+                error: Some(Cow::Borrowed("Failed to save token statuses")),
+                message: Some(Cow::Borrowed("无法保存令牌状态数据")),
+            }),
+        ));
+    }
+
+    let message = format!("已设置{updated_count}个令牌状态, {failed_count}个令牌设置失败");
 
     Ok(Json(CommonResponse {
         status: ApiStatus::Success,
@@ -367,7 +498,7 @@ pub async fn handle_get_token_tags(
     Ok(Json(NormalResponse {
         status: ApiStatus::Success,
         data: Some(tags),
-        message: Some(format!("获取到{len}个标签")),
+        message: Some(Cow::Owned(format!("获取到{len}个标签"))),
     }))
 }
 
@@ -397,8 +528,8 @@ pub async fn handle_get_tokens_by_tag(
             Json(ErrorResponse {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(e.to_string()),
-                message: Some(format!("标签\"{tag}\"不存在")),
+                error: Some(Cow::Owned(e.to_string())),
+                message: Some(Cow::Owned(format!("标签\"{tag}\"不存在"))),
             }),
         )),
     }

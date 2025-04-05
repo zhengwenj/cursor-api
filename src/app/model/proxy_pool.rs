@@ -164,17 +164,16 @@ impl Proxies {
         }
 
         // 5. 设置通用客户端
-        if let Some(proxy) = self.proxies.get(&self.general) {
-            if let Some(client) = pool.clients.get(proxy) {
-                pool.general = Some(client.clone());
-            } else {
-                // 这不应该发生
-                unreachable!()
-            }
-        } else {
-            // 这不应该发生
-            unreachable!()
-        }
+        pool.general = Some(
+            pool.clients
+                .get(
+                    self.proxies
+                        .get(&self.general)
+                        .expect("General proxy not found in proxy list"),
+                )
+                .expect("Client for general proxy not found in client pool")
+                .clone(),
+        );
 
         Ok(())
     }

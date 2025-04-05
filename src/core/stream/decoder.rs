@@ -11,6 +11,14 @@ use std::time::Instant;
 // 解压gzip数据
 #[inline]
 fn decompress_gzip(data: &[u8]) -> Option<Vec<u8>> {
+    if data.len() < 3
+        || unsafe { *data.get_unchecked(0) } != 0x1f
+        || unsafe { *data.get_unchecked(1) } != 0x8b
+        || unsafe { *data.get_unchecked(2) } != 0x08
+    {
+        return None;
+    }
+
     let mut decoder = GzDecoder::new(data);
     let mut decompressed = Vec::new();
 
