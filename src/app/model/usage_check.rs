@@ -3,7 +3,23 @@ use crate::{
     core::{config::key_config, constant::Models},
 };
 use serde::{Deserialize, Serialize};
-// use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
+
+// 定义类型常量
+crate::define_typed_constants! {
+    &'static str => {
+        TYPE_NONE = "none",
+        TYPE_DISABLED = "disabled",
+        TYPE_DEFAULT = "default",
+        TYPE_ALL = "all",
+        TYPE_EVERYTHING = "everything",
+        TYPE_LIST = "list",
+
+        FIELD_TYPE = "type",
+        FIELD_CONTENT = "content",
+
+        STRUCT_NAME = "UsageCheck",
+    }
+}
 
 #[derive(Clone, PartialEq)]
 pub enum UsageCheck {
@@ -14,56 +30,79 @@ pub enum UsageCheck {
 }
 
 impl UsageCheck {
-    pub fn from_proto(model: Option<&key_config::UsageCheckModel>) -> Option<Self> {
-        model.map(|model| {
-            use key_config::usage_check_model::Type;
-            match Type::try_from(model.r#type).unwrap_or(Type::Default) {
-                Type::Default | Type::Disabled => Self::None,
-                Type::All => Self::All,
-                Type::Custom => {
-                    let models: Vec<_> = model
-                        .model_ids
-                        .iter()
-                        .filter_map(|id| Models::find_id(id))
-                        .map(|m| m.id)
-                        .collect();
-                    if models.is_empty() {
-                        Self::None
-                    } else {
-                        Self::Custom(models)
-                    }
-                }
-            }
-        })
+    #[inline]
+    pub fn from_str(s: &str) -> Self {
+        let s = s.trim();
+
+        // 快速路径：空字符串
+        if s.is_empty() {
+            return Self::default();
+        }
+
+        // 转小写并匹配预定义类型
+        let lower = s.to_lowercase();
+        match lower.as_str() {
+            TYPE_NONE | TYPE_DISABLED => Self::None,
+            TYPE_DEFAULT => Self::Default,
+            TYPE_ALL | TYPE_EVERYTHING => Self::All,
+            _ => Self::parse_custom_models(s),
+        }
     }
 
-    // pub fn to_proto(&self) -> key_config::UsageCheckModel {
-    //     use key_config::usage_check_model::Type;
-    //     match self {
-    //         Self::None => key_config::UsageCheckModel {
-    //             r#type: Type::Disabled.into(),
-    //             model_ids: vec![],
-    //         },
-    //         Self::Default => key_config::UsageCheckModel {
-    //             r#type: Type::Default.into(),
-    //             model_ids: vec![],
-    //         },
-    //         Self::All => key_config::UsageCheckModel {
-    //             r#type: Type::All.into(),
-    //             model_ids: vec![],
-    //         },
-    //         Self::Custom(models) => key_config::UsageCheckModel {
-    //             r#type: Type::Custom.into(),
-    //             model_ids: models.iter().map(|&s| s.to_string()).collect(),
-    //         },
-    //     }
-    // }
+    #[inline]
+    fn parse_custom_models(s: &str) -> Self {
+        let models: Vec<_> = s
+            .split(COMMA)
+            .filter_map(|model| Models::find_id(model.trim()))
+            .map(|m| m.id)
+            .collect();
+
+        if models.is_empty() {
+            Self::default()
+        } else {
+            Self::Custom(models)
+        }
+    }
+
+    #[inline]
+    pub fn from_proto(model: &key_config::UsageCheckModel) -> Self {
+        use key_config::usage_check_model::Type;
+
+        match Type::try_from(model.r#type).unwrap_or(Type::Default) {
+            Type::Default | Type::Disabled => Self::None,
+            Type::All => Self::All,
+            Type::Custom => {
+                let models: Vec<_> = model
+                    .model_ids
+                    .iter()
+                    .filter_map(|id| Models::find_id(id))
+                    .map(|m| m.id)
+                    .collect();
+
+                if models.is_empty() {
+                    Self::None
+                } else {
+                    Self::Custom(models)
+                }
+            }
+        }
+    }
+
+    // 辅助方法：获取类型字符串
+    #[inline]
+    fn type_str(&self) -> &'static str {
+        match self {
+            Self::None => TYPE_NONE,
+            Self::Default => TYPE_DEFAULT,
+            Self::All => TYPE_ALL,
+            Self::Custom(_) => TYPE_LIST,
+        }
+    }
 }
 
 impl Default for UsageCheck {
-    fn default() -> Self {
-        Self::Default
-    }
+    #[inline(always)]
+    fn default() -> Self { Self::Default }
 }
 
 impl Serialize for UsageCheck {
@@ -72,23 +111,20 @@ impl Serialize for UsageCheck {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("UsageCheck", 1)?;
+
         match self {
-            UsageCheck::None => {
-                state.serialize_field("type", "none")?;
+            Self::Custom(models) => {
+                let mut state = serializer.serialize_struct(STRUCT_NAME, 2)?;
+                state.serialize_field(FIELD_TYPE, TYPE_LIST)?;
+                state.serialize_field(FIELD_CONTENT, &models.join(COMMA_STRING))?;
+                state.end()
             }
-            UsageCheck::Default => {
-                state.serialize_field("type", "default")?;
-            }
-            UsageCheck::All => {
-                state.serialize_field("type", "all")?;
-            }
-            UsageCheck::Custom(models) => {
-                state.serialize_field("type", "list")?;
-                state.serialize_field("content", &models.join(COMMA_STRING))?;
+            _ => {
+                let mut state = serializer.serialize_struct(STRUCT_NAME, 1)?;
+                state.serialize_field(FIELD_TYPE, self.type_str())?;
+                state.end()
             }
         }
-        state.end()
     }
 }
 
@@ -97,73 +133,71 @@ impl<'de> Deserialize<'de> for UsageCheck {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        #[serde(tag = "type", content = "content")]
-        enum UsageCheckHelper {
-            #[serde(rename = "none")]
-            None,
-            #[serde(rename = "default")]
-            Default,
-            #[serde(rename = "all")]
-            All,
-            #[serde(rename = "list")]
-            Custom(String),
-        }
+        use serde::de::{self, MapAccess, Visitor};
 
-        let helper = <UsageCheckHelper as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(match helper {
-            UsageCheckHelper::None => UsageCheck::None,
-            UsageCheckHelper::Default => UsageCheck::Default,
-            UsageCheckHelper::All => UsageCheck::All,
-            UsageCheckHelper::Custom(list) => {
-                if list.is_empty() {
-                    return Ok(UsageCheck::None);
-                }
+        struct UsageCheckVisitor;
 
-                let models: Vec<_> = list
-                    .split(COMMA)
-                    .filter_map(|model| {
-                        let model = model.trim();
-                        Models::find_id(model)
-                    })
-                    .map(|m| m.id)
-                    .collect();
+        impl<'de> Visitor<'de> for UsageCheckVisitor {
+            type Value = UsageCheck;
 
-                if models.is_empty() {
-                    UsageCheck::None
-                } else {
-                    UsageCheck::Custom(models)
-                }
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                formatter.write_str("a UsageCheck object with 'type' field")
             }
-        })
-    }
-}
 
-impl UsageCheck {
-    pub fn from_str(s: &str) -> Self {
-        match s.trim().to_lowercase().as_str() {
-            "none" | "disabled" => Self::None,
-            "default" => Self::Default,
-            "all" | "everything" => Self::All,
-            list => {
-                if list.is_empty() {
-                    return Self::default();
-                }
-                let models: Vec<_> = list
-                    .split(COMMA)
-                    .filter_map(|model| {
-                        let model = model.trim();
-                        Models::find_id(model)
-                    })
-                    .map(|m| m.id)
-                    .collect();
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut type_value: Option<String> = None;
+                let mut content_value: Option<String> = None;
 
-                if models.is_empty() {
-                    Self::default()
-                } else {
-                    Self::Custom(models)
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        FIELD_TYPE => {
+                            type_value = Some(map.next_value()?);
+                        }
+                        FIELD_CONTENT => {
+                            content_value = Some(map.next_value()?);
+                        }
+                        _ => {
+                            // 忽略未知字段
+                            let _: de::IgnoredAny = map.next_value()?;
+                        }
+                    }
                 }
+
+                let type_str = type_value.ok_or_else(|| de::Error::missing_field(FIELD_TYPE))?;
+
+                Ok(match type_str.as_str() {
+                    TYPE_NONE => UsageCheck::None,
+                    TYPE_DEFAULT => UsageCheck::Default,
+                    TYPE_ALL => UsageCheck::All,
+                    TYPE_LIST => {
+                        let content =
+                            content_value.ok_or_else(|| de::Error::missing_field(FIELD_CONTENT))?;
+
+                        if content.is_empty() {
+                            UsageCheck::None
+                        } else {
+                            UsageCheck::parse_custom_models(&content)
+                        }
+                    }
+                    _ => {
+                        return Err(de::Error::unknown_variant(&type_str, &[
+                            TYPE_NONE,
+                            TYPE_DEFAULT,
+                            TYPE_ALL,
+                            TYPE_LIST,
+                        ]));
+                    }
+                })
             }
         }
+
+        deserializer.deserialize_struct(
+            STRUCT_NAME,
+            &[FIELD_TYPE, FIELD_CONTENT],
+            UsageCheckVisitor,
+        )
     }
 }

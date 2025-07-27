@@ -1,26 +1,33 @@
-use serde::Serialize;
+use ::serde::Serialize;
 
 #[derive(Clone, PartialEq, Default)]
 pub enum TriState<T> {
     #[default]
-    None,
-    Null,
-    Some(T),
+    Undefined, // 未定义/字段不存在
+    Null,     // 显式空值
+    Value(T), // 包含具体值
 }
 
 impl<T> TriState<T> {
-    // pub fn is_some(&self) -> bool {
-    //     matches!(self, TriState::Some(_))
-    // }
-
-    // pub fn is_null(&self) -> bool {
-    //     matches!(self, TriState::Null)
-    // }
-
     #[inline(always)]
-    pub const fn is_none(&self) -> bool {
-        matches!(*self, TriState::None)
-    }
+    pub const fn is_undefined(&self) -> bool { matches!(*self, TriState::Undefined) }
+
+    // #[inline(always)]
+    // pub const fn is_null(&self) -> bool {
+    //     matches!(*self, TriState::Null)
+    // }
+
+    // #[inline(always)]
+    // pub const fn is_value(&self) -> bool {
+    //     matches!(*self, TriState::Value(_))
+    // }
+
+    // pub const fn as_value(&self) -> Option<&T> {
+    //     match self {
+    //         TriState::Value(v) => Some(v),
+    //         _ => None,
+    //     }
+    // }
 }
 
 impl<T> Serialize for TriState<T>
@@ -32,36 +39,9 @@ where
         S: serde::Serializer,
     {
         match self {
-            TriState::None => serializer.serialize_none(),
+            TriState::Undefined => serializer.serialize_none(),
             TriState::Null => serializer.serialize_unit(),
-            TriState::Some(value) => value.serialize(serializer),
+            TriState::Value(value) => value.serialize(serializer),
         }
     }
 }
-
-// impl<'de, T> Deserialize<'de> for TriState<T>
-// where
-//     T: Deserialize<'de>,
-// {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         let opt = Option::<T>::deserialize(deserializer);
-
-//         match opt {
-//             Ok(Some(value)) => Ok(TriState::Some(value)),
-//             Ok(None) => Ok(TriState::Null),
-//             Err(_) => Ok(TriState::None),
-//         }
-//     }
-// }
-
-// impl<T> From<Option<T>> for TriState<T> {
-//     fn from(option: Option<T>) -> Self {
-//         match option {
-//             Some(value) => TriState::Some(value),
-//             None => TriState::Null,
-//         }
-//     }
-// }

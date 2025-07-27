@@ -1,203 +1,217 @@
 use crate::{
     app::model::{
-        AppState, CommonResponse, ProxiesDeleteRequest, ProxiesDeleteResponse, ProxyAddRequest,
+        CommonResponse, ProxiesDeleteRequest, ProxiesDeleteResponse, ProxyAddRequest,
         ProxyInfoResponse, ProxyUpdateRequest, SetGeneralProxyRequest,
+        proxy_pool::{self, Proxies},
     },
-    common::model::{ApiStatus, ErrorResponse},
+    common::{
+        model::{ApiStatus, GenericError},
+        utils::string_builder::StringBuilder,
+    },
 };
-use axum::{Json, extract::State, http::StatusCode};
+use ahash::HashMap;
+use axum::{Json, http::StatusCode};
 use std::{borrow::Cow, sync::Arc};
-use tokio::sync::Mutex;
+
+crate::define_typed_constants! {
+    &'static str => {
+        ERROR_SAVE_PROXY_CONFIG = "Failed to save proxy configuration: ",
+        MESSAGE_SAVE_PROXY_CONFIG_FAILED = "无法保存代理配置",
+        ERROR_PROXY_NAME_NOT_FOUND = "Proxy name not found",
+        MESSAGE_PROXY_NAME_NOT_FOUND = "代理名称不存在",
+        MESSAGE_GENERAL_PROXY_SET = "通用代理已设置",
+        MESSAGE_PROXY_CONFIG_UPDATED = "代理配置已更新",
+        MESSAGE_NO_NEW_PROXY_ADDED = "没有添加新代理",
+        MESSAGE_ADDED_PREFIX = "已添加 ",
+        MESSAGE_ADDED_SUFFIX = " 个新代理",
+    }
+}
 
 // 获取所有代理配置
-pub async fn handle_get_proxies(
-    State(state): State<Arc<Mutex<AppState>>>,
-) -> Result<Json<ProxyInfoResponse>, StatusCode> {
+pub async fn handle_get_proxies() -> Json<ProxyInfoResponse> {
     // 获取代理配置并立即释放锁
-    let proxies = {
-        let state = state.lock().await;
-        state.proxies.clone()
-    };
+    let proxies = proxy_pool::proxies().load_full();
 
-    let proxies_count = proxies.get_proxies().len();
-    let general_proxy = proxies.get_general().to_string();
+    let proxies_count = proxies.len();
+    let general_proxy = proxy_pool::general_name().load_full();
 
-    Ok(Json(ProxyInfoResponse {
+    Json(ProxyInfoResponse {
         status: ApiStatus::Success,
         proxies: Some(proxies),
         proxies_count,
         general_proxy: Some(general_proxy),
         message: None,
-    }))
+    })
 }
 
 // 更新代理配置
 pub async fn handle_set_proxies(
-    State(state): State<Arc<Mutex<AppState>>>,
-    Json(request): Json<ProxyUpdateRequest>,
-) -> Result<Json<ProxyInfoResponse>, (StatusCode, Json<ErrorResponse>)> {
-    // 获取新的代理配置
-    let mut proxies = request.proxies;
-
+    Json(proxies): Json<ProxyUpdateRequest>,
+) -> Result<Json<ProxyInfoResponse>, (StatusCode, Json<GenericError>)> {
     // 更新全局代理池并保存配置
-    if let Err(e) = proxies.update_and_save().await {
+    proxies.update_global();
+    if let Err(e) = Proxies::update_and_save().await {
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse {
+            Json(GenericError {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(Cow::Owned(format!(
-                    "Failed to save proxy configuration: {e}"
-                ))),
-                message: Some(Cow::Borrowed("无法保存代理配置")),
+                error: Some(Cow::Owned(
+                    StringBuilder::with_capacity(2)
+                        .append(ERROR_SAVE_PROXY_CONFIG)
+                        .append(e.to_string())
+                        .build(),
+                )),
+                message: Some(Cow::Borrowed(MESSAGE_SAVE_PROXY_CONFIG_FAILED)),
             }),
         ));
     }
 
     // 获取通用代理信息（在更新应用状态前）
-    let proxies_count = proxies.get_proxies().len();
-
-    // 只在需要更新应用状态时持有锁
-    {
-        let mut state_guard = state.lock().await;
-        // 更新应用状态（完全覆盖）
-        state_guard.proxies = proxies;
-    }
+    let proxies_count = proxy_pool::proxies().load().len();
 
     Ok(Json(ProxyInfoResponse {
         status: ApiStatus::Success,
         proxies: None,
         proxies_count,
         general_proxy: None,
-        message: Some("代理配置已更新".to_string()),
+        message: Some(Cow::Borrowed(MESSAGE_PROXY_CONFIG_UPDATED)),
     }))
 }
 
 // 添加新的代理
 pub async fn handle_add_proxy(
-    State(state): State<Arc<Mutex<AppState>>>,
     Json(request): Json<ProxyAddRequest>,
-) -> Result<Json<ProxyInfoResponse>, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<Json<ProxyInfoResponse>, (StatusCode, Json<GenericError>)> {
     // 获取当前的代理配置
-    let mut proxies = {
-        let state_guard = state.lock().await;
-        state_guard.proxies.clone()
-    };
+    let current = proxy_pool::proxies().load_full();
+    let proxies = request
+        .proxies
+        .into_iter()
+        .filter(|(name, _)| !current.contains_key(name))
+        .collect::<HashMap<_, _>>();
 
-    // 创建现有代理名称的集合
-    let existing_proxies: std::collections::HashSet<String> =
-        proxies.get_proxies().keys().cloned().collect();
+    if proxies.is_empty() {
+        // 如果没有新代理，返回当前状态
+        let proxies_count = current.len();
+
+        return Ok(Json(ProxyInfoResponse {
+            status: ApiStatus::Success,
+            proxies: Some(current),
+            proxies_count,
+            general_proxy: None,
+            message: Some(Cow::Borrowed(MESSAGE_NO_NEW_PROXY_ADDED)),
+        }));
+    }
+
+    let mut current = (*current).clone();
 
     // 处理新的代理
     let mut added_count = 0;
 
-    for (name, proxy) in &request.proxies {
-        // 跳过已存在的代理
-        if existing_proxies.contains(name) {
-            continue;
-        }
-
+    for (name, proxy) in proxies {
         // 直接添加新的代理
-        proxies.add_proxy(name.clone(), proxy.clone());
+        current.insert(name, proxy);
         added_count += 1;
     }
 
-    // 如果有新代理才进行后续操作
-    if added_count > 0 {
-        // 更新全局代理池并保存配置
-        if let Err(e) = proxies.update_and_save().await {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    status: ApiStatus::Error,
-                    code: None,
-                    error: Some(Cow::Owned(format!(
-                        "Failed to save proxy configuration: {e}"
-                    ))),
-                    message: Some(Cow::Borrowed("无法保存代理配置")),
-                }),
-            ));
-        }
-
-        // 获取更新后的信息
-        let proxies_count = proxies.get_proxies().len();
-
-        // 更新应用状态，只在需要时持有锁
-        {
-            let mut state_guard = state.lock().await;
-            state_guard.proxies = proxies.clone();
-        }
-
-        Ok(Json(ProxyInfoResponse {
-            status: ApiStatus::Success,
-            proxies: None,
-            proxies_count,
-            general_proxy: None,
-            message: Some(format!("已添加 {added_count} 个新代理")),
-        }))
-    } else {
-        // 如果没有新代理，返回当前状态
-        let general_proxy = proxies.get_general().to_string();
-        let proxies_count = proxies.get_proxies().len();
-
-        Ok(Json(ProxyInfoResponse {
-            status: ApiStatus::Success,
-            proxies: Some(proxies),
-            proxies_count,
-            general_proxy: Some(general_proxy),
-            message: Some("没有添加新代理".to_string()),
-        }))
-    }
-}
-
-// 删除指定的代理
-pub async fn handle_delete_proxies(
-    State(state): State<Arc<Mutex<AppState>>>,
-    Json(request): Json<ProxiesDeleteRequest>,
-) -> Result<Json<ProxiesDeleteResponse>, (StatusCode, Json<ErrorResponse>)> {
-    // 获取当前的代理配置并计算失败的代理名称
-    let mut proxies = {
-        let state_guard = state.lock().await;
-        state_guard.proxies.clone()
-    };
-
-    // 计算失败的代理名称
-    let failed_names: Vec<String> = request
-        .names
-        .iter()
-        .filter(|name| !proxies.get_proxies().contains_key(*name))
-        .cloned()
-        .collect();
-
-    // 删除指定的代理
-    for name in &request.names {
-        proxies.remove_proxy(name);
-    }
-
     // 更新全局代理池并保存配置
-    if let Err(e) = proxies.update_and_save().await {
+    proxy_pool::proxies().store(Arc::new(current));
+    if let Err(e) = Proxies::update_and_save().await {
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse {
+            Json(GenericError {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(Cow::Owned(format!(
-                    "Failed to save proxy configuration: {e}"
-                ))),
-                message: Some(Cow::Borrowed("无法保存代理配置")),
+                error: Some(Cow::Owned(
+                    StringBuilder::with_capacity(2)
+                        .append(ERROR_SAVE_PROXY_CONFIG)
+                        .append(e.to_string())
+                        .build(),
+                )),
+                message: Some(Cow::Borrowed(MESSAGE_SAVE_PROXY_CONFIG_FAILED)),
             }),
         ));
     }
 
-    // 更新应用状态，只在需要时持有锁
-    {
-        let mut state_guard = state.lock().await;
-        state_guard.proxies = proxies.clone();
+    // 获取更新后的信息
+    let proxies_count = proxy_pool::proxies().load().len();
+
+    Ok(Json(ProxyInfoResponse {
+        status: ApiStatus::Success,
+        proxies: None,
+        proxies_count,
+        general_proxy: None,
+        message: Some(Cow::Owned(
+            StringBuilder::with_capacity(3)
+                .append(MESSAGE_ADDED_PREFIX)
+                .append(added_count.to_string())
+                .append(MESSAGE_ADDED_SUFFIX)
+                .build(),
+        )),
+    }))
+}
+
+// 删除指定的代理
+pub async fn handle_delete_proxies(
+    Json(request): Json<ProxiesDeleteRequest>,
+) -> Result<Json<ProxiesDeleteResponse>, (StatusCode, Json<GenericError>)> {
+    let names = request.names;
+
+    // 获取当前的代理配置并计算失败的代理名称
+    let current = proxy_pool::proxies().load_full();
+
+    // 计算失败的代理名称
+    let capacity = (names.len() * 3) >> 2;
+    let mut processing_names: Vec<String> = Vec::with_capacity(capacity);
+    let mut failed_names: Vec<String> = Vec::with_capacity(capacity);
+    for name in names {
+        if current.contains_key(&name) {
+            processing_names.push(name);
+        } else {
+            failed_names.push(name);
+        }
+    }
+
+    // 删除指定的代理
+    if !processing_names.is_empty() {
+        let mut map = current
+            .iter()
+            .filter_map(|(name, value)| {
+                if !processing_names.contains(name) {
+                    Some((name.clone(), value.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect::<HashMap<_, _>>();
+        if map.is_empty() {
+            map = crate::app::model::proxy_pool::default_proxies();
+        }
+        proxy_pool::proxies().store(Arc::new(map));
+    }
+
+    // 更新全局代理池并保存配置
+    if let Err(e) = Proxies::update_and_save().await {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(GenericError {
+                status: ApiStatus::Error,
+                code: None,
+                error: Some(Cow::Owned(
+                    StringBuilder::with_capacity(2)
+                        .append(ERROR_SAVE_PROXY_CONFIG)
+                        .append(e.to_string())
+                        .build(),
+                )),
+                message: Some(Cow::Borrowed(MESSAGE_SAVE_PROXY_CONFIG_FAILED)),
+            }),
+        ));
     }
 
     // 根据expectation返回不同的结果
     let updated_proxies = if request.expectation.needs_updated_tokens() {
-        Some(proxies)
+        Some(proxy_pool::proxies().load_full())
     } else {
         None
     };
@@ -215,54 +229,44 @@ pub async fn handle_delete_proxies(
 
 // 设置通用代理
 pub async fn handle_set_general_proxy(
-    State(state): State<Arc<Mutex<AppState>>>,
     Json(request): Json<SetGeneralProxyRequest>,
-) -> Result<Json<CommonResponse>, (StatusCode, Json<ErrorResponse>)> {
-    // 获取当前的代理配置
-    let mut proxies = {
-        let state_guard = state.lock().await;
-        state_guard.proxies.clone()
-    };
-
+) -> Result<Json<CommonResponse>, (StatusCode, Json<GenericError>)> {
     // 检查代理名称是否存在
-    if !proxies.get_proxies().contains_key(&request.name) {
+    if !proxy_pool::proxies().load().contains_key(&request.name) {
         return Err((
             StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
+            Json(GenericError {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(Cow::Borrowed("Proxy name not found")),
-                message: Some(Cow::Borrowed("代理名称不存在")),
+                error: Some(Cow::Borrowed(ERROR_PROXY_NAME_NOT_FOUND)),
+                message: Some(Cow::Borrowed(MESSAGE_PROXY_NAME_NOT_FOUND)),
             }),
         ));
     }
 
     // 设置通用代理
-    proxies.set_general(&request.name);
+    proxy_pool::general_name().store(Arc::new(request.name));
 
     // 更新全局代理池并保存配置
-    if let Err(e) = proxies.update_and_save().await {
+    if let Err(e) = Proxies::update_and_save().await {
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse {
+            Json(GenericError {
                 status: ApiStatus::Error,
                 code: None,
-                error: Some(Cow::Owned(format!(
-                    "Failed to save proxy configuration: {e}"
-                ))),
-                message: Some(Cow::Borrowed("无法保存代理配置")),
+                error: Some(Cow::Owned(
+                    StringBuilder::with_capacity(2)
+                        .append(ERROR_SAVE_PROXY_CONFIG)
+                        .append(e.to_string())
+                        .build(),
+                )),
+                message: Some(Cow::Borrowed(MESSAGE_SAVE_PROXY_CONFIG_FAILED)),
             }),
         ));
     }
 
-    // 更新应用状态，只在需要时持有锁
-    {
-        let mut state_guard = state.lock().await;
-        state_guard.proxies = proxies;
-    }
-
     Ok(Json(CommonResponse {
         status: ApiStatus::Success,
-        message: Some("通用代理已设置".to_string()),
+        message: Cow::Borrowed(MESSAGE_GENERAL_PROXY_SET),
     }))
 }

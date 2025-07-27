@@ -51,9 +51,7 @@ fn get_files_hash() -> Result<HashMap<PathBuf, String>> {
     let readme_path = Path::new("README.md");
     if readme_path.exists() {
         let content = fs::read(readme_path)?;
-        let mut hasher = Sha256::new();
-        hasher.update(&content);
-        let hash = format!("{:x}", hasher.finalize());
+        let hash = format!("{:x}", Sha256::new().chain_update(&content).finalize());
         file_hashes.insert(readme_path.to_path_buf(), hash);
     }
 
@@ -63,15 +61,13 @@ fn get_files_hash() -> Result<HashMap<PathBuf, String>> {
             let path = entry.path();
 
             // 检查是否是支持的文件类型，且不是已经压缩的文件
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if SUPPORTED_EXTENSIONS.contains(&ext) && !path.to_string_lossy().contains(".min.")
-                {
-                    let content = fs::read(&path)?;
-                    let mut hasher = Sha256::new();
-                    hasher.update(&content);
-                    let hash = format!("{:x}", hasher.finalize());
-                    file_hashes.insert(path, hash);
-                }
+            if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                && SUPPORTED_EXTENSIONS.contains(&ext)
+                && !path.to_string_lossy().contains(".min.")
+            {
+                let content = fs::read(&path)?;
+                let hash = format!("{:x}", Sha256::new().chain_update(&content).finalize());
+                file_hashes.insert(path, hash);
             }
         }
     }
@@ -172,92 +168,133 @@ fn minify_assets() -> Result<()> {
     Ok(())
 }
 
-/**
- * 更新版本号函数
- * 此函数会读取 VERSION 文件中的数字，将其加1，然后保存回文件
- * 如果 VERSION 文件不存在或为空，将从1开始计数
- * 只在 release 模式下执行，debug/dev 模式下完全跳过
- */
-#[cfg(not(debug_assertions))]
-#[cfg(feature = "__preview")]
-fn update_version() -> Result<()> {
-    let version_path = "VERSION";
-    // VERSION文件的监控已经在main函数中添加，此处无需重复
+include!("build_info.rs");
 
-    // 读取当前版本号
-    let mut version = String::new();
-    let mut file = match File::open(version_path) {
-        Ok(file) => file,
-        Err(_) => {
-            // 如果文件不存在或无法打开，从1开始
-            println!("cargo:warning=VERSION file not found, creating with initial value 1");
-            let mut new_file = File::create(version_path)?;
-            new_file.write_all(b"1")?;
-            return Ok(());
+#[cfg(feature = "__protoc")]
+macro_rules! proto_attributes {
+    (config: $config:expr, paths: $paths:expr, attributes: [$($attr:expr),* $(,)?]) => {
+        for path in $paths {
+            $(
+                $config.type_attribute(path, $attr);
+            )*
         }
     };
-
-    file.read_to_string(&mut version)?;
-
-    // 确保版本号是有效数字
-    let version_num = match version.trim().parse::<u64>() {
-        Ok(num) => num,
-        Err(_) => {
-            println!("cargo:warning=Invalid version number in VERSION file. Setting to 1.");
-            let mut file = File::create(version_path)?;
-            file.write_all(b"1")?;
-            return Ok(());
-        }
-    };
-
-    // 版本号加1
-    let new_version = version_num + 1;
-    println!(
-        "cargo:warning=Release build - bumping version from {} to {}",
-        version_num, new_version
-    );
-
-    // 写回文件
-    let mut file = File::create(version_path)?;
-    file.write_all(new_version.to_string().as_bytes())?;
-
-    Ok(())
 }
 
 fn main() -> Result<()> {
     // 更新版本号 - 只在 release 构建时执行
-    #[cfg(not(debug_assertions))]
-    #[cfg(feature = "__preview")]
+    #[cfg(all(not(debug_assertions), feature = "__preview"))]
     update_version()?;
 
-    // Proto 文件处理
-    // println!("cargo:rerun-if-changed=src/core/aiserver/v1/lite.proto");
-    // println!("cargo:rerun-if-changed=src/core/config/key.proto");
-    // 获取环境变量 PROTOC
-    // let protoc_path = match std::env::var_os("PROTOC") {
-    //     Some(path) => PathBuf::from(path),
-    //     None => {
-    //         println!("cargo:warning=PROTOC environment variable not set, using default protoc.");
-    //         // 如果 PROTOC 未设置，则返回一个空的 PathBuf，prost-build 会尝试使用默认的 protoc
-    //         PathBuf::new()
-    //     }
-    // };
-    // let mut config = prost_build::Config::new();
-    // // 如果 protoc_path 不为空，则配置使用指定的 protoc
-    // if !protoc_path.as_os_str().is_empty() {
-    //     config.protoc_executable(protoc_path);
-    // }
-    // config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
-    // config.enum_attribute(".aiserver.v1", "#[allow(clippy::enum_variant_names)]");
-    // config
-    //     .compile_protos(
-    //         &["src/core/aiserver/v1/lite.proto"],
-    //         &["src/core/aiserver/v1/"],
-    //     )
-    //     .unwrap();
-    // config
-    //     .compile_protos(&["src/core/config/key.proto"], &["src/core/config/"])
-    //     .unwrap();
+    #[cfg(feature = "__protoc")]
+    {
+        // Proto 文件处理
+        println!("cargo:rerun-if-changed=src/core/aiserver/v1/lite.proto");
+        println!("cargo:rerun-if-changed=src/core/config/key.proto");
+
+        // 获取环境变量 PROTOC 并创建配置
+        let mut config = prost_build::Config::new();
+
+        // 检查环境变量是否设置
+        match std::env::var_os("PROTOC") {
+            Some(path) => {
+                // 有环境变量时直接配置
+                config.protoc_executable(PathBuf::from(path));
+            }
+            None => {
+                // 无环境变量时输出警告，使用默认 protoc
+                println!(
+                    "cargo:warning=PROTOC environment variable not set, using default protoc."
+                );
+                // 这里不需要额外操作，prost-build 会自动使用默认的 protoc
+            }
+        }
+
+        // config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
+        // config.enum_attribute(".aiserver.v1", "#[allow(clippy::enum_variant_names)]");
+        for p in [
+            ".aiserver.v1.CppSessionEvent.event.git_context_event",
+            ".aiserver.v1.CppTimelineEvent.v.event",
+            ".aiserver.v1.StreamAiLintBugResponse.response.bug",
+            ".aiserver.v1.StreamChatToolformerResponse.response_type.tool_action",
+            ".aiserver.v1.TaskStreamLogResponse.response.streamed_log_item",
+            ".aiserver.v1.StreamUnifiedChatRequestWithTools.request.stream_unified_chat_request",
+            ".aiserver.v1.StreamUnifiedChatRequestWithTools.request.client_side_tool_v2_result",
+            ".aiserver.v1.StreamUnifiedChatResponseWithTools.response.client_side_tool_v2_call",
+            ".aiserver.v1.StreamUnifiedChatResponseWithTools.response.stream_unified_chat_response",
+        ] {
+            config.boxed(p);
+        }
+
+        proto_attributes! {
+            config: config,
+            paths: [
+                ".aiserver.v1.CursorPosition",
+                ".aiserver.v1.SimplestRange",
+                ".aiserver.v1.SimpleRange",
+                ".aiserver.v1.LineRange",
+                ".aiserver.v1.CursorRange",
+                ".aiserver.v1.Diagnostic",
+                ".aiserver.v1.BM25Chunk",
+                ".aiserver.v1.CurrentFileInfo",
+                ".aiserver.v1.DataframeInfo",
+                ".aiserver.v1.LinterError",
+                ".aiserver.v1.LinterErrors",
+                ".aiserver.v1.LspSubgraphPosition",
+                ".aiserver.v1.LspSubgraphRange",
+                ".aiserver.v1.LspSubgraphContextItem",
+                ".aiserver.v1.LspSubgraphFullContext",
+                ".aiserver.v1.FSUploadFileRequest",
+                ".aiserver.v1.FilesyncUpdateWithModelVersion",
+                ".aiserver.v1.SingleUpdateRequest",
+                ".aiserver.v1.FSSyncFileRequest",
+                ".aiserver.v1.CppIntentInfo",
+                ".aiserver.v1.LspSuggestion",
+                ".aiserver.v1.LspSuggestedItems",
+                ".aiserver.v1.StreamCppRequest",
+                ".aiserver.v1.CppConfigRequest",
+                ".aiserver.v1.AdditionalFile",
+                ".aiserver.v1.AvailableCppModelsRequest",
+                ".aiserver.v1.CppFileDiffHistory",
+                ".aiserver.v1.CppContextItem",
+                ".aiserver.v1.CppParameterHint",
+                ".aiserver.v1.IRange",
+                ".aiserver.v1.BlockDiffPatch",
+                ".aiserver.v1.AvailableModelsRequest",
+            ],
+            attributes: [
+                "#[derive(::serde::Deserialize)]",
+            ]
+        }
+
+        proto_attributes! {
+            config: config,
+            paths: &[
+                ".aiserver.v1.LineRange",
+                ".aiserver.v1.FSUploadErrorType",
+                ".aiserver.v1.FSSyncErrorType",
+                ".aiserver.v1.FSUploadFileResponse",
+                ".aiserver.v1.FSSyncFileResponse",
+                ".aiserver.v1.StreamCppResponse",
+                ".aiserver.v1.CppConfigResponse",
+                ".aiserver.v1.AvailableCppModelsResponse",
+                ".aiserver.v1.AvailableModelsResponse",
+            ],
+            attributes: [
+                "#[derive(::serde::Serialize)]",
+            ]
+        }
+
+        config
+            .compile_protos(
+                &["src/core/aiserver/v1/lite.proto"],
+                &["src/core/aiserver/v1/"],
+            )
+            .unwrap();
+        config
+            .compile_protos(&["src/core/config/key.proto"], &["src/core/config/"])
+            .unwrap();
+    }
 
     // 静态资源文件处理
     println!("cargo:rerun-if-changed=scripts/minify.js");
@@ -266,13 +303,15 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=static/build_key.html");
     println!("cargo:rerun-if-changed=static/config.html");
     println!("cargo:rerun-if-changed=static/logs.html");
+    println!("cargo:rerun-if-changed=static/proxies.html");
     println!("cargo:rerun-if-changed=static/shared-styles.css");
     println!("cargo:rerun-if-changed=static/shared.js");
     println!("cargo:rerun-if-changed=static/tokens.html");
     println!("cargo:rerun-if-changed=README.md");
-    
+
     // 只在release模式下监控VERSION文件变化
     #[cfg(not(debug_assertions))]
+    #[cfg(feature = "__preview")]
     println!("cargo:rerun-if-changed=VERSION");
 
     #[cfg(not(any(feature = "use-minified")))]
@@ -283,6 +322,9 @@ fn main() -> Result<()> {
         // 运行资源压缩
         minify_assets()?;
     }
+
+    // 生成构建信息文件
+    generate_build_info()?;
 
     Ok(())
 }

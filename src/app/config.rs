@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use super::{constant::AUTHORIZATION_BEARER_PREFIX, lazy::AUTH_TOKEN, model::AppConfig};
 use crate::common::model::{
-    ApiStatus, ErrorResponse, NormalResponse,
-    config::{ConfigData, ConfigUpdateRequest},
+    ApiStatus, GenericError,
+    config::{ConfigData, ConfigResponse, ConfigUpdateRequest},
 };
 use axum::{
     Json,
@@ -35,26 +35,26 @@ macro_rules! handle_resets {
 pub async fn handle_config_update(
     headers: HeaderMap,
     Json(request): Json<ConfigUpdateRequest>,
-) -> Result<Json<NormalResponse<ConfigData>>, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<Json<ConfigResponse>, (StatusCode, Json<GenericError>)> {
     let auth_header = headers
         .get(AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
         .and_then(|h| h.strip_prefix(AUTHORIZATION_BEARER_PREFIX))
         .ok_or((
             StatusCode::UNAUTHORIZED,
-            Json(ErrorResponse {
-                status: ApiStatus::Failure,
+            Json(GenericError {
+                status: ApiStatus::Error,
                 code: Some(401),
                 error: Some(Cow::Borrowed("未提供认证令牌")),
                 message: None,
             }),
         ))?;
 
-    if auth_header != AUTH_TOKEN.as_str() {
+    if auth_header != *AUTH_TOKEN {
         return Err((
             StatusCode::UNAUTHORIZED,
-            Json(ErrorResponse {
-                status: ApiStatus::Failure,
+            Json(GenericError {
+                status: ApiStatus::Error,
                 code: Some(401),
                 error: Some(Cow::Borrowed("无效的认证令牌")),
                 message: None,
@@ -63,10 +63,10 @@ pub async fn handle_config_update(
     }
 
     match request.action.as_str() {
-        "get" => Ok(Json(NormalResponse {
+        "get" => Ok(Json(ConfigResponse {
             status: ApiStatus::Success,
             data: Some(ConfigData {
-                page_content: AppConfig::get_page_content(&request.path),
+                content: AppConfig::get_page_content(&request.path),
                 vision_ability: AppConfig::get_vision_ability(),
                 enable_slow_pool: AppConfig::get_slow_pool(),
                 enable_long_context: AppConfig::get_long_context(),
@@ -74,26 +74,26 @@ pub async fn handle_config_update(
                 enable_dynamic_key: AppConfig::get_dynamic_key(),
                 share_token: AppConfig::get_share_token(),
                 include_web_references: AppConfig::get_web_refs(),
+                fetch_raw_models: AppConfig::get_fetch_models(),
             }),
             message: None,
         })),
 
         "update" => {
             // 处理页面内容更新
-            if !request.path.is_empty() {
-                if let Some(content) = request.content {
-                    if let Err(e) = AppConfig::update_page_content(&request.path, content) {
-                        return Err((
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            Json(ErrorResponse {
-                                status: ApiStatus::Failure,
-                                code: Some(500),
-                                error: Some(Cow::Owned(format!("更新页面内容失败: {e}"))),
-                                message: None,
-                            }),
-                        ));
-                    }
-                }
+            if !request.path.is_empty()
+                && let Some(content) = request.content
+                && AppConfig::update_page_content(&request.path, content)
+            {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(GenericError {
+                        status: ApiStatus::Error,
+                        code: Some(400),
+                        error: Some(Cow::Borrowed("更新页面内容失败: 无效的路径")),
+                        message: None,
+                    }),
+                ));
             }
 
             handle_updates!(request,
@@ -104,9 +104,10 @@ pub async fn handle_config_update(
                 enable_dynamic_key => AppConfig::update_dynamic_key,
                 share_token => AppConfig::update_share_token,
                 include_web_references => AppConfig::update_web_refs,
+                fetch_raw_models => AppConfig::update_fetch_models,
             );
 
-            Ok(Json(NormalResponse {
+            Ok(Json(ConfigResponse {
                 status: ApiStatus::Success,
                 data: None,
                 message: Some(Cow::Borrowed("配置已更新")),
@@ -115,18 +116,16 @@ pub async fn handle_config_update(
 
         "reset" => {
             // 重置页面内容
-            if !request.path.is_empty() {
-                if let Err(e) = AppConfig::reset_page_content(&request.path) {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            status: ApiStatus::Failure,
-                            code: Some(500),
-                            error: Some(Cow::Owned(format!("重置页面内容失败: {e}"))),
-                            message: None,
-                        }),
-                    ));
-                }
+            if !request.path.is_empty() && AppConfig::reset_page_content(&request.path) {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(GenericError {
+                        status: ApiStatus::Error,
+                        code: Some(400),
+                        error: Some(Cow::Borrowed("重置页面内容失败: 无效的路径")),
+                        message: None,
+                    }),
+                ));
             }
 
             handle_resets!(request,
@@ -137,9 +136,10 @@ pub async fn handle_config_update(
                 enable_dynamic_key => AppConfig::reset_dynamic_key,
                 share_token => AppConfig::reset_share_token,
                 include_web_references => AppConfig::reset_web_refs,
+                fetch_raw_models => AppConfig::reset_fetch_models,
             );
 
-            Ok(Json(NormalResponse {
+            Ok(Json(ConfigResponse {
                 status: ApiStatus::Success,
                 data: None,
                 message: Some(Cow::Borrowed("配置已重置")),
@@ -148,8 +148,8 @@ pub async fn handle_config_update(
 
         _ => Err((
             StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                status: ApiStatus::Failure,
+            Json(GenericError {
+                status: ApiStatus::Error,
                 code: Some(400),
                 error: Some(Cow::Borrowed("无效的操作类型")),
                 message: None,

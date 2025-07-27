@@ -13,9 +13,9 @@ on:
         required: true
         type: boolean
         default: true
-  push:
-    tags:
-      - 'v*'
+  # push:
+  #   tags:
+  #     - 'v*'
 
 env:
   IMAGE_NAME: ${{ github.repository_owner }}/cursor-api

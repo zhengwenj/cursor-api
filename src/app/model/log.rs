@@ -1,4 +1,4 @@
-use crate::core::model::Role;
+use crate::core::{constant::get_static_id, model::Role};
 
 #[derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 enum ErrorInfoHelper {
@@ -11,8 +11,8 @@ impl From<ErrorInfoHelper> for super::ErrorInfo {
     fn from(helper: ErrorInfoHelper) -> Self {
         match helper {
             ErrorInfoHelper::None => Self::None,
-            ErrorInfoHelper::Error(e) => Self::new(&e),
-            ErrorInfoHelper::Details { error, details } => Self::new_details(&error, &details),
+            ErrorInfoHelper::Error(e) => Self::new(e),
+            ErrorInfoHelper::Details { error, details } => Self::new_details(error, details),
         }
     }
 }
@@ -32,9 +32,9 @@ impl From<super::ErrorInfo> for ErrorInfoHelper {
 #[derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub(super) struct RequestLogHelper {
     id: u64,
-    timestamp: chrono::DateTime<chrono::Local>,
+    timestamp: chrono::NaiveDateTime,
     model: String,
-    token_info: super::TokenInfo,
+    token_info: super::LogTokenInfo,
     chain: Option<ChainHelper>,
     timing: super::TimingInfo,
     stream: bool,
@@ -46,8 +46,8 @@ impl RequestLogHelper {
     pub(super) fn into_request_log(self) -> super::RequestLog {
         super::RequestLog {
             id: self.id,
-            timestamp: self.timestamp,
-            model: crate::leak::intern_string(self.model),
+            timestamp: self.timestamp.into(),
+            model: get_static_id(self.model),
             token_info: self.token_info,
             chain: self.chain.map(Into::into),
             timing: self.timing,
@@ -62,9 +62,9 @@ impl From<&super::RequestLog> for RequestLogHelper {
     fn from(log: &super::RequestLog) -> Self {
         Self {
             id: log.id,
-            timestamp: log.timestamp,
+            timestamp: log.timestamp.into(),
             model: log.model.to_string(),
-            token_info: log.token_info.clone(),
+            token_info: log.token_info,
             chain: log.chain.clone().map(Into::into),
             timing: log.timing,
             stream: log.stream,
@@ -81,15 +81,9 @@ pub struct PromptMessageHelper {
 impl From<PromptMessageHelper> for super::PromptMessage {
     #[inline]
     fn from(helper: PromptMessageHelper) -> Self {
-        match helper.role {
-            Role::System => super::PromptMessage {
-                role: helper.role,
-                content: super::PromptContent::Leaked(crate::leak::intern_string(helper.content)),
-            },
-            _ => super::PromptMessage {
-                role: helper.role,
-                content: super::PromptContent::Shared(super::RODEO.get_or_intern(helper.content)),
-            },
+        super::PromptMessage {
+            role: helper.role,
+            content: super::PromptContent(crate::leak::intern_arc(helper.content)),
         }
     }
 }
@@ -114,9 +108,8 @@ impl From<PromptHelper> for super::Prompt {
         match helper {
             PromptHelper::None => Self::None,
             PromptHelper::Origin(s) => Self::Origin(s),
-            PromptHelper::Parsed(v) => {
-                Self::Parsed(v.into_iter().map(Into::into).collect::<Vec<_>>())
-            }
+            PromptHelper::Parsed(v) =>
+                Self::Parsed(v.into_iter().map(Into::into).collect::<Vec<_>>()),
         }
     }
 }
@@ -126,9 +119,8 @@ impl From<super::Prompt> for PromptHelper {
         match ori {
             super::Prompt::None => Self::None,
             super::Prompt::Origin(s) => Self::Origin(s),
-            super::Prompt::Parsed(v) => {
-                Self::Parsed(v.into_iter().map(Into::into).collect::<Vec<_>>())
-            }
+            super::Prompt::Parsed(v) =>
+                Self::Parsed(v.into_iter().map(Into::into).collect::<Vec<_>>()),
         }
     }
 }
@@ -136,7 +128,8 @@ impl From<super::Prompt> for PromptHelper {
 pub struct ChainHelper {
     pub prompt: PromptHelper,
     pub delays: Option<(String, Vec<(u32, f32)>)>,
-    pub usage: super::OptionUsage,
+    pub usage: Option<super::ChainUsage>,
+    pub think: Option<String>,
 }
 impl From<ChainHelper> for super::Chain {
     #[inline]
@@ -145,6 +138,7 @@ impl From<ChainHelper> for super::Chain {
             prompt: helper.prompt.into(),
             delays: helper.delays,
             usage: helper.usage,
+            think: helper.think,
         }
     }
 }
@@ -155,6 +149,7 @@ impl From<super::Chain> for ChainHelper {
             prompt: ori.prompt.into(),
             delays: ori.delays,
             usage: ori.usage,
+            think: ori.think,
         }
     }
 }

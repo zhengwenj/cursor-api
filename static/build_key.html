@@ -1,31 +1,114 @@
 <!DOCTYPE html>
-<html lang="zh">
-
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <link rel="icon" type="image/x-icon" href="data:image/x-icon;,">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Key 构建</title>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="data:image/x-icon;," />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>构建 Key</title>
   <!-- 引入共享样式 -->
-  <link rel="stylesheet" href="/static/shared-styles.css">
+  <link rel="stylesheet" href="/static/shared-styles.css" />
   <script src="/static/shared.js"></script>
   <style>
-    .key-result {
-      word-break: break-all;
+    /* 表单分组样式 */
+    .form-section {
+      margin-bottom: 30px;
+      padding: 20px;
       background: var(--card-background);
-      padding: var(--spacing);
+      border-radius: var(--border-radius);
+      border: 1px solid var(--border-color);
+    }
+
+    .form-section h3 {
+      margin: 0 0 15px 0;
+      color: var(--text-primary);
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-section-description {
+      margin-bottom: 15px;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* 必填字段标记 */
+    .required-mark {
+      color: var(--error-color);
+      margin-left: 4px;
+    }
+
+    /* 输入提示样式 */
+    .input-hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Key 结果展示样式 */
+    .key-result {
+      background: var(--card-background);
       border-radius: var(--border-radius);
       border: 1px solid var(--border-color);
       margin-top: var(--spacing);
+      overflow: hidden;
+    }
+
+    .key-result-header {
+      padding: 15px 20px;
+      background: var(--primary-color-alpha);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .key-result-header h3 {
+      margin: 0;
+      color: var(--primary-color);
+      font-size: 16px;
+    }
+
+    .key-result-content {
+      padding: 20px;
+    }
+
+    .key-item {
+      margin-bottom: 15px;
+      padding: 15px;
+      background: var(--background-color);
+      border-radius: 4px;
       position: relative;
+    }
+
+    .key-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .key-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    .key-value {
+      font-family: monospace;
+      font-size: 14px;
+      word-break: break-all;
+      color: var(--text-primary);
+      padding-right: 80px;
     }
 
     .copy-button {
       position: absolute;
       right: 10px;
-      top: 10px;
-      padding: 4px 8px;
-      font-size: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 6px 12px;
+      font-size: 12px;
       background: var(--primary-color-alpha);
       color: var(--primary-color);
       border: 1px solid var(--primary-color);
@@ -37,213 +120,1549 @@
     .copy-button:hover {
       background: var(--primary-color);
       color: white;
+      transform: translateY(calc(-50% + 1px));
     }
 
+    .copy-button.copied {
+      background: var(--success-color);
+      color: white;
+      border-color: var(--success-color);
+    }
+
+    /* 模型选择器样式 */
     .model-list {
-      max-height: 150px;
+      max-height: 200px;
       overflow-y: auto;
-      padding: 8px;
+      padding: 10px;
       border: 1px solid var(--border-color);
       border-radius: 4px;
       margin-top: 8px;
-      background: var(--card-background);
+      background: var(--background-color);
     }
 
     .model-item {
       display: flex;
       align-items: center;
-      margin-bottom: 4px;
+      padding: 6px 0;
+      transition: background var(--transition-fast);
+    }
+
+    .model-item:hover {
+      background: var(--primary-color-alpha);
+      margin: 0 -10px;
+      padding-left: 10px;
+      padding-right: 10px;
     }
 
     .model-item input[type="checkbox"] {
       margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .model-item label {
+      margin: 0;
+      cursor: pointer;
+      flex: 1;
+      user-select: none;
+    }
+
+    /* 折叠面板样式 */
+    .collapsible {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .collapsible::before {
+      content: "▼";
+      display: inline-block;
+      margin-right: 8px;
+      transition: transform var(--transition-fast);
+      font-size: 12px;
+    }
+
+    .collapsible.collapsed::before {
+      transform: rotate(-90deg);
+    }
+
+    .collapsible-content {
+      margin-top: 15px;
+      transition: all var(--transition-fast);
+    }
+
+    .collapsible-content.collapsed {
+      display: none;
+    }
+
+    /* 输入验证样式 */
+    input.invalid {
+      border-color: var(--error-color);
+    }
+
+    input.valid {
+      border-color: var(--success-color);
+    }
+
+    /* 快捷操作按钮 */
+    .quick-actions {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .quick-action-button {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: var(--background-color);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .quick-action-button:hover {
+      background: var(--primary-color-alpha);
+      border-color: var(--primary-color);
+      color: var(--primary-color);
+    }
+
+    /* 时区选择器样式 */
+    .timezone-selector {
+      position: relative;
+    }
+
+    .timezone-search {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .timezone-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 300px;
+      overflow-y: auto;
+      background: var(--card-background);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      margin-top: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      display: none;
+    }
+
+    .timezone-dropdown.show {
+      display: block;
+    }
+
+    .timezone-item {
+      padding: 10px 15px;
+      cursor: pointer;
+      transition: background var(--transition-fast);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .timezone-item:last-child {
+      border-bottom: none;
+    }
+
+    .timezone-item:hover {
+      background: var(--primary-color-alpha);
+    }
+
+    .timezone-item.selected {
+      background: var(--primary-color-alpha);
+      color: var(--primary-color);
+    }
+
+    .timezone-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .timezone-offset {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .timezone-no-results {
+      padding: 20px;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    /* 响应式布局优化 */
+    @media (max-width: 768px) {
+      .form-section {
+        padding: 15px;
+      }
+
+      .key-value {
+        padding-right: 0;
+        margin-bottom: 10px;
+      }
+
+      .copy-button {
+        position: static;
+        transform: none;
+        width: 100%;
+        margin-top: 10px;
+      }
+
+      .quick-actions {
+        flex-wrap: wrap;
+      }
+
+      .timezone-dropdown {
+        max-height: 250px;
+      }
     }
   </style>
 </head>
 
 <body>
-  <h1>Key 构建</h1>
+  <h1>Key 构建器</h1>
 
   <div class="container">
-    <div class="form-group">
-      <label>服务认证令牌:</label>
-      <input type="password" id="authToken" placeholder="输入服务认证令牌">
+    <!-- 快捷操作 -->
+    <div class="quick-actions">
+      <button class="quick-action-button" onclick="loadFromCache()">
+        恢复上次数据
+      </button>
+      <button class="quick-action-button" onclick="clearForm()">
+        清空表单
+      </button>
     </div>
 
-    <div class="form-group">
-      <label>数据认证令牌:</label>
-      <input type="password" id="dataToken" placeholder="输入数据认证令牌">
-    </div>
-
-    <div class="form-group">
-      <label>图片处理能力:</label>
-      <select id="disableVision">
-        <option value="">跟随全局</option>
-        <option value="true">禁用</option>
-        <option value="false">启用</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>慢速池:</label>
-      <select id="enableSlowPool">
-        <option value="">跟随全局</option>
-        <option value="true">启用</option>
-        <option value="false">禁用</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>使用量检查模型规则:</label>
-      <select id="usageCheckType" onchange="toggleModelList()">
-        <option value="">跟随全局</option>
-        <option value="default">默认</option>
-        <option value="disabled">禁用</option>
-        <option value="all">所有</option>
-        <option value="custom">自定义</option>
-      </select>
-      <div id="modelListContainer" class="model-list" style="display: none;">
-        <!-- 模型列表将通过 JavaScript 动态填充 -->
+    <!-- API认证密钥 -->
+    <div class="form-section">
+      <h3>API 认证</h3>
+      <p class="form-section-description">
+        输入用于调用构建Key服务的认证密钥
+      </p>
+      <div class="form-group">
+        <label>
+          认证密钥 (AUTH_TOKEN)
+        </label>
+        <input
+          type="password"
+          id="authToken"
+          placeholder="用于认证API调用的密钥（可选）"
+          autocomplete="off"
+        />
+        <div class="input-hint">此密钥用于认证对构建Key服务的访问（可选字段）</div>
       </div>
     </div>
 
-    <div class="form-group">
-      <label>代理名称:</label>
-      <input type="text" id="proxyName" placeholder="输入代理名称（可选）">
+    <!-- 认证信息 -->
+    <div class="form-section">
+      <h3 class="collapsible" onclick="toggleSection(this)">认证信息</h3>
+      <div class="collapsible-content">
+        <p class="form-section-description">输入认证所需的令牌和校验信息</p>
+
+        <div class="form-group">
+          <label>
+            令牌 (Token)
+            <span class="required-mark">*</span>
+          </label>
+          <input
+            type="text"
+            id="token"
+            placeholder="输入 JWT 格式的令牌"
+            autocomplete="off"
+          />
+          <div class="input-hint">JWT 格式的认证令牌</div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            校验和 - First
+            <span class="required-mark">*</span>
+          </label>
+          <input
+            type="text"
+            id="checksumFirst"
+            placeholder="64位 Hex 编码字符串"
+            pattern="^[0-9a-fA-F]{64}$"
+            maxlength="64"
+            autocomplete="off"
+          />
+          <div class="input-hint">64个十六进制字符（0-9, a-f, A-F）</div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            校验和 - Second
+            <span class="required-mark">*</span>
+          </label>
+          <input
+            type="text"
+            id="checksumSecond"
+            placeholder="64位 Hex 编码字符串"
+            pattern="^[0-9a-fA-F]{64}$"
+            maxlength="64"
+            autocomplete="off"
+          />
+          <div class="input-hint">64个十六进制字符（0-9, a-f, A-F）</div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            客户端密钥 (Client Key)
+            <span class="required-mark">*</span>
+          </label>
+          <input
+            type="text"
+            id="clientKey"
+            placeholder="64位 Hex 编码字符串"
+            pattern="^[0-9a-fA-F]{64}$"
+            maxlength="64"
+            autocomplete="off"
+          />
+          <div class="input-hint">64个十六进制字符（0-9, a-f, A-F）</div>
+        </div>
+      </div>
     </div>
 
-    <div class="form-group">
-      <label>包含网络引用:</label>
-      <select id="includeWebReferences">
-        <option value="">跟随全局</option>
-        <option value="true">启用</option>
-        <option value="false">禁用</option>
-      </select>
+    <!-- 配置信息 -->
+    <div class="form-section">
+      <h3 class="collapsible" onclick="toggleSection(this)">配置信息</h3>
+      <div class="collapsible-content">
+        <p class="form-section-description">设置配置版本和会话标识</p>
+
+        <div class="form-group">
+          <label>
+            配置版本 (Config Version)
+            <span class="required-mark">*</span>
+          </label>
+          <div style="display: flex; gap: 10px; align-items: flex-start;">
+            <input
+              type="text"
+              id="configVersion"
+              placeholder="UUID 格式，如：550e8400-e29b-41d4-a716-446655440000"
+              pattern="^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$"
+              style="flex: 1;"
+            />
+            <button 
+              type="button" 
+              id="fetchConfigVersionButton" 
+              onclick="fetchConfigVersion()"
+              style="padding: 8px 16px; font-size: 14px; white-space: nowrap;"
+            >
+              获取
+            </button>
+          </div>
+          <div class="input-hint">标准 UUID 格式，先填写其他项后最后再点击"获取"按钮获取</div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            会话 ID (Session ID)
+            <span class="required-mark">*</span>
+          </label>
+          <input
+            type="text"
+            id="sessionId"
+            placeholder="UUID 格式，如：550e8400-e29b-41d4-a716-446655440000"
+            pattern="^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$"
+          />
+          <div class="input-hint">标准 UUID 格式</div>
+        </div>
+
+        <div class="form-group">
+          <label>密钥 (Secret)</label>
+          <input type="text" id="secret" placeholder="可选字段" />
+          <div class="input-hint">可选，通常不需要填写</div>
+        </div>
+      </div>
     </div>
 
+    <!-- 代理和区域设置 -->
+    <div class="form-section">
+      <h3 class="collapsible collapsed" onclick="toggleSection(this)">
+        代理和区域设置
+      </h3>
+      <div class="collapsible-content collapsed">
+        <p class="form-section-description">配置代理、时区和代码补全区域</p>
+
+        <div class="form-group">
+          <label>代理名称 (Proxy Name)</label>
+          <input
+            type="text"
+            id="proxyName"
+            placeholder="输入代理名称（可选）"
+          />
+          <div class="input-hint">指定要使用的代理</div>
+        </div>
+
+        <div class="form-group">
+          <label>时区 (Timezone)</label>
+          <div class="timezone-selector">
+            <input
+              type="text"
+              id="timezone"
+              class="timezone-search"
+              placeholder="搜索时区，如：Shanghai、Beijing、Tokyo（可选）"
+              autocomplete="off"
+              onkeyup="filterTimezones(this.value)"
+              onfocus="showTimezoneDropdown()"
+              onblur="hideTimezoneDropdown(event)"
+            />
+            <div id="timezoneDropdown" class="timezone-dropdown">
+              <!-- 动态生成的时区列表 -->
+            </div>
+          </div>
+          <div class="input-hint">
+            输入城市名或时区名称进行搜索，或从列表中选择
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>代码补全区域 (GCPP Host)</label>
+          <select id="gcppHost">
+            <option value="">跟随全局设置</option>
+            <option value="Asia">亚洲 (Asia)</option>
+            <option value="EU">欧洲 (EU)</option>
+            <option value="US">美国 (US)</option>
+          </select>
+          <div class="input-hint">选择最近的服务器区域以获得更好的延迟</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 功能开关 -->
+    <div class="form-section">
+      <h3 class="collapsible collapsed" onclick="toggleSection(this)">
+        功能开关
+      </h3>
+      <div class="collapsible-content collapsed">
+        <p class="form-section-description">控制各项功能的启用状态</p>
+
+        <div class="form-group">
+          <label>图片处理能力 (Vision)</label>
+          <select id="disableVision">
+            <option value="">跟随全局设置</option>
+            <option value="false">启用</option>
+            <option value="true">禁用</option>
+          </select>
+          <div class="input-hint">控制是否启用图片识别功能</div>
+        </div>
+
+        <div class="form-group">
+          <label>慢速池 (Slow Pool)</label>
+          <select id="enableSlowPool">
+            <option value="">跟随全局设置</option>
+            <option value="true">启用</option>
+            <option value="false">禁用</option>
+          </select>
+          <div class="input-hint">启用后可能获得更稳定但响应较慢的服务</div>
+        </div>
+
+        <div class="form-group">
+          <label>网络引用 (Web References)</label>
+          <select id="includeWebReferences">
+            <option value="">跟随全局设置</option>
+            <option value="true">包含</option>
+            <option value="false">不包含</option>
+          </select>
+          <div class="input-hint">是否在响应中包含网络引用信息</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 使用量检查配置 -->
+    <div class="form-section">
+      <h3 class="collapsible collapsed" onclick="toggleSection(this)">
+        使用量检查配置
+      </h3>
+      <div class="collapsible-content collapsed">
+        <p class="form-section-description">配置模型使用量检查规则</p>
+
+        <div class="form-group">
+          <label>检查规则</label>
+          <select id="usageCheckType" onchange="toggleModelList()">
+            <option value="">跟随全局设置</option>
+            <option value="default">使用默认规则</option>
+            <option value="disabled">禁用检查</option>
+            <option value="all">检查所有模型</option>
+            <option value="custom">自定义模型列表</option>
+          </select>
+          <div class="input-hint">选择如何检查模型使用量</div>
+        </div>
+
+        <div id="modelListContainer" class="model-list" style="display: none">
+          <div
+            style="
+              padding: 10px;
+              text-align: center;
+              color: var(--text-secondary);
+            "
+          >
+            加载模型列表中...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作按钮 -->
     <div class="button-group">
-      <button onclick="buildKey()">构建 Key</button>
+      <button onclick="buildKey()" id="buildButton">构建 Key</button>
       <button onclick="clearForm()" class="secondary">清空表单</button>
     </div>
   </div>
 
-  <div id="keyResult" class="key-result" style="display: none;">
-    <button class="copy-button" onclick="copyKey()">复制</button>
-    <div id="keyContent"></div>
+  <!-- Key 结果展示 -->
+  <div id="keyResult" class="key-result" style="display: none">
+    <div class="key-result-header">
+      <h3>生成的 Key</h3>
+      <button class="secondary" onclick="hideKeyResult()">关闭</button>
+    </div>
+    <div class="key-result-content" id="keyContent">
+      <!-- 动态生成的内容 -->
+    </div>
   </div>
 
-  <div id="message"></div>
-
   <script>
+    // 配置常量
+    const CONFIG = {
+      HEX_PATTERN: /^[0-9a-fA-F]{64}$/,
+      UUID_PATTERN:
+        /^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$/,
+      CACHE_KEY: "buildKeyFormData",
+      CACHE_EXPIRY: 7 * 24 * 60 * 60 * 1000, // 7天
+    };
+
+    // 可用模型列表
     let availableModels = [];
 
-    async function getModels() {
+    // 时区数据
+    const TIMEZONES = [
+      // 亚洲主要城市
+      {
+        name: "Asia/Shanghai",
+        display: "上海",
+        offset: "+08:00",
+        keywords: ["shanghai", "上海", "china", "中国"],
+      },
+      {
+        name: "Asia/Beijing",
+        display: "北京",
+        offset: "+08:00",
+        keywords: ["beijing", "北京", "peking"],
+      },
+      {
+        name: "Asia/Hong_Kong",
+        display: "香港",
+        offset: "+08:00",
+        keywords: ["hongkong", "hong kong", "香港", "hk"],
+      },
+      {
+        name: "Asia/Taipei",
+        display: "台北",
+        offset: "+08:00",
+        keywords: ["taipei", "台北", "taiwan", "台湾"],
+      },
+      {
+        name: "Asia/Singapore",
+        display: "新加坡",
+        offset: "+08:00",
+        keywords: ["singapore", "新加坡", "sg"],
+      },
+      {
+        name: "Asia/Tokyo",
+        display: "东京",
+        offset: "+09:00",
+        keywords: ["tokyo", "东京", "japan", "日本"],
+      },
+      {
+        name: "Asia/Seoul",
+        display: "首尔",
+        offset: "+09:00",
+        keywords: ["seoul", "首尔", "korea", "韩国"],
+      },
+      {
+        name: "Asia/Bangkok",
+        display: "曼谷",
+        offset: "+07:00",
+        keywords: ["bangkok", "曼谷", "thailand", "泰国"],
+      },
+      {
+        name: "Asia/Jakarta",
+        display: "雅加达",
+        offset: "+07:00",
+        keywords: ["jakarta", "雅加达", "indonesia", "印尼"],
+      },
+      {
+        name: "Asia/Kolkata",
+        display: "加尔各答",
+        offset: "+05:30",
+        keywords: ["kolkata", "calcutta", "加尔各答", "india", "印度"],
+      },
+      {
+        name: "Asia/Dubai",
+        display: "迪拜",
+        offset: "+04:00",
+        keywords: ["dubai", "迪拜", "uae", "阿联酋"],
+      },
+
+      // 欧洲主要城市
+      {
+        name: "Europe/London",
+        display: "伦敦",
+        offset: "+00:00",
+        keywords: ["london", "伦敦", "uk", "英国", "britain"],
+      },
+      {
+        name: "Europe/Paris",
+        display: "巴黎",
+        offset: "+01:00",
+        keywords: ["paris", "巴黎", "france", "法国"],
+      },
+      {
+        name: "Europe/Berlin",
+        display: "柏林",
+        offset: "+01:00",
+        keywords: ["berlin", "柏林", "germany", "德国"],
+      },
+      {
+        name: "Europe/Madrid",
+        display: "马德里",
+        offset: "+01:00",
+        keywords: ["madrid", "马德里", "spain", "西班牙"],
+      },
+      {
+        name: "Europe/Rome",
+        display: "罗马",
+        offset: "+01:00",
+        keywords: ["rome", "罗马", "italy", "意大利"],
+      },
+      {
+        name: "Europe/Moscow",
+        display: "莫斯科",
+        offset: "+03:00",
+        keywords: ["moscow", "莫斯科", "russia", "俄罗斯"],
+      },
+      {
+        name: "Europe/Amsterdam",
+        display: "阿姆斯特丹",
+        offset: "+01:00",
+        keywords: ["amsterdam", "阿姆斯特丹", "netherlands", "荷兰"],
+      },
+      {
+        name: "Europe/Zurich",
+        display: "苏黎世",
+        offset: "+01:00",
+        keywords: ["zurich", "苏黎世", "switzerland", "瑞士"],
+      },
+
+      // 美洲主要城市
+      {
+        name: "America/New_York",
+        display: "纽约",
+        offset: "-05:00",
+        keywords: ["new york", "newyork", "纽约", "ny", "eastern"],
+      },
+      {
+        name: "America/Los_Angeles",
+        display: "洛杉矶",
+        offset: "-08:00",
+        keywords: ["los angeles", "la", "洛杉矶", "pacific"],
+      },
+      {
+        name: "America/Chicago",
+        display: "芝加哥",
+        offset: "-06:00",
+        keywords: ["chicago", "芝加哥", "central"],
+      },
+      {
+        name: "America/Toronto",
+        display: "多伦多",
+        offset: "-05:00",
+        keywords: ["toronto", "多伦多", "canada", "加拿大"],
+      },
+      {
+        name: "America/Vancouver",
+        display: "温哥华",
+        offset: "-08:00",
+        keywords: ["vancouver", "温哥华"],
+      },
+      {
+        name: "America/Mexico_City",
+        display: "墨西哥城",
+        offset: "-06:00",
+        keywords: ["mexico city", "墨西哥城", "mexico", "墨西哥"],
+      },
+      {
+        name: "America/Sao_Paulo",
+        display: "圣保罗",
+        offset: "-03:00",
+        keywords: ["sao paulo", "圣保罗", "brazil", "巴西"],
+      },
+      {
+        name: "America/Buenos_Aires",
+        display: "布宜诺斯艾利斯",
+        offset: "-03:00",
+        keywords: ["buenos aires", "布宜诺斯艾利斯", "argentina", "阿根廷"],
+      },
+
+      // 大洋洲
+      {
+        name: "Australia/Sydney",
+        display: "悉尼",
+        offset: "+10:00",
+        keywords: ["sydney", "悉尼", "australia", "澳大利亚"],
+      },
+      {
+        name: "Australia/Melbourne",
+        display: "墨尔本",
+        offset: "+10:00",
+        keywords: ["melbourne", "墨尔本"],
+      },
+      {
+        name: "Pacific/Auckland",
+        display: "奥克兰",
+        offset: "+12:00",
+        keywords: ["auckland", "奥克兰", "new zealand", "新西兰"],
+      },
+
+      // 其他重要时区
+      {
+        name: "UTC",
+        display: "UTC",
+        offset: "+00:00",
+        keywords: ["utc", "gmt", "greenwich"],
+      },
+      {
+        name: "Asia/Chongqing",
+        display: "重庆",
+        offset: "+08:00",
+        keywords: ["chongqing", "重庆"],
+      },
+      {
+        name: "Asia/Shenzhen",
+        display: "深圳",
+        offset: "+08:00",
+        keywords: ["shenzhen", "深圳"],
+      },
+      {
+        name: "Asia/Guangzhou",
+        display: "广州",
+        offset: "+08:00",
+        keywords: ["guangzhou", "广州", "canton"],
+      },
+      {
+        name: "Asia/Hangzhou",
+        display: "杭州",
+        offset: "+08:00",
+        keywords: ["hangzhou", "杭州"],
+      },
+      {
+        name: "Asia/Chengdu",
+        display: "成都",
+        offset: "+08:00",
+        keywords: ["chengdu", "成都"],
+      },
+      {
+        name: "Asia/Wuhan",
+        display: "武汉",
+        offset: "+08:00",
+        keywords: ["wuhan", "武汉"],
+      },
+      {
+        name: "Asia/Harbin",
+        display: "哈尔滨",
+        offset: "+08:00",
+        keywords: ["harbin", "哈尔滨"],
+      },
+      {
+        name: "Asia/Urumqi",
+        display: "乌鲁木齐",
+        offset: "+06:00",
+        keywords: ["urumqi", "乌鲁木齐", "xinjiang", "新疆"],
+      },
+    ];
+
+    // 时区下拉框是否应该保持显示
+    let keepTimezoneDropdownOpen = false;
+
+    /**
+     * 初始化页面
+     */
+    async function initializePage() {
+      // 初始化认证Token处理
+      initializeTokenHandling("authToken");
+
+      // 加载模型列表
+      await loadModels();
+
+      // 初始化时区选择器
+      initializeTimezoneSelector();
+
+      // 尝试从缓存恢复数据
+      const cached = getCachedFormData();
+      if (cached) {
+        showGlobalMessage("已恢复上次的表单数据", false, 2000);
+      }
+
+      // 添加输入验证
+      setupInputValidation();
+
+      // 自动保存表单数据
+      setupAutoSave();
+    }
+
+    /**
+     * 加载可用模型列表
+     */
+    async function loadModels() {
       try {
-        const response = await fetch('/v1/models');
+        const response = await fetch("/v1/models");
         const data = await response.json();
-        availableModels = data.data.map(model => model.id);
+        availableModels = data.data.map((model) => model.id);
         updateModelList();
       } catch (error) {
-        showGlobalMessage('获取模型列表失败', true);
+        console.error("获取模型列表失败:", error);
       }
     }
 
+    /**
+     * 更新模型列表UI
+     */
     function updateModelList() {
-      const container = document.getElementById('modelListContainer');
-      container.innerHTML = availableModels.map(model => `<div class="model-item"><input type="checkbox" id="model_${model}" value="${model}"><label for="model_${model}">${model}</label></div>`).join('');
+      const container = document.getElementById("modelListContainer");
+      if (availableModels.length === 0) {
+        container.innerHTML =
+          '<div style="padding: 10px; text-align: center; color: var(--text-secondary);">暂无可用模型</div>';
+        return;
+      }
+
+      container.innerHTML = availableModels
+        .map(
+          (model) => `
+      <div class="model-item">
+        <input type="checkbox" id="model_${model}" value="${model}">
+        <label for="model_${model}">${model}</label>
+      </div>
+    `,
+        )
+        .join("");
     }
 
+    /**
+     * 切换模型列表显示
+     */
     function toggleModelList() {
-      const type = document.getElementById('usageCheckType').value;
-      const container = document.getElementById('modelListContainer');
-      container.style.display = type === 'custom' ? 'block' : 'none';
+      const type = document.getElementById("usageCheckType").value;
+      const container = document.getElementById("modelListContainer");
+      container.style.display = type === "custom" ? "block" : "none";
     }
 
-    async function buildKey() {
-      const authToken = document.getElementById('authToken').value;
-      const dataToken = document.getElementById('dataToken').value;
+    /**
+     * 切换折叠面板
+     */
+    function toggleSection(element) {
+      element.classList.toggle("collapsed");
+      const content = element.nextElementSibling;
+      content.classList.toggle("collapsed");
+    }
 
-      if (!authToken) {
-        showGlobalMessage('请输入服务认证令牌', true);
-        return;
-      }
-
-      if (!dataToken) {
-        showGlobalMessage('请输入数据认证令牌', true);
-        return;
-      }
-
-      const type = document.getElementById('usageCheckType').value;
-      let modelIds = '';
-      if (type === 'custom') {
-        modelIds = Array.from(document.querySelectorAll('#modelListContainer input:checked'))
-          .map(input => input.value)
-          .join(',');
-      }
-
-      const data = {
-        auth_token: dataToken,
-        proxy_name: document.getElementById('proxyName').value || undefined,
-        disable_vision: parseBooleanFromString(document.getElementById('disableVision').value, undefined),
-        enable_slow_pool: parseBooleanFromString(document.getElementById('enableSlowPool').value, undefined),
-        usage_check_models: type ? {
-          type: type,
-          model_ids: type === 'custom' ? modelIds : undefined
-        } : undefined,
-        include_web_references: parseBooleanFromString(document.getElementById('includeWebReferences').value, undefined)
-      };
-
-      try {
-        const response = await makeAuthenticatedRequest('/build-key', {
-          method: 'POST',
-          body: JSON.stringify(data)
+    /**
+     * 设置输入验证
+     */
+    function setupInputValidation() {
+      // Hex 字段验证
+      ["checksumFirst", "checksumSecond", "clientKey"].forEach((id) => {
+        const input = document.getElementById(id);
+        input.addEventListener("input", function () {
+          validateHexInput(this);
         });
+      });
 
-        if (response) {
-          const keyResult = document.getElementById('keyResult');
-          const keyContent = document.getElementById('keyContent');
-          keyContent.textContent = response.key || response.error;
-          keyResult.style.display = 'block';
-          showGlobalMessage(response.key ? 'Key 构建成功' : '构建失败: ' + response.error, !response.key);
-        }
-      } catch (error) {
-        showGlobalMessage('请求失败: ' + error.message, true);
-      }
-    }
-
-    function copyKey() {
-      const keyContent = document.getElementById('keyContent').textContent;
-      navigator.clipboard.writeText(keyContent).then(() => {
-        showGlobalMessage('Key 已复制到剪贴板');
-      }).catch(() => {
-        showGlobalMessage('复制失败', true);
+      // UUID 字段验证
+      ["configVersion", "sessionId"].forEach((id) => {
+        const input = document.getElementById(id);
+        input.addEventListener("input", function () {
+          validateUUIDInput(this);
+        });
       });
     }
 
-    function clearForm() {
-      document.getElementById('authToken').value = '';
-      document.getElementById('dataToken').value = '';
-      document.getElementById('proxyName').value = '';
-      document.getElementById('disableVision').value = '';
-      document.getElementById('enableSlowPool').value = '';
-      document.getElementById('usageCheckType').value = 'default';
-      document.getElementById('includeWebReferences').value = '';
-      document.getElementById('modelListContainer').style.display = 'none';
-      document.getElementById('keyResult').style.display = 'none';
-      showGlobalMessage('表单已清空');
+    /**
+     * 验证 Hex 输入
+     */
+    function validateHexInput(input) {
+      const value = input.value.trim();
+      if (value === "") {
+        input.classList.remove("valid", "invalid");
+        return;
+      }
+
+      if (CONFIG.HEX_PATTERN.test(value)) {
+        input.classList.remove("invalid");
+        input.classList.add("valid");
+      } else {
+        input.classList.remove("valid");
+        input.classList.add("invalid");
+      }
     }
 
-    // 初始化
-    document.addEventListener('DOMContentLoaded', () => {
-      getModels();
-      const authToken = getAuthToken();
-      if (authToken) {
-        document.getElementById('authToken').value = authToken;
-        fetchLogs();
+    /**
+     * 验证 UUID 输入
+     */
+    function validateUUIDInput(input) {
+      const value = input.value.trim();
+      if (value === "") {
+        input.classList.remove("valid", "invalid");
+        return;
       }
+
+      if (CONFIG.UUID_PATTERN.test(value)) {
+        input.classList.remove("invalid");
+        input.classList.add("valid");
+      } else {
+        input.classList.remove("valid");
+        input.classList.add("invalid");
+      }
+    }
+
+    /**
+     * 设置自动保存
+     */
+    function setupAutoSave() {
+      const inputs = document.querySelectorAll("input, select");
+      inputs.forEach((input) => {
+        input.addEventListener("change", saveFormData);
+      });
+    }
+
+    /**
+     * 保存表单数据到本地存储
+     */
+    function saveFormData() {
+      const formData = {
+        authToken: document.getElementById("authToken").value,
+        token: document.getElementById("token").value,
+        checksumFirst: document.getElementById("checksumFirst").value,
+        checksumSecond: document.getElementById("checksumSecond").value,
+        clientKey: document.getElementById("clientKey").value,
+        configVersion: document.getElementById("configVersion").value,
+        sessionId: document.getElementById("sessionId").value,
+        secret: document.getElementById("secret").value,
+        proxyName: document.getElementById("proxyName").value,
+        timezone: document.getElementById("timezone").value,
+        gcppHost: document.getElementById("gcppHost").value,
+        disableVision: document.getElementById("disableVision").value,
+        enableSlowPool: document.getElementById("enableSlowPool").value,
+        includeWebReferences: document.getElementById("includeWebReferences")
+          .value,
+        usageCheckType: document.getElementById("usageCheckType").value,
+        selectedModels: getSelectedModels(),
+      };
+
+      const cacheData = {
+        data: formData,
+        timestamp: Date.now(),
+      };
+
+      localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify(cacheData));
+    }
+
+    /**
+     * 从缓存恢复表单数据
+     */
+    function getCachedFormData() {
+      try {
+        const cached = localStorage.getItem(CONFIG.CACHE_KEY);
+        if (!cached) return null;
+
+        const { data, timestamp } = JSON.parse(cached);
+
+        // 检查是否过期
+        if (Date.now() - timestamp > CONFIG.CACHE_EXPIRY) {
+          localStorage.removeItem(CONFIG.CACHE_KEY);
+          return null;
+        }
+
+        // 恢复表单数据
+        Object.keys(data).forEach((key) => {
+          if (key === "selectedModels") {
+            // 恢复选中的模型
+            data[key].forEach((modelId) => {
+              const checkbox = document.getElementById(`model_${modelId}`);
+              if (checkbox) checkbox.checked = true;
+            });
+          } else {
+            const element = document.getElementById(key);
+            if (element) element.value = data[key] || "";
+          }
+        });
+
+        return data;
+      } catch (error) {
+        console.error("恢复缓存数据失败:", error);
+        return null;
+      }
+    }
+
+    /**
+     * 从缓存加载数据
+     */
+    function loadFromCache() {
+      const cached = getCachedFormData();
+      if (cached) {
+        showGlobalMessage("已恢复表单数据");
+      } else {
+        showGlobalMessage("没有找到缓存的数据", true);
+      }
+    }
+
+    /**
+     * 获取选中的模型
+     */
+    function getSelectedModels() {
+      return Array.from(
+        document.querySelectorAll("#modelListContainer input:checked"),
+      ).map((input) => input.value);
+    }
+
+    /**
+     * 通用的API请求函数，选择使用makeAuthenticatedRequest或fetch
+     */
+    async function makeApiRequest(url, requestData) {
+      const authToken = document.getElementById("authToken").value.trim();
+
+      if (authToken) {
+        // 如果有认证密钥，使用 makeAuthenticatedRequest 函数
+        const result = await makeAuthenticatedRequest(url, {
+          body: JSON.stringify(requestData),
+        });
+
+        if (!result) {
+          // makeAuthenticatedRequest 已经显示了错误信息
+          return null;
+        }
+
+        return result;
+      } else {
+        // 如果没有认证密钥，直接使用 fetch
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestData),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          showGlobalMessage(`请求失败: ${response.status} ${errorText}`, true);
+          return null;
+        }
+
+        return await response.json();
+      }
+    }
+
+    /**
+     * 获取配置版本
+     */
+    async function fetchConfigVersion() {
+      // 验证必填字段
+      const requiredFields = {
+        token: "令牌",
+        checksumFirst: "校验和 First",
+        checksumSecond: "校验和 Second",
+        clientKey: "客户端密钥",
+        sessionId: "会话 ID",
+      };
+
+      for (const [field, name] of Object.entries(requiredFields)) {
+        const value = document.getElementById(field).value.trim();
+        if (!value) {
+          showGlobalMessage(`请填写${name}`, true);
+          document.getElementById(field).focus();
+          return;
+        }
+      }
+
+      // 验证格式
+      if (
+        !CONFIG.HEX_PATTERN.test(
+          document.getElementById("checksumFirst").value,
+        )
+      ) {
+        showGlobalMessage("校验和 First 格式不正确", true);
+        return;
+      }
+
+      if (
+        !CONFIG.HEX_PATTERN.test(
+          document.getElementById("checksumSecond").value,
+        )
+      ) {
+        showGlobalMessage("校验和 Second 格式不正确", true);
+        return;
+      }
+
+      if (
+        !CONFIG.HEX_PATTERN.test(document.getElementById("clientKey").value)
+      ) {
+        showGlobalMessage("客户端密钥格式不正确", true);
+        return;
+      }
+
+      if (
+        !CONFIG.UUID_PATTERN.test(document.getElementById("sessionId").value)
+      ) {
+        showGlobalMessage("会话 ID 格式不正确", true);
+        return;
+      }
+
+      // 构建请求数据
+      const requestData = {
+        token: document.getElementById("token").value,
+        checksum: {
+          first: document.getElementById("checksumFirst").value,
+          second: document.getElementById("checksumSecond").value,
+        },
+        client_key: document.getElementById("clientKey").value,
+        session_id: document.getElementById("sessionId").value,
+        proxy_name: document.getElementById("proxyName").value || undefined,
+        timezone: document.getElementById("timezone").value || undefined,
+        gcpp_host: document.getElementById("gcppHost").value || undefined,
+      };
+
+      // 移除 undefined 值
+      Object.keys(requestData).forEach((key) => {
+        if (requestData[key] === undefined) {
+          delete requestData[key];
+        }
+      });
+
+      // 禁用按钮
+      const fetchButton = document.getElementById("fetchConfigVersionButton");
+      fetchButton.disabled = true;
+      fetchButton.textContent = "获取中...";
+
+      try {
+        const result = await makeApiRequest("/config-version", requestData);
+
+        if (result && result.config_version) {
+          document.getElementById("configVersion").value = result.config_version;
+          showGlobalMessage("配置版本获取成功");
+
+          // 获取成功后禁用按钮
+          fetchButton.disabled = true;
+          fetchButton.textContent = "已获取";
+
+          // 保存表单数据
+          saveFormData();
+        } else if (result && result.error) {
+          showGlobalMessage("获取失败: " + result.error, true);
+          fetchButton.disabled = false;
+          fetchButton.textContent = "获取";
+        } else {
+          showGlobalMessage("未知错误", true);
+          fetchButton.disabled = false;
+          fetchButton.textContent = "获取";
+        }
+      } catch (error) {
+        showGlobalMessage("请求失败: " + error.message, true);
+        fetchButton.disabled = false;
+        fetchButton.textContent = "获取";
+      }
+    }
+
+    /**
+     * 构建 Key
+     */
+    async function buildKey() {
+      // 验证必填字段
+      const requiredFields = {
+        token: "令牌",
+        checksumFirst: "校验和 First",
+        checksumSecond: "校验和 Second",
+        clientKey: "客户端密钥",
+        configVersion: "配置版本",
+        sessionId: "会话 ID",
+      };
+
+      for (const [field, name] of Object.entries(requiredFields)) {
+        const value = document.getElementById(field).value.trim();
+        if (!value) {
+          showGlobalMessage(`请填写${name}`, true);
+          document.getElementById(field).focus();
+          return;
+        }
+      }
+
+      // 验证格式
+      if (
+        !CONFIG.HEX_PATTERN.test(
+          document.getElementById("checksumFirst").value,
+        )
+      ) {
+        showGlobalMessage("校验和 First 格式不正确", true);
+        return;
+      }
+
+      if (
+        !CONFIG.HEX_PATTERN.test(
+          document.getElementById("checksumSecond").value,
+        )
+      ) {
+        showGlobalMessage("校验和 Second 格式不正确", true);
+        return;
+      }
+
+      if (
+        !CONFIG.HEX_PATTERN.test(document.getElementById("clientKey").value)
+      ) {
+        showGlobalMessage("客户端密钥格式不正确", true);
+        return;
+      }
+
+      if (
+        !CONFIG.UUID_PATTERN.test(
+          document.getElementById("configVersion").value,
+        )
+      ) {
+        showGlobalMessage("配置版本格式不正确", true);
+        return;
+      }
+
+      if (
+        !CONFIG.UUID_PATTERN.test(document.getElementById("sessionId").value)
+      ) {
+        showGlobalMessage("会话 ID 格式不正确", true);
+        return;
+      }
+
+      // 构建请求数据
+      const usageCheckType = document.getElementById("usageCheckType").value;
+      let usageCheckModels = undefined;
+
+      if (usageCheckType) {
+        usageCheckModels = { type: usageCheckType };
+        if (usageCheckType === "custom") {
+          const modelIds = getSelectedModels().join(",");
+          if (!modelIds) {
+            showGlobalMessage("请至少选择一个模型", true);
+            return;
+          }
+          usageCheckModels.model_ids = modelIds;
+        }
+      }
+
+      const requestData = {
+        token: document.getElementById("token").value,
+        checksum: {
+          first: document.getElementById("checksumFirst").value,
+          second: document.getElementById("checksumSecond").value,
+        },
+        client_key: document.getElementById("clientKey").value,
+        config_version: document.getElementById("configVersion").value,
+        session_id: document.getElementById("sessionId").value,
+        secret: document.getElementById("secret").value || undefined,
+        proxy_name: document.getElementById("proxyName").value || undefined,
+        timezone: document.getElementById("timezone").value || undefined,
+        gcpp_host: document.getElementById("gcppHost").value || undefined,
+        disable_vision: parseBooleanFromString(
+          document.getElementById("disableVision").value,
+          undefined,
+        ),
+        enable_slow_pool: parseBooleanFromString(
+          document.getElementById("enableSlowPool").value,
+          undefined,
+        ),
+        include_web_references: parseBooleanFromString(
+          document.getElementById("includeWebReferences").value,
+          undefined,
+        ),
+        usage_check_models: usageCheckModels,
+      };
+
+      // 移除 undefined 值
+      Object.keys(requestData).forEach((key) => {
+        if (requestData[key] === undefined) {
+          delete requestData[key];
+        }
+      });
+
+      // 禁用按钮
+      const buildButton = document.getElementById("buildButton");
+      buildButton.disabled = true;
+      buildButton.textContent = "构建中...";
+
+      try {
+        const result = await makeApiRequest("/build-key", requestData);
+
+        if (result && result.keys && result.keys.length > 0) {
+          displayKeys(result.keys);
+          showGlobalMessage("Key 构建成功");
+
+          // 保存表单数据
+          saveFormData();
+        } else if (result && result.error) {
+          showGlobalMessage("构建失败: " + result.error, true);
+        } else {
+          showGlobalMessage("未知错误", true);
+        }
+      } catch (error) {
+        showGlobalMessage("请求失败: " + error.message, true);
+      } finally {
+        buildButton.disabled = false;
+        buildButton.textContent = "构建 Key";
+      }
+    }
+
+    /**
+     * 显示生成的 Keys
+     */
+    function displayKeys(keys) {
+      const keyResult = document.getElementById("keyResult");
+      const keyContent = document.getElementById("keyContent");
+
+      const keyLabels = ["完整 Key", "Base64 编码 Key", "数字 Key"];
+
+      keyContent.innerHTML = keys
+        .map(
+          (key, index) => `
+      <div class="key-item">
+        <div class="key-label">${keyLabels[index] || `Key ${index + 1}`}</div>
+        <div class="key-value" id="key-${index}">${key}</div>
+        <button class="copy-button" onclick="copyKey('key-${index}', this)">复制</button>
+      </div>
+    `,
+        )
+        .join("");
+
+      keyResult.style.display = "block";
+
+      // 滚动到结果区域
+      keyResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    /**
+     * 复制 Key
+     */
+    async function copyKey(keyId, button) {
+      const keyElement = document.getElementById(keyId);
+      const keyText = keyElement.textContent;
+
+      // 使用共享的复制方法
+      await copyToClipboard(keyText, {
+        successMessage: "Key 已复制到剪贴板",
+        errorMessage: "复制失败，请手动复制",
+        sourceElement: button,
+        onSuccess: () => {
+          // 按钮状态已由 copyToClipboard 处理
+        },
+      });
+    }
+
+    /**
+     * 隐藏 Key 结果
+     */
+    function hideKeyResult() {
+      document.getElementById("keyResult").style.display = "none";
+    }
+
+    /**
+     * 清空表单
+     */
+    function clearForm() {
+      // 清空所有输入框
+      const inputs = document.querySelectorAll("input, select");
+      inputs.forEach((input) => {
+        if (input.type === "checkbox") {
+          input.checked = false;
+        } else {
+          input.value = "";
+        }
+        // 移除验证样式
+        input.classList.remove("valid", "invalid");
+      });
+
+      // 重置获取配置版本按钮状态
+      const fetchButton = document.getElementById("fetchConfigVersionButton");
+      if (fetchButton) {
+        fetchButton.disabled = false;
+        fetchButton.textContent = "获取";
+      }
+
+      // 隐藏结果区域
+      hideKeyResult();
+
+      // 清除缓存
+      localStorage.removeItem(CONFIG.CACHE_KEY);
+
+      showGlobalMessage("表单已清空");
+    }
+
+    /**
+     * 初始化时区选择器
+     */
+    function initializeTimezoneSelector() {
+      // 初始化时渲染所有时区
+      renderTimezones();
+
+      // 添加全局点击事件监听
+      document.addEventListener("click", function (e) {
+        const dropdown = document.getElementById("timezoneDropdown");
+        const input = document.getElementById("timezone");
+
+        if (!dropdown.contains(e.target) && e.target !== input) {
+          dropdown.classList.remove("show");
+        }
+      });
+    }
+
+    /**
+     * 渲染时区列表
+     */
+    function renderTimezones(filter = "") {
+      const dropdown = document.getElementById("timezoneDropdown");
+      const normalizedFilter = filter.toLowerCase();
+
+      // 过滤时区
+      const filteredTimezones = TIMEZONES.filter((tz) => {
+        if (!filter) return true;
+
+        // 检查时区名称
+        if (tz.name.toLowerCase().includes(normalizedFilter)) return true;
+
+        // 检查显示名称
+        if (tz.display.toLowerCase().includes(normalizedFilter)) return true;
+
+        // 检查关键词
+        return tz.keywords.some((keyword) =>
+          keyword.toLowerCase().includes(normalizedFilter),
+        );
+      });
+
+      // 如果没有匹配项
+      if (filteredTimezones.length === 0) {
+        dropdown.innerHTML =
+          '<div class="timezone-no-results">没有找到匹配的时区</div>';
+        return;
+      }
+
+      // 渲染时区列表
+      dropdown.innerHTML = filteredTimezones
+        .map((tz) => {
+          const currentValue = document.getElementById("timezone").value;
+          const isSelected = currentValue === tz.name;
+
+          return `
+        <div class="timezone-item ${isSelected ? "selected" : ""}" 
+              data-timezone="${tz.name}"
+              onmousedown="selectTimezone('${tz.name}')">
+          <div class="timezone-name">${tz.display} - ${tz.name}</div>
+          <div class="timezone-offset">UTC${tz.offset}</div>
+        </div>
+      `;
+        })
+        .join("");
+    }
+
+    /**
+     * 显示时区下拉框
+     */
+    function showTimezoneDropdown() {
+      const dropdown = document.getElementById("timezoneDropdown");
+      dropdown.classList.add("show");
+
+      // 如果输入框为空，显示所有时区
+      const input = document.getElementById("timezone");
+      if (!input.value) {
+        renderTimezones();
+      }
+    }
+
+    /**
+     * 隐藏时区下拉框
+     */
+    function hideTimezoneDropdown(event) {
+      // 使用 setTimeout 确保在点击事件之后执行
+      setTimeout(() => {
+        if (!keepTimezoneDropdownOpen) {
+          const dropdown = document.getElementById("timezoneDropdown");
+          dropdown.classList.remove("show");
+        }
+        keepTimezoneDropdownOpen = false;
+      }, 200);
+    }
+
+    /**
+     * 过滤时区
+     */
+    function filterTimezones(value) {
+      renderTimezones(value);
+    }
+
+    /**
+     * 选择时区
+     */
+    function selectTimezone(timezone) {
+      keepTimezoneDropdownOpen = true;
+      const input = document.getElementById("timezone");
+      input.value = timezone;
+
+      // 触发 change 事件以保存数据
+      input.dispatchEvent(new Event("change"));
+
+      // 隐藏下拉框
+      setTimeout(() => {
+        const dropdown = document.getElementById("timezoneDropdown");
+        dropdown.classList.remove("show");
+      }, 100);
+
+      // showGlobalMessage(`已选择时区: ${timezone}`);
+    }
+
+    /**
+     * 自动检测时区（已弃用，保留以兼容）
+     */
+    function detectTimezone() {
+      try {
+        // 尝试使用 Intl API 获取时区
+        if (
+          Intl &&
+          Intl.DateTimeFormat &&
+          Intl.DateTimeFormat().resolvedOptions
+        ) {
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (timezone) {
+            // 查找匹配的时区
+            const matchedTimezone = TIMEZONES.find(
+              (tz) => tz.name === timezone,
+            );
+            if (matchedTimezone) {
+              selectTimezone(timezone);
+            } else {
+              // 如果不在列表中，直接设置
+              document.getElementById("timezone").value = timezone;
+              showGlobalMessage(`已检测到时区: ${timezone}`);
+              saveFormData();
+            }
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("时区检测失败:", error);
+      }
+
+      // 如果 Intl API 不可用或失败，提示用户手动输入
+      showGlobalMessage("无法自动检测时区，请从列表中选择", true);
+      document.getElementById("timezone").focus();
+    }
+
+    // 页面加载时初始化
+    document.addEventListener("DOMContentLoaded", () => {
+      initializePage();
     });
-    initializeTokenHandling('authToken');
   </script>
 </body>
-
 </html>

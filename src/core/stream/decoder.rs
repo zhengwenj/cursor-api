@@ -1,12 +1,21 @@
+pub mod cpp;
+pub mod direct;
+pub mod types;
+
 use crate::core::{
-    aiserver::v1::{StreamChatResponse, WebReference},
-    error::{ChatError, StreamError},
+    aiserver::v1::{
+        StreamUnifiedChatResponseWithTools, WebReference, conversation_message::Thinking,
+    },
+    error::{CursorError, StreamError},
 };
-use bytes::{Buf, BytesMut};
+use bytes::{Buf as _, BytesMut};
 use flate2::read::GzDecoder;
-use prost::Message;
-use std::io::Read;
-use std::time::Instant;
+use prost::Message as _;
+use std::{
+    io::Read as _,
+    // sync::atomic::{AtomicU32, Ordering},
+    time::Instant,
+};
 
 pub trait InstantExt {
     fn duration_as_secs_f32(&mut self) -> f32;
@@ -22,30 +31,48 @@ impl InstantExt for Instant {
     }
 }
 
-/// 解压gzip数据
+// 解压gzip数据
 #[inline]
 fn decompress_gzip(data: &[u8]) -> Option<Vec<u8>> {
-    if data.len() < 3
-        || unsafe { *data.get_unchecked(0) } != 0x1f
-        || unsafe { *data.get_unchecked(1) } != 0x8b
-        || unsafe { *data.get_unchecked(2) } != 0x08
+    // 一个最小的 GZIP 文件需要 10 字节的头和 8 字节的尾，所以至少 18 字节。
+    if data.len() < 18
+        || unsafe {
+            *data.get_unchecked(0) != 0x1f
+                || *data.get_unchecked(1) != 0x8b
+                || *data.get_unchecked(2) != 0x08
+        }
     {
         return None;
     }
 
-    let mut decoder = GzDecoder::new(data);
-    let mut decompressed = Vec::new();
+    let capacity = unsafe {
+        const SIZE: usize = 4;
+        let last_four_bytes_ptr = data.as_ptr().add(data.len() - SIZE);
+        let raw_isize = {
+            let mut tmp = ::core::mem::MaybeUninit::uninit();
+            // SAFETY: the caller must guarantee that `src` is valid for reads.
+            // `src` cannot overlap `tmp` because `tmp` was just allocated on
+            // the stack as a separate allocation.
+            //
+            // Also, since we just wrote a valid value into `tmp`, it is guaranteed
+            // to be properly initialized.
+            std::ptr::copy_nonoverlapping(last_four_bytes_ptr, tmp.as_mut_ptr() as *mut u8, SIZE);
+            tmp.assume_init()
+        };
+        u32::from_le(raw_isize) as usize
+    };
 
-    match decoder.read_to_end(&mut decompressed) {
-        Ok(_) => Some(decompressed),
-        Err(_) => {
-            // println!("gzip解压失败: {}", e);
-            None
-        }
+    let mut decoder = GzDecoder::new(data);
+    let mut decompressed = Vec::with_capacity(capacity);
+
+    if decoder.read_to_end(&mut decompressed).is_ok() {
+        Some(decompressed)
+    } else {
+        None
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StreamMessage {
     // 调试
     Debug(String),
@@ -54,10 +81,10 @@ pub enum StreamMessage {
     // 内容开始标志
     #[cfg(test)]
     ContentStart,
+    // 思考
+    Thinking(Thinking),
     // 消息内容
     Content(String),
-    // 额度消耗
-    Usage(String),
     // 流结束标志
     StreamEnd,
 }
@@ -71,18 +98,31 @@ impl StreamMessage {
                     return StreamMessage::Content(String::new());
                 }
 
-                let mut result = String::from("WebReferences:\n");
+                use crate::common::utils::StringBuilder;
+
+                // 计算需要添加的字符串部分数量
+                // 每个web引用需要8个部分：序号、"[", 标题、"](", URL、")<", chunk、换行符
+                // 再加上头部"WebReferences:\n"和末尾的额外换行符，共两个部分
+                let parts_count = refs.len() * 8 + 2;
+
+                let mut builder =
+                    StringBuilder::with_capacity(parts_count).append("WebReferences:\n");
+
                 for (i, web_ref) in refs.iter().enumerate() {
-                    result.push_str(&format!(
-                        "{}. [{}]({})<{}>\n",
-                        i + 1,
-                        web_ref.title,
-                        web_ref.url,
-                        web_ref.chunk
-                    ));
+                    builder
+                        .append_mut((i + 1).to_string())
+                        .append_mut(". [")
+                        .append_mut(&web_ref.title)
+                        .append_mut("](")
+                        .append_mut(&web_ref.url)
+                        .append_mut(")<")
+                        .append_mut(&web_ref.chunk)
+                        .append_mut(">\n");
                 }
-                result.push('\n');
-                StreamMessage::Content(result)
+
+                builder.append_mut("\n");
+
+                StreamMessage::Content(builder.build())
             }
             other => other,
         }
@@ -90,11 +130,12 @@ impl StreamMessage {
 }
 
 pub struct StreamDecoder {
-    // 主要数据缓冲区
+    // 主要数据缓冲区 (32字节)
     buffer: BytesMut,
-    // 结果相关 (24字节 + 48字节)
+    // 结果相关 (24字节 + 24字节 + 24字节)
     first_result: Option<Vec<StreamMessage>>,
     content_delays: Option<(String, Vec<(u32, f32)>)>,
+    thinking_content: Option<String>,
     // 计数器和时间 (8字节 + 8字节)
     empty_stream_count: usize,
     last_content_time: Instant,
@@ -102,6 +143,8 @@ pub struct StreamDecoder {
     first_result_ready: bool,
     first_result_taken: bool,
     has_seen_content: bool,
+    // 调试使用
+    // counter: AtomicU32,
 }
 
 impl StreamDecoder {
@@ -110,26 +153,23 @@ impl StreamDecoder {
             buffer: BytesMut::new(),
             first_result: None,
             content_delays: None,
+            thinking_content: None,
             empty_stream_count: 0,
             last_content_time: Instant::now(),
             first_result_ready: false,
             first_result_taken: false,
             has_seen_content: false,
+            // counter: AtomicU32::new(0),
         }
     }
 
     #[inline]
-    pub fn get_empty_stream_count(&self) -> usize {
-        self.empty_stream_count
-    }
+    pub fn get_empty_stream_count(&self) -> usize { self.empty_stream_count }
 
     #[inline]
     pub fn reset_empty_stream_count(&mut self) {
         if self.empty_stream_count > 0 {
-            crate::debug_println!(
-                "重置连续空流计数，之前的计数为: {}",
-                self.empty_stream_count
-            );
+            // crate::debug!("重置连续空流计数，之前的计数为: {}", self.empty_stream_count);
             self.empty_stream_count = 0;
         }
     }
@@ -146,18 +186,19 @@ impl StreamDecoder {
     }
 
     #[cfg(test)]
-    fn is_incomplete(&self) -> bool {
-        !self.buffer.is_empty()
-    }
+    fn is_incomplete(&self) -> bool { !self.buffer.is_empty() }
 
     #[inline]
-    pub fn is_first_result_ready(&self) -> bool {
-        self.first_result_ready
-    }
+    pub fn is_first_result_ready(&self) -> bool { self.first_result_ready }
 
     #[inline]
     pub fn take_content_delays(&mut self) -> Option<(String, Vec<(u32, f32)>)> {
-        std::mem::take(&mut self.content_delays)
+        ::core::mem::take(&mut self.content_delays)
+    }
+
+    #[inline]
+    pub fn take_thinking_content(&mut self) -> Option<String> {
+        ::core::mem::take(&mut self.thinking_content)
     }
 
     #[inline]
@@ -184,7 +225,7 @@ impl StreamDecoder {
 
                 return Err(StreamError::EmptyStream);
             }
-            crate::debug_println!("数据长度小于5字节，当前数据: {}", hex::encode(&self.buffer));
+            crate::debug!("数据长度小于5字节，当前数据: {}", hex::encode(&self.buffer));
             return Err(StreamError::DataLengthLessThan5);
         }
 
@@ -207,16 +248,18 @@ impl StreamDecoder {
                     ]) as usize;
                 }
 
+                offset += 5;
+
                 if msg_len == 0 {
-                    offset += 5;
                     continue;
                 }
 
-                if offset + 5 + msg_len > self.buffer.len() {
+                if offset + msg_len > self.buffer.len() {
+                    // 最后一次循环 offset -= 5;
                     break;
                 }
 
-                offset += 5 + msg_len;
+                offset += msg_len;
                 count += 1;
             }
             count
@@ -249,49 +292,57 @@ impl StreamDecoder {
                 ]) as usize;
             }
 
+            offset += 5;
+
             if msg_len == 0 {
-                offset += 5;
                 #[cfg(test)]
                 messages.push(StreamMessage::ContentStart);
                 continue;
             }
 
-            if offset + 5 + msg_len > self.buffer.len() {
+            let expected_size = offset + msg_len;
+            if expected_size > self.buffer.len() {
+                offset -= 5;
                 break;
             }
+            let msg_data = unsafe { self.buffer.get_unchecked(offset..expected_size) };
 
-            let msg_data = &self.buffer[offset + 5..offset + 5 + msg_len];
-
-            if let Some(msg) = self.process_message(msg_type, msg_data)? {
+            if let Some(msg) = Self::process_message(msg_type, msg_data)? {
                 if let StreamMessage::Content(content) = &msg {
                     self.has_seen_content = true;
                     let delay = self.last_content_time.duration_as_secs_f32();
-                    if let Some(content_delays) = self.content_delays.as_mut() {
-                        content_delays.0.push_str(content);
-                        content_delays
-                            .1
-                            .push((content.chars().count() as u32, delay));
+                    let content_delays = __unwrap!(self.content_delays.as_mut());
+                    content_delays.0.push_str(content);
+                    content_delays
+                        .1
+                        .push((content.chars().count() as u32, delay));
+                } else if let StreamMessage::Thinking(thinking) = &msg {
+                    if let Some(thinking_content) = self.thinking_content.as_mut() {
+                        thinking_content.push_str(&thinking.text);
+                    } else {
+                        self.thinking_content = Some(thinking.text.clone());
                     }
                 }
-                if convert_web_ref {
-                    messages.push(msg.convert_web_ref_to_content());
+                let msg = if convert_web_ref {
+                    msg.convert_web_ref_to_content()
                 } else {
-                    messages.push(msg);
-                }
+                    msg
+                };
+                messages.push(msg);
             }
 
-            offset += 5 + msg_len;
+            offset += msg_len;
         }
 
         self.buffer.advance(offset);
 
         if !self.first_result_taken && !messages.is_empty() {
             if self.first_result.is_none() {
-                self.first_result = Some(std::mem::take(&mut messages));
-            } else if !self.first_result_ready {
-                if let Some(first_result) = &mut self.first_result {
-                    first_result.append(&mut messages);
-                }
+                self.first_result = Some(::core::mem::take(&mut messages));
+            } else if !self.first_result_ready
+                && let Some(first_result) = &mut self.first_result
+            {
+                first_result.append(&mut messages);
             }
         }
         if !self.first_result_ready {
@@ -305,97 +356,73 @@ impl StreamDecoder {
 
     #[inline]
     fn process_message(
-        &self,
         msg_type: u8,
         msg_data: &[u8],
     ) -> Result<Option<StreamMessage>, StreamError> {
         match msg_type {
-            0 => self.handle_text_message(msg_data),
-            1 => self.handle_gzip_message(msg_data),
-            2 => self.handle_json_message(msg_data),
-            3 => self.handle_gzip_json_message(msg_data),
+            0 => Self::handle_text_message(msg_data),
+            1 => Self::handle_gzip_message(msg_data, Self::handle_text_message),
+            2 => Self::handle_json_message(msg_data),
+            3 => Self::handle_gzip_message(msg_data, Self::handle_json_message),
             t => {
                 eprintln!("收到未知消息类型: {t}，请尝试联系开发者以获取支持");
-                crate::debug_println!("消息类型: {t}，消息内容: {}", hex::encode(msg_data));
+                crate::debug!("消息类型: {t}，消息内容: {}", hex::encode(msg_data));
                 Ok(None)
             }
         }
     }
 
     #[inline]
-    fn handle_text_message(&self, msg_data: &[u8]) -> Result<Option<StreamMessage>, StreamError> {
-        if let Ok(response) = StreamChatResponse::decode(msg_data) {
-            // crate::debug_println!("[text] StreamChatResponse [hex: {}]: {:#?}", hex::encode(msg_data), response);
-            if !response.text.is_empty() {
-                Ok(Some(StreamMessage::Content(response.text)))
-            } else if let Some(filled_prompt) = response.filled_prompt {
-                Ok(Some(StreamMessage::Debug(filled_prompt)))
-            } else if let Some(web_citation) = response.web_citation {
-                Ok(Some(StreamMessage::WebReference(web_citation.references)))
-            } else if let Some(usage_uuid) = response.usage_uuid {
-                Ok(Some(StreamMessage::Usage(usage_uuid)))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    #[inline]
-    fn handle_gzip_message(&self, msg_data: &[u8]) -> Result<Option<StreamMessage>, StreamError> {
-        if let Some(text) = decompress_gzip(msg_data) {
-            if let Ok(response) = StreamChatResponse::decode(&text[..]) {
-                // crate::debug_println!("[gzip] StreamChatResponse [hex: {}]: {:#?}", hex::encode(msg_data), response);
+    fn handle_text_message(msg_data: &[u8]) -> Result<Option<StreamMessage>, StreamError> {
+        // let count = self.counter.fetch_add(1, Ordering::SeqCst);
+        if let Ok(response) = StreamUnifiedChatResponseWithTools::decode(msg_data) {
+            // crate::debug!("StreamUnifiedChatResponseWithTools [hex: {}]: {:#?}", hex::encode(msg_data), response);
+            // crate::debug!("{count}: {response:?}");
+            if let Some(super::super::aiserver::v1::stream_unified_chat_response_with_tools::Response::StreamUnifiedChatResponse(response)) = response.response {
                 if !response.text.is_empty() {
-                    Ok(Some(StreamMessage::Content(response.text)))
+                    return Ok(Some(StreamMessage::Content(response.text)));
+                } else if let Some(thinking) = response.thinking {
+                    // if let Ok(s) = serde_json::to_string(&thinking) {
+                    //     crate::debug!("thinking ? = {s}");
+                    // }
+                    return Ok(Some(StreamMessage::Thinking(thinking)))
                 } else if let Some(filled_prompt) = response.filled_prompt {
-                    Ok(Some(StreamMessage::Debug(filled_prompt)))
+                    return Ok(Some(StreamMessage::Debug(filled_prompt)));
                 } else if let Some(web_citation) = response.web_citation {
-                    Ok(Some(StreamMessage::WebReference(web_citation.references)))
-                } else if let Some(usage_uuid) = response.usage_uuid {
-                    Ok(Some(StreamMessage::Usage(usage_uuid)))
-                } else {
-                    Ok(None)
+                    return Ok(Some(StreamMessage::WebReference(web_citation.references)));
                 }
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    #[inline]
-    fn handle_json_message(&self, msg_data: &[u8]) -> Result<Option<StreamMessage>, StreamError> {
-        if msg_data.len() == 2 {
-            return Ok(Some(StreamMessage::StreamEnd));
-        }
-        if let Ok(text) = String::from_utf8(msg_data.to_vec()) {
-            // crate::debug_println!("[text] JSON消息 [hex: {}]: {}", hex::encode(msg_data), text);
-            if let Ok(error) = serde_json::from_str::<ChatError>(&text) {
-                return Err(StreamError::ChatError(error));
             }
         }
+        // crate::debug!("{count}: {}", hex::encode(msg_data));
         Ok(None)
     }
 
     #[inline]
-    fn handle_gzip_json_message(
-        &self,
+    fn handle_gzip_message(
         msg_data: &[u8],
+        f: fn(&[u8]) -> Result<Option<StreamMessage>, StreamError>,
     ) -> Result<Option<StreamMessage>, StreamError> {
-        if let Some(text) = decompress_gzip(msg_data) {
-            if text.len() == 2 {
-                return Ok(Some(StreamMessage::StreamEnd));
-            }
-            if let Ok(text) = String::from_utf8(text) {
-                // crate::debug_println!("[gzip] JSON消息 [hex: {}]: {}", hex::encode(msg_data), text);
-                if let Ok(error) = serde_json::from_str::<ChatError>(&text) {
-                    return Err(StreamError::ChatError(error));
-                }
+        if let Some(msg_data) = decompress_gzip(msg_data) {
+            f(&msg_data)
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[inline]
+    fn handle_json_message(msg_data: &[u8]) -> Result<Option<StreamMessage>, StreamError> {
+        if msg_data.len() == 2 {
+            return Ok(Some(StreamMessage::StreamEnd));
+        }
+        // let count = self.counter.fetch_add(1, Ordering::SeqCst);
+        if let Ok(text) = String::from_utf8(msg_data.to_vec()) {
+            // crate::debug!("JSON消息 [hex: {}]: {}", hex::encode(msg_data), text);
+            // crate::debug!("{count}: {text:?}");
+            if let Ok(error) = serde_json::from_str::<CursorError>(&text) {
+                return Err(StreamError::Upstream(error));
             }
         }
+        // crate::debug!("{count}: {}", hex::encode(msg_data));
         Ok(None)
     }
 }
@@ -423,18 +450,21 @@ mod tests {
         let mut decoder = StreamDecoder::new().no_first_cache();
 
         match decoder.decode(&bytes, false) {
-            Ok(messages) => {
+            Ok(messages) =>
                 for message in messages {
                     match message {
                         StreamMessage::StreamEnd => {
                             println!("流结束");
                             break;
                         }
-                        StreamMessage::Usage(msg) => {
-                            println!("额度uuid: {msg}");
-                        }
+                        // StreamMessage::Usage(msg) => {
+                        //     println!("额度uuid: {msg}");
+                        // }
                         StreamMessage::Content(msg) => {
                             println!("消息内容: {msg}");
+                        }
+                        StreamMessage::Thinking(msg) => {
+                            println!("思考: {msg:?}");
                         }
                         StreamMessage::WebReference(refs) => {
                             println!("网页引用:");
@@ -452,8 +482,7 @@ mod tests {
                             println!("流开始");
                         }
                     }
-                }
-            }
+                },
             Err(e) => {
                 println!("解析错误: {e}");
             }
@@ -518,11 +547,14 @@ mod tests {
                                 should_break = true;
                                 break;
                             }
-                            StreamMessage::Usage(msg) => {
-                                println!("额度uuid: {msg}");
-                            }
+                            // StreamMessage::Usage(msg) => {
+                            //     println!("额度uuid: {msg}");
+                            // }
                             StreamMessage::Content(msg) => {
                                 println!("消息内容 [hex: {hex_str}]: {msg}");
+                            }
+                            StreamMessage::Thinking(msg) => {
+                                println!("思考: {msg:?}");
                             }
                             StreamMessage::WebReference(refs) => {
                                 println!("网页引用 [hex: {hex_str}]:");
@@ -545,13 +577,13 @@ mod tests {
                         break;
                     }
                     if decoder.is_incomplete() {
-                        println!("数据不完整 [hex: {}]", hex_str);
+                        println!("数据不完整 [hex: {hex_str}]");
                         break;
                     }
                     offset += msg_boundary;
                 }
                 Err(e) => {
-                    println!("解析错误 [hex: {}]: {}", hex_str, e);
+                    println!("解析错误 [hex: {hex_str}]: {e}");
                     break;
                 }
             }

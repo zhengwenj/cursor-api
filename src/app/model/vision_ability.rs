@@ -1,32 +1,68 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum VisionAbility {
-    #[serde(rename = "none", alias = "disabled")]
     None,
-    #[serde(rename = "base64", alias = "base64-only")]
     Base64,
-    #[serde(rename = "all", alias = "base64-http")]
     All,
 }
 
 impl VisionAbility {
+    /// 主要的字符串表示
+    const NONE: &'static str = "none";
+    const BASE64: &'static str = "base64";
+    const ALL: &'static str = "all";
+
+    /// 别名
+    const NONE_ALIAS: &'static str = "disabled";
+    const BASE64_ALIAS: &'static str = "base64-only";
+    const ALL_ALIAS: &'static str = "base64-http";
+
+    #[inline]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
-            "none" | "disabled" => Self::None,
-            "base64" | "base64-only" => Self::Base64,
-            "all" | "base64-http" => Self::All,
+            Self::NONE | Self::NONE_ALIAS => Self::None,
+            Self::BASE64 | Self::BASE64_ALIAS => Self::Base64,
+            Self::ALL | Self::ALL_ALIAS => Self::All,
             _ => Self::default(),
         }
     }
 
-    pub fn is_none(&self) -> bool {
-        matches!(self, VisionAbility::None)
+    #[inline(always)]
+    pub fn is_none(&self) -> bool { matches!(self, VisionAbility::None) }
+
+    /// 获取枚举的主要字符串表示
+    #[inline]
+    const fn as_str(&self) -> &'static str {
+        match self {
+            Self::None => Self::NONE,
+            Self::Base64 => Self::BASE64,
+            Self::All => Self::ALL,
+        }
     }
 }
 
 impl Default for VisionAbility {
-    fn default() -> Self {
-        Self::Base64
+    #[inline(always)]
+    fn default() -> Self { Self::Base64 }
+}
+
+impl Serialize for VisionAbility {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for VisionAbility {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(Self::from_str(&s))
     }
 }

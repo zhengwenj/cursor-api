@@ -1,63 +1,103 @@
-cargo-features = ["profile-rustflags", "trim-paths"]
-
 [package]
 name = "cursor-api"
-version = "0.1.3-rc.5.2.5"
+version = "0.3.6"
 edition = "2024"
 authors = ["wisdgod <nav@wisdgod.com>"]
 description = "OpenAI format compatibility layer for the Cursor API"
 repository = "https://github.com/wisdgod/cursor-api"
 
+[[bin]]
+name = "cursor-api"
+path = "src/main.rs"
+
+# [[bin]]
+# name = "rkyv-adapter"
+# path = "tools/rkyv_adapter/src/main.rs"
+
 [build-dependencies]
-prost-build = "^0.13"
-sha2 = { version = "^0.10.8", default-features = false }
-serde_json = "^1.0"
+chrono = { version = "0.4", default-features = false, features = ["alloc"]}
+prost-build = { version = "0.14", optional = true }
+sha2 = { version = "0.10", default-features = false }
+serde_json = "1"
 
 [dependencies]
-axum = { version = "^0.8", default-features = false, features = ["http1", "http2", "json", "tokio", "query"] }
-base64 = { version = "^0.22", default-features = false, features = ["std"] }
-# brotli = { version = "^7.0", default-features = false, features = ["std"] }
-bytes = "^1.10"
-chrono = { version = "^0.4", default-features = false, features = ["std", "clock", "now", "serde", "rkyv-64"] }
-chrono-tz = { version = "^0.10", features = ["serde"] }
-dotenvy = "^0.15"
+ahash = { version = "0.8", default-features = false, features = ["std", "compile-time-rng", "serde"] }
+arc-swap = "1"
+axum = { version = "0.8", default-features = false, features = ["http1", "http2", "json", "tokio", "query", "macros"] }
+# base62 = "2.2.1"
+base64 = { version = "0.22", default-features = false, features = ["std"] }
+# bs58 = { version = "0.5.1", default-features = false, features = ["std"] }
+# brotli = { version = "7.0", default-features = false, features = ["std"] }
+bytes = "1.10"
+chrono = { version = "0.4", default-features = false, features = ["alloc", "serde", "rkyv-64"] }
+chrono-tz = { version = "0.10", features = ["serde"] }
+dotenvy = "0.15"
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
-futures = { version = "^0.3", default-features = false, features = ["std"] }
-gif = { version = "^0.13", default-features = false, features = ["std"] }
-hex = { version = "^0.4", default-features = false, features = ["std"] }
+futures = { version = "0.3", default-features = false, features = ["std"] }
+gif = { version = "0.13", default-features = false, features = ["std"] }
+hashbrown = { version = "0.15", default-features = false }
+hex = { version = "0.4", default-features = false, features = ["std"] }
 http = "1"
-image = { version = "^0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
-lasso = { version = "^0.7", features = ["inline-more", "multi-threaded"] }
-memmap2 = "^0.9"
-# openssl = { version = "^0.10", features = ["vendored"] }
-parking_lot = "^0.12"
-paste = "^1.0"
-prost = "^0.13"
-prost-types = "^0.13"
-rand = { version = "^0.9", default-features = false, features = ["thread_rng"] }
-reqwest = { version = "^0.12", default-features = false, features = ["gzip", "brotli", "json", "stream", "socks", "__tls", "charset", "rustls-tls-webpki-roots", "macos-system-configuration"] }
-rkyv = { version = "^0.7", default-features = false, features = ["alloc", "std", "bytecheck", "size_64", "validation", "std"] }
-serde = { version = "^1.0", default-features = false, features = ["std", "derive", "rc"] }
-serde_json = { package = "sonic-rs", version = "0.5" }
-# serde_json = "^1.0"
-sha2 = { version = "^0.10", default-features = false }
-sysinfo = { version = "^0.34", default-features = false, features = ["system"] }
-tokio = { version = "^1.43", features = ["rt-multi-thread", "macros", "net", "sync", "time", "fs", "signal"] }
-# tokio-stream = { version = "^0.1", features = ["time"] }
-tower-http = { version = "^0.6", features = ["cors", "limit"] }
-url = { version = "^2.5", default-features = false, features = ["serde"] }
-uuid = { version = "^1.14", features = ["v4"] }
+http-body-util = "0.1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+# lasso = { version = "0.7", features = ["multi-threaded", "ahasher"] }
+memmap2 = "0.9"
+# openssl = { version = "0.10", features = ["vendored"] }
+parking_lot = "0.12"
+paste = "1.0"
+phf = { version = "0.12", features = ["macros"] }
+# pin-project-lite = "0.2"
+# pin-project = "1"
+prost = "0.14"
+prost-types = "0.14"
+rand = { version = "0.9", default-features = false, features = ["thread_rng"] }
+reqwest = { version = "0.12", default-features = false, features = ["gzip", "brotli", "json", "stream", "socks", "charset", "http2", "macos-system-configuration"] }
+rkyv = { version = "0.8", default-features = false, features = ["std", "pointer_width_64", "uuid-1"] }
+# rustls = { version = "0.23.26", default-features = false, features = ["std", "tls12"] }
+serde = { version = "1", default-features = false, features = ["std", "derive", "rc"] }
+# serde_json = { package = "sonic-rs", version = "0" }
+serde_json = "1"
+sha2 = { version = "0", default-features = false }
+sysinfo = { version = "0.36", default-features = false, features = ["system"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "fs", "signal"] }
+tokio-util = { version = "0.7", features = ["io"] }
+# tokio-tungstenite = { version = "0.26.2", features = ["rustls-tls-webpki-roots"] }
+# tokio-stream = { version = "0.1", features = ["time"] }
+tower-http = { version = "0.6", features = ["cors", "limit"] }
+tracing = { version = "*", default-features = false, features = ["max_level_off", "release_max_level_off"] }
+ulid = { version = "1.2", default-features = false, features = ["std", "rkyv"] }
+# tracing-subscriber = "0.3"
+url = { version = "2.5", default-features = false, features = ["serde"] }
+uuid = { version = "1.14", default-features = false, features = ["v4", "fast-rng", "serde"] }
 
 [profile.release]
 lto = true
 codegen-units = 1
 panic = 'abort'
 strip = true
+# debug = true
+# split-debuginfo = 'packed'
+# strip = "none"
+# panic = 'unwind'
 opt-level = 3
 trim-paths = "all"
 rustflags = ["-Cdebuginfo=0", "-Zthreads=8"]
 
 [features]
-default = []
+default = ["webpki-roots"]
+webpki-roots = ["reqwest/rustls-tls-webpki-roots"]
+native-roots = ["reqwest/rustls-tls-native-roots"]
 use-minified = []
 __preview = []
+__protoc = ["prost-build"]
+__compat = []
+
+[patch.crates-io]
+h2 = { path = "patch/h2-0.4.10" }
+reqwest = { path = "patch/reqwest-0.12.18" }
+rustls = { path = "patch/rustls-0.23.27" }
+chrono = { path = "patch/chrono-0.4.41" }
+ulid = { path = "patch/ulid-1.2.1" }
+dotenvy = { path = "patch/dotenvy-0.15.7" }
+# bs58 = { path = "patch/bs58-0.5.1" }
+# base62 = { path = "patch/base62-2.2.1" }

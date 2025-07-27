@@ -1,47 +1,41 @@
 use axum::{
-    extract::Query,
     http::{HeaderMap, header::CONTENT_TYPE},
     response::{IntoResponse as _, Response},
 };
-use serde::Deserialize;
 
-use crate::{
-    app::constant::header_value_text_plain_utf8,
-    common::utils::{
-        generate_checksum_with_default, generate_checksum_with_repair, generate_hash,
-        generate_timestamp_header,
-    },
+use crate::app::{
+    constant::HEADER_VALUE_TEXT_PLAIN_UTF8,
+    model::{Checksum, Hash, TimestampHeader},
 };
 
-pub async fn handle_get_hash() -> Response {
-    let hash = generate_hash();
+pub async fn handle_gen_uuid() -> Response {
+    let uuid = uuid::Uuid::new_v4().to_string();
 
-    let headers = HeaderMap::from_iter([(CONTENT_TYPE, header_value_text_plain_utf8().clone())]);
+    let headers = HeaderMap::from_iter([(CONTENT_TYPE, HEADER_VALUE_TEXT_PLAIN_UTF8)]);
+
+    (headers, uuid).into_response()
+}
+
+pub async fn handle_gen_hash() -> Response {
+    let hash = Hash::random().to_string();
+
+    let headers = HeaderMap::from_iter([(CONTENT_TYPE, HEADER_VALUE_TEXT_PLAIN_UTF8)]);
 
     (headers, hash).into_response()
 }
 
-#[derive(Deserialize)]
-pub struct ChecksumQuery {
-    #[serde(default)]
-    pub checksum: Option<String>,
-}
+pub async fn handle_gen_checksum() -> Response {
+    let checksum = Checksum::random().to_string();
 
-pub async fn handle_get_checksum(Query(query): Query<ChecksumQuery>) -> Response {
-    let checksum = match query.checksum {
-        None => generate_checksum_with_default(),
-        Some(checksum) => generate_checksum_with_repair(&checksum),
-    };
-
-    let headers = HeaderMap::from_iter([(CONTENT_TYPE, header_value_text_plain_utf8().clone())]);
+    let headers = HeaderMap::from_iter([(CONTENT_TYPE, HEADER_VALUE_TEXT_PLAIN_UTF8)]);
 
     (headers, checksum).into_response()
 }
 
 pub async fn handle_get_timestamp_header() -> Response {
-    let timestamp_header = generate_timestamp_header();
+    let timestamp_header = TimestampHeader::get_global().to_string();
 
-    let headers = HeaderMap::from_iter([(CONTENT_TYPE, header_value_text_plain_utf8().clone())]);
+    let headers = HeaderMap::from_iter([(CONTENT_TYPE, HEADER_VALUE_TEXT_PLAIN_UTF8)]);
 
     (headers, timestamp_header).into_response()
 }

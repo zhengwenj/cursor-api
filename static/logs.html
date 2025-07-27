@@ -1,15 +1,97 @@
 <!DOCTYPE html>
-<html lang="zh">
-
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <link rel="icon" type="image/x-icon" href="data:image/x-icon;,">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="data:image/x-icon;," />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>请求日志查看</title>
   <!-- 引入共享样式 -->
-  <link rel="stylesheet" href="/static/shared-styles.css">
+  <link rel="stylesheet" href="/static/shared-styles.css" />
   <script src="/static/shared.js"></script>
   <style>
+    /* 筛选面板样式 */
+    .filter-panel {
+      background: var(--card-background);
+      padding: 20px;
+      border-radius: var(--border-radius);
+      margin-bottom: var(--spacing);
+      border: 1px solid var(--border-color);
+    }
+
+    .filter-section {
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .filter-section:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .filter-section h3 {
+      margin: 0 0 15px 0;
+      color: var(--primary-color);
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .filter-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .filter-group input[type="datetime-local"],
+    .filter-group input[type="text"],
+    .filter-group input[type="number"],
+    .filter-group select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      background: var(--card-background);
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      border-color: var(--primary-color);
+      outline: none;
+    }
+
+    .range-input {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .range-input input {
+      flex: 1;
+    }
+
+    .filter-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
     /* 创建正确的堆叠上下文 */
     .stats-grid {
       display: grid;
@@ -48,6 +130,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 15px;
     }
 
     .auto-refresh {
@@ -114,9 +197,14 @@
     }
 
     .close {
-      float: right;
+      font-size: 24px;
+      font-weight: bold;
       cursor: pointer;
-      font-size: 28px;
+      padding: 5px 10px;
+    }
+
+    .close:hover {
+      color: var(--primary-color);
     }
 
     .info-button {
@@ -162,17 +250,6 @@
       white-space: nowrap;
     }
 
-    .close {
-      font-size: 24px;
-      font-weight: bold;
-      cursor: pointer;
-      padding: 5px 10px;
-    }
-
-    .close:hover {
-      color: var(--primary-color);
-    }
-
     .usage-progress-container {
       margin: 16px 0;
       height: 8px;
@@ -189,20 +266,16 @@
       border-radius: 4px;
     }
 
-    /* 根据使用比例改变颜色 */
     .usage-progress-bar.low {
       background-color: #4caf50;
-      /* 绿色 */
     }
 
     .usage-progress-bar.medium {
       background-color: #ff9800;
-      /* 橙色 */
     }
 
     .usage-progress-bar.high {
       background-color: #f44336;
-      /* 红色 */
     }
 
     /* Token 信息和对话预览的通用样式 */
@@ -216,6 +289,7 @@
       position: absolute;
       z-index: 1002;
       background-color: var(--card-background);
+      color: var(--text-primary);
       padding: 12px 15px;
       border-radius: var(--border-radius);
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
@@ -224,7 +298,9 @@
       transform: translateX(-50%);
       bottom: calc(100% + 8px);
       opacity: 0;
-      transition: opacity 0.3s, visibility 0.3s;
+      transition:
+        opacity 0.3s,
+        visibility 0.3s;
       text-align: left;
       line-height: 1.6;
       border: 1px solid var(--border-color);
@@ -236,9 +312,8 @@
       opacity: 1;
     }
 
-    /* 添加小三角形指示器 */
     .token-info-tooltip .tooltip-content::after {
-      content: '';
+      content: "";
       position: absolute;
       top: 100%;
       left: 50%;
@@ -248,9 +323,8 @@
       border-color: var(--card-background) transparent transparent transparent;
     }
 
-    /* 添加不可见的连接区域 */
     .token-info-tooltip::after {
-      content: '';
+      content: "";
       position: absolute;
       left: 50%;
       transform: translateX(-50%);
@@ -260,7 +334,6 @@
       background: transparent;
     }
 
-    /* Token 信息特定样式 */
     .token-info-tooltip .tooltip-info-row {
       display: flex;
       justify-content: space-between;
@@ -311,7 +384,6 @@
       word-break: break-word;
     }
 
-    /* 优化滚动条样式 */
     .prompt-preview .tooltip-content::-webkit-scrollbar {
       width: 6px;
     }
@@ -352,7 +424,6 @@
       transition: background-color var(--transition-fast);
     }
 
-    /* 优化表格悬停效果 */
     #logsTable tr:hover td {
       background-color: var(--hover-color, rgba(0, 0, 0, 0.02));
     }
@@ -372,10 +443,45 @@
       border: 1px solid var(--error-color);
       cursor: pointer;
       transition: all var(--transition-fast);
+      margin-right: 8px;
     }
 
     .danger-button:hover {
       background: var(--error-color);
+      color: white;
+    }
+
+    .warning-button {
+      padding: 6px 12px;
+      font-size: 14px;
+      border-radius: var(--border-radius);
+      background: rgba(255, 193, 7, 0.1);
+      color: #e8a400;
+      border: 1px solid #e8a400;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-right: 8px;
+    }
+
+    .warning-button:hover {
+      background: #e8a400;
+      color: white;
+    }
+
+    .success-button {
+      padding: 6px 12px;
+      font-size: 14px;
+      border-radius: var(--border-radius);
+      background: rgba(76, 175, 80, 0.1);
+      color: #4caf50;
+      border: 1px solid #4caf50;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-right: 8px;
+    }
+
+    .success-button:hover {
+      background: #4caf50;
       color: white;
     }
 
@@ -398,6 +504,7 @@
     .tab-button {
       padding: 8px 16px;
       background: var(--card-background);
+      color: var(--text-secondary);
       border: 1px solid var(--border-color);
       cursor: pointer;
       transition: all var(--transition-fast);
@@ -434,46 +541,6 @@
     .delay-table-container {
       max-height: none;
       overflow-y: visible;
-    }
-
-    /* 响应式样式 - 所有@media查询集中在此 */
-    @media (max-width: 768px) {
-      .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-      }
-
-      .stat-card {
-        padding: 16px;
-      }
-
-      .stat-value {
-        font-size: 24px;
-      }
-
-      .modal-content {
-        margin: 2% auto;
-        width: 95%;
-        padding: 16px;
-      }
-
-      .chart-container {
-        height: 200px;
-        padding: 16px;
-      }
-
-      .modal-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .tab-menu {
-        width: 100%;
-      }
-
-      .tab-button {
-        flex: 1;
-      }
     }
 
     .pagination-container {
@@ -527,6 +594,50 @@
       color: white;
       border-color: var(--primary-color);
     }
+
+    /* 响应式样式 */
+    @media (max-width: 768px) {
+      .filter-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      .stat-card {
+        padding: 16px;
+      }
+
+      .stat-value {
+        font-size: 24px;
+      }
+
+      .modal-content {
+        margin: 2% auto;
+        width: 95%;
+        padding: 16px;
+      }
+
+      .chart-container {
+        height: 200px;
+        padding: 16px;
+      }
+
+      .modal-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .tab-menu {
+        width: 100%;
+      }
+
+      .tab-button {
+        flex: 1;
+      }
+    }
   </style>
 </head>
 
@@ -536,34 +647,78 @@
   <div class="container">
     <div class="form-group">
       <label>认证令牌:</label>
-      <input type="password" id="authToken" placeholder="输入 AUTH_TOKEN">
+      <input type="password" id="authToken" placeholder="输入 AUTH_TOKEN" />
     </div>
 
-    <!-- 添加查询参数区域 -->
-    <div class="form-group" style="margin-top: 15px;">
-      <details>
-        <summary>高级筛选</summary>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
-          <div>
-            <label for="statusFilter">状态:</label>
-            <select id="statusFilter" class="form-control">
-              <option value="">全部</option>
-              <option value="success">成功</option>
-              <option value="failure">失败</option>
-              <option value="pending">处理中</option>
-            </select>
+    <!-- 新的筛选面板 -->
+    <div class="filter-panel">
+      <!-- 时间范围筛选 -->
+      <div class="filter-section">
+        <h3>📅 时间范围</h3>
+        <div class="filter-grid">
+          <div class="filter-group">
+            <label for="fromDate">开始时间</label>
+            <input type="datetime-local" id="fromDate" />
           </div>
-          <div>
-            <label for="modelFilter">模型:</label>
-            <input type="text" id="modelFilter" class="form-control" placeholder="模型名称">
+          <div class="filter-group">
+            <label for="toDate">结束时间</label>
+            <input type="datetime-local" id="toDate" />
           </div>
-          <div>
-            <label for="emailFilter">用户邮箱:</label>
-            <input type="text" id="emailFilter" class="form-control" placeholder="用户邮箱">
+        </div>
+        <div style="margin-top: 10px">
+          <label
+            style="
+              display: block;
+              margin-bottom: 5px;
+              font-size: 13px;
+              color: var(--text-secondary);
+            "
+            >快速选择</label
+          >
+          <div class="button-group" style="justify-content: flex-start">
+            <button
+              onclick="setTimeRange('1h')"
+              style="padding: 6px 12px; font-size: 14px"
+            >
+              最近1小时
+            </button>
+            <button
+              onclick="setTimeRange('24h')"
+              style="padding: 6px 12px; font-size: 14px"
+            >
+              最近24小时
+            </button>
+            <button
+              onclick="setTimeRange('7d')"
+              style="padding: 6px 12px; font-size: 14px"
+            >
+              最近7天
+            </button>
+            <button
+              onclick="setTimeRange('30d')"
+              style="padding: 6px 12px; font-size: 14px"
+            >
+              最近30天
+            </button>
           </div>
-          <div>
-            <label for="membershipFilter">会员类型:</label>
-            <select id="membershipFilter" class="form-control">
+        </div>
+      </div>
+
+      <!-- 用户筛选 -->
+      <div class="filter-section">
+        <h3>👤 用户筛选</h3>
+        <div class="filter-grid">
+          <div class="filter-group">
+            <label for="userId">用户ID</label>
+            <input type="text" id="userId" placeholder="精确匹配用户ID" />
+          </div>
+          <div class="filter-group">
+            <label for="email">邮箱</label>
+            <input type="text" id="email" placeholder="支持部分匹配" />
+          </div>
+          <div class="filter-group">
+            <label for="membershipType">会员类型</label>
+            <select id="membershipType">
               <option value="">全部</option>
               <option value="free">免费</option>
               <option value="free_trial">试用</option>
@@ -571,44 +726,165 @@
               <option value="enterprise">企业版</option>
             </select>
           </div>
-          <div>
-            <label for="streamFilter">流式响应:</label>
-            <select id="streamFilter" class="form-control">
+        </div>
+      </div>
+
+      <!-- 模型筛选 -->
+      <div class="filter-section">
+        <h3>🤖 模型筛选</h3>
+        <div class="filter-grid">
+          <div class="filter-group">
+            <label for="model">模型名称</label>
+            <input type="text" id="model" placeholder="支持部分匹配" />
+          </div>
+          <div class="filter-group">
+            <label for="includeModels">包含模型</label>
+            <input
+              type="text"
+              id="includeModels"
+              placeholder="逗号分隔，如: gpt-4,claude"
+            />
+          </div>
+          <div class="filter-group">
+            <label for="excludeModels">排除模型</label>
+            <input
+              type="text"
+              id="excludeModels"
+              placeholder="逗号分隔，如: gpt-3.5,dall-e"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- 性能筛选 -->
+      <div class="filter-section">
+        <h3>📊 性能筛选</h3>
+        <div class="filter-grid">
+          <div class="filter-group">
+            <label>耗时范围（秒）</label>
+            <div class="range-input">
+              <input
+                type="number"
+                id="minTotalTime"
+                placeholder="最小"
+                step="0.1"
+                min="0"
+              />
+              <span>~</span>
+              <input
+                type="number"
+                id="maxTotalTime"
+                placeholder="最大"
+                step="0.1"
+                min="0"
+              />
+            </div>
+          </div>
+          <div class="filter-group">
+            <label>Tokens范围</label>
+            <div class="range-input">
+              <input
+                type="number"
+                id="minTokens"
+                placeholder="最小"
+                min="0"
+              />
+              <span>~</span>
+              <input
+                type="number"
+                id="maxTokens"
+                placeholder="最大"
+                min="0"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 其他选项 -->
+      <div class="filter-section">
+        <h3>🔧 其他选项</h3>
+        <div class="filter-grid">
+          <div class="filter-group">
+            <label for="status">状态</label>
+            <select id="status">
+              <option value="">全部</option>
+              <option value="pending">处理中</option>
+              <option value="success">成功</option>
+              <option value="failure">失败</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="stream">流式响应</label>
+            <select id="stream">
               <option value="">全部</option>
               <option value="true">是</option>
               <option value="false">否</option>
             </select>
           </div>
-          <div>
-            <label for="errorFilter">包含错误:</label>
-            <select id="errorFilter" class="form-control">
+          <div class="filter-group">
+            <label for="hasError">包含错误</label>
+            <select id="hasError">
               <option value="">全部</option>
               <option value="true">是</option>
               <option value="false">否</option>
             </select>
           </div>
-          <div>
-            <label for="pageSize">每页显示:</label>
-            <select id="pageSize" class="form-control">
+          <div class="filter-group">
+            <label for="hasChain">包含对话</label>
+            <select id="hasChain">
+              <option value="">全部</option>
+              <option value="true">是</option>
+              <option value="false">否</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="hasUsage">包含用量</label>
+            <select id="hasUsage">
+              <option value="">全部</option>
+              <option value="true">是</option>
+              <option value="false">否</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="reverse">排序方式</label>
+            <select id="reverse">
+              <option value="false">从旧到新</option>
+              <option value="true">从新到旧</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="pageSize">每页显示</label>
+            <select id="pageSize">
               <option value="10">10 条</option>
               <option value="20" selected>20 条</option>
               <option value="50">50 条</option>
               <option value="100">100 条</option>
             </select>
           </div>
-          <div style="display: flex; align-items: flex-end;">
-            <button onclick="applyFilters()" style="margin-top: 8px;">应用筛选</button>
+          <div class="filter-group">
+            <label for="errorText">错误信息</label>
+            <input type="text" id="errorText" placeholder="支持部分匹配" />
           </div>
         </div>
-      </details>
+      </div>
+
+      <!-- 筛选操作按钮 -->
+      <div class="filter-actions">
+        <button onclick="resetFilters()">重置</button>
+        <button onclick="applyFilters()">应用筛选</button>
+      </div>
     </div>
 
     <div class="refresh-container">
       <div class="button-group">
         <button onclick="fetchLogs()">刷新日志</button>
+        <button onclick="exportLogs()" style="margin-left: 10px">
+          导出数据
+        </button>
       </div>
       <div class="auto-refresh">
-        <input type="checkbox" id="autoRefresh" checked>
+        <input type="checkbox" id="autoRefresh" checked />
         <label for="autoRefresh">自动刷新 (60秒)</label>
       </div>
     </div>
@@ -621,12 +897,12 @@
         <div id="totalRequests" class="stat-value">-</div>
       </div>
       <div class="stat-card">
-        <h4>活跃请求数</h4>
-        <div id="activeRequests" class="stat-value">-</div>
+        <h4>成功请求</h4>
+        <div id="successRequests" class="stat-value">-</div>
       </div>
       <div class="stat-card">
-        <h4>错误请求数</h4>
-        <div id="errorRequests" class="stat-value">-</div>
+        <h4>失败请求</h4>
+        <div id="failureRequests" class="stat-value">-</div>
       </div>
       <div class="stat-card">
         <h4>最后更新</h4>
@@ -643,14 +919,14 @@
       <table id="logsTable">
         <thead>
           <tr>
-            <th>序</th>
+            <th>序号</th>
             <th>时间</th>
             <th>模型</th>
             <th>Token信息</th>
             <th>对话</th>
             <th>用时</th>
             <th>输入/输出</th>
-            <th>流式响应</th>
+            <th>流式</th>
             <th>状态</th>
             <th>错误信息</th>
           </tr>
@@ -659,134 +935,143 @@
       </table>
     </div>
 
-    <!-- 添加分页控件 -->
-    <div class="pagination-container"
-      style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+    <!-- 分页控件 -->
+    <div class="pagination-container">
       <div class="pagination-info">
-        共 <span id="totalRecords">0</span> 条记录，
-        每页 <input type="number" id="customPageSize" class="page-input" min="5" max="100" value="20"> 条
+        共 <span id="totalRecords">0</span> 条记录， 每页
+        <input
+          type="number"
+          id="customPageSize"
+          class="page-input"
+          min="5"
+          max="100"
+          value="20"
+        />
+        条
         <button class="page-go-btn" onclick="changePageSize()">应用</button>
       </div>
       <div class="pagination-controls">
-        <button id="prevPage" onclick="changePage(-1)" disabled>&laquo; 上一页</button>
+        <button id="prevPage" onclick="changePage(-1)" disabled>
+          &laquo; 上一页
+        </button>
         <span id="currentPage">第 1 页</span>
-        <button id="nextPage" onclick="changePage(1)" disabled>下一页 &raquo;</button>
+        <button id="nextPage" onclick="changePage(1)" disabled>
+          下一页 &raquo;
+        </button>
         <div class="page-jumper">
-          跳转到第 <input type="number" id="pageNumberInput" class="page-input" min="1" value="1"> 页
+          跳转到第
+          <input
+            type="number"
+            id="pageNumberInput"
+            class="page-input"
+            min="1"
+            value="1"
+          />
+          页
           <button class="page-go-btn" onclick="jumpToPage()">GO</button>
         </div>
       </div>
     </div>
   </div>
 
-  <div id="message"></div>
-
-  <!-- 添加弹窗组件 -->
+  <!-- Token详情模态框 -->
   <div id="tokenModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
         <h3>Token 详细信息</h3>
-        <div class="modal-actions">
-          <button class="danger-button" id="deleteTokenBtn">删除此Token</button>
-          <span class="close">&times;</span>
-        </div>
+        <span class="close">&times;</span>
       </div>
       <div class="token-info-container">
         <table class="message-table">
-          <tr>
-            <td>Token:</td>
-            <td id="modalToken"></td>
-          </tr>
-          <tr>
-            <td>校验和:</td>
-            <td id="modalChecksum"></td>
-          </tr>
-          <tr>
-            <td colspan="2" style="text-align: center; font-weight: bold; background-color: var(--border-color);">
-              用户信息
-            </td>
-          </tr>
-          <tr>
-            <td>邮箱:</td>
-            <td id="modalEmail"></td>
-          </tr>
-          <tr>
-            <td>用户名:</td>
-            <td id="modalName"></td>
-          </tr>
-          <tr>
-            <td>用户ID:</td>
-            <td id="modalId"></td>
-          </tr>
-          <tr>
-            <td>更新时间:</td>
-            <td id="modalUpdatedAt"></td>
-          </tr>
-          <tr>
-            <td colspan="2" style="text-align: center; font-weight: bold; background-color: var(--border-color);">
-              会员信息
-            </td>
-          </tr>
-          <tr>
-            <td>会员类型:</td>
-            <td id="modalMemberType"></td>
-          </tr>
-          <tr>
-            <td>支付ID:</td>
-            <td id="modalPaymentId"></td>
-          </tr>
-          <tr>
-            <td>试用剩余:</td>
-            <td id="modalTrialDays"></td>
-          </tr>
-          <tr>
-            <td colspan="2" style="text-align: center; font-weight: bold; background-color: var(--border-color);">
-              使用量统计 (最近30天)
-            </td>
-          </tr>
-          <tr>
-            <td>Premium models:</td>
-            <td id="modalPremiumUsage"></td>
-          </tr>
-          <tr>
-            <td>Standard models:</td>
-            <td id="modalStandardUsage"></td>
-          </tr>
-          <tr>
-            <td>Unknown models:</td>
-            <td id="modalUnknownUsage"></td>
-          </tr>
+          <tbody>
+            <tr>
+              <td>Token</td>
+              <td id="modalToken">-</td>
+            </tr>
+            <tr>
+              <td>Checksum</td>
+              <td id="modalChecksum">-</td>
+            </tr>
+            <tr>
+              <td>Client Key</td>
+              <td id="modalClientKey">-</td>
+            </tr>
+            <tr>
+              <td>Config Version</td>
+              <td id="modalConfigVersion">-</td>
+            </tr>
+            <tr>
+              <td>Session ID</td>
+              <td id="modalSessionId">-</td>
+            </tr>
+            <tr>
+              <td>Proxy</td>
+              <td id="modalProxy">-</td>
+            </tr>
+            <tr>
+              <td>Timezone</td>
+              <td id="modalTimezone">-</td>
+            </tr>
+            <tr>
+              <td>Email</td>
+              <td id="modalEmail">-</td>
+            </tr>
+            <tr>
+              <td>Name</td>
+              <td id="modalName">-</td>
+            </tr>
+            <tr>
+              <td>Updated At</td>
+              <td id="modalUpdatedAt">-</td>
+            </tr>
+            <tr>
+              <td>Member Type</td>
+              <td id="modalMemberType">-</td>
+            </tr>
+            <tr>
+              <td>Payment ID</td>
+              <td id="modalPaymentId">-</td>
+            </tr>
+            <tr>
+              <td>Trial Days</td>
+              <td id="modalTrialDays">-</td>
+            </tr>
+          </tbody>
         </table>
+        <div id="usageProgressContainer"></div>
       </div>
-      <div id="usageProgressContainer"></div>
     </div>
   </div>
 
+  <!-- 对话详情模态框 -->
   <div id="conversationModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
         <h3>对话详情</h3>
         <div class="tab-menu">
           <button id="tab-prompt" class="tab-button active">对话内容</button>
+          <button id="tab-think" class="tab-button">思考过程</button>
           <button id="tab-delays" class="tab-button">延迟分析</button>
         </div>
         <span class="close">&times;</span>
       </div>
       <div id="conversation-content-container">
         <div id="dialogContent" class="tab-content active"></div>
+        <div id="thinkContent" class="tab-content">
+          <pre id="thinkText"></pre>
+        </div>
         <div id="delaysContent" class="tab-content">
-          <div class="chart-container delay-chart-container">
+          <div class="delay-chart-container">
             <canvas id="delayChart"></canvas>
           </div>
-          <h4>事件表</h4>
           <div class="delay-table-container">
-            <table class="message-table" id="delaysTable">
+            <table id="delaysTable" class="message-table">
               <thead>
                 <tr>
-                  <th style="width: 8%">序号</th>
-                  <th style="width: 52%">文本</th>
-                  <th style="width: 15%">间隔 (秒)</th>
-                  <th style="width: 25%">速率 (字符/秒)</th>
+                  <th>序号</th>
+                  <th>文本块</th>
+                  <th>延迟时间(s)</th>
+                  <th>速率(字符/秒)</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -797,174 +1082,262 @@
     </div>
   </div>
 
-  <!-- 添加 Chart.js 库 -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"
-    integrity="sha512-IMvjDnJzMKoQZLPYQHxR4g8nm0sSd9bR7Kl5ayxnPHV8ChqVpHCdBYXGib3ZftuDlfaceqn7t47fObseBCEEJw=="
-    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- 引入Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 
   <script>
-    let refreshInterval;
-    let requestsChart;
+    // 全局变量
     let currentPageIndex = 0;
     let pageSize = 20;
     let totalRecords = 0;
     let currentFilters = {};
+    let refreshInterval = null;
+    let requestsChart = null;
 
+    // 初始化变量
+    let currentTokenDetails = {};
+
+    // Token信息缓存
+    let tokenInfoCache = {};
+    let allTokensLoaded = false; // 标记是否已加载所有token信息
+
+    // 更新统计信息
     function updateStats(data) {
-      document.getElementById('totalRequests').textContent = data.total || 0;
-      document.getElementById('activeRequests').textContent = data.active || 0;
-      if (data.error) {
-        document.getElementById('errorRequests').textContent = data.error;
-        document.getElementById('errorRequests').parentElement.style.display = '';
-      } else {
-        document.getElementById('errorRequests').parentElement.style.display = 'none';
+      // 计算各种统计
+      const totalRequests = data.total || 0;
+      const successRequests = data.logs.filter(
+        (log) => log.status === "success",
+      ).length;
+      const failureRequests = data.logs.filter(
+        (log) => log.status === "failure",
+      ).length;
+
+      // 更新统计卡片
+      document.getElementById("totalRequests").textContent =
+        totalRequests.toLocaleString();
+      document.getElementById("successRequests").textContent =
+        successRequests.toLocaleString();
+      document.getElementById("failureRequests").textContent =
+        failureRequests.toLocaleString();
+      document.getElementById("lastUpdate").textContent =
+        new Date().toLocaleTimeString("zh-CN");
+    }
+
+    // 显示Token详情模态框
+    async function showTokenModal(tokenInfo) {
+      const modal = document.getElementById("tokenModal");
+
+      // 如果有key，优先从缓存获取详细信息
+      if (tokenInfo.key && tokenInfoCache[tokenInfo.key]) {
+        // 使用缓存的数据
+        tokenInfo = { ...tokenInfo, ...tokenInfoCache[tokenInfo.key] };
       }
-      document.getElementById('lastUpdate').textContent =
-        new Date(data.timestamp).toLocaleTimeString();
-    }
 
-    function getProgressBarClass(percentage) {
-      if (percentage <= 60) return 'low';
-      if (percentage <= 85) return 'medium';
-      return 'high';
-    }
+      // 设置基础信息
+      document.getElementById("modalToken").textContent =
+        tokenInfo.primary_token || "-";
 
-    function showTokenModal(tokenInfo) {
-      const modal = document.getElementById('tokenModal');
-      const deleteBtn = document.getElementById('deleteTokenBtn');
+      // 处理checksum
+      if (tokenInfo.checksum) {
+        document.getElementById("modalChecksum").textContent = `${
+          tokenInfo.checksum.first || "-"
+        } / ${tokenInfo.checksum.second || "-"}`;
+      } else {
+        document.getElementById("modalChecksum").textContent = "-";
+      }
 
-      // 存储当前token用于删除操作
-      const currentToken = tokenInfo.token;
+      // 设置其他字段
+      document.getElementById("modalClientKey").textContent =
+        tokenInfo.client_key || "-";
+      document.getElementById("modalConfigVersion").textContent =
+        tokenInfo.config_version || "-";
+      document.getElementById("modalSessionId").textContent =
+        tokenInfo.session_id || "-";
+      document.getElementById("modalProxy").textContent =
+        tokenInfo.proxy || "-";
+      document.getElementById("modalTimezone").textContent =
+        tokenInfo.timezone || "-";
 
-      // 更新删除按钮点击事件
-      deleteBtn.onclick = async () => {
-        if (!currentToken) {
-          showGlobalMessage('无效的Token', true);
-          return;
-        }
+      // 处理用户信息
+      if (tokenInfo.user) {
+        document.getElementById("modalEmail").textContent =
+          tokenInfo.user.email || "-";
+        document.getElementById("modalName").textContent =
+          tokenInfo.user.name || "-";
+        document.getElementById("modalUpdatedAt").textContent = tokenInfo.user
+          .updated_at
+          ? new Date(tokenInfo.user.updated_at).toLocaleString()
+          : "-";
+      } else {
+        document.getElementById("modalEmail").textContent = "-";
+        document.getElementById("modalName").textContent = "-";
+        document.getElementById("modalUpdatedAt").textContent = "-";
+      }
 
-        if (!confirm('确定要删除此Token吗？此操作不可撤销。')) {
-          return;
-        }
+      // 处理Stripe信息
+      if (tokenInfo.stripe) {
+        document.getElementById("modalMemberType").textContent =
+          formatMembershipType(tokenInfo.stripe.membership_type);
+        document.getElementById("modalPaymentId").textContent =
+          tokenInfo.stripe.payment_id || "-";
+        document.getElementById("modalTrialDays").textContent =
+          tokenInfo.stripe.days_remaining_on_trial > 0
+            ? `${tokenInfo.stripe.days_remaining_on_trial}天`
+            : "-";
+      } else {
+        document.getElementById("modalMemberType").textContent = "-";
+        document.getElementById("modalPaymentId").textContent = "-";
+        document.getElementById("modalTrialDays").textContent = "-";
+      }
 
-        const data = await makeAuthenticatedRequest('/tokens/del', {
-          method: 'POST',
-          body: JSON.stringify({
-            tokens: [currentToken],
-            expectation: 'failed_tokens'
-          })
-        });
+      // 处理使用量信息
+      const container = document.getElementById("usageProgressContainer");
+      container.innerHTML = "";
 
-        if (data) {
-          modal.style.display = 'none';
-          let message = 'Token删除成功';
-          if (data.failed_tokens?.length) {
-            message = 'Token删除失败：未找到该Token';
-          }
-          showGlobalMessage(message);
-        }
-      };
-
-      document.getElementById('modalToken').textContent = tokenInfo.token || '-';
-      document.getElementById('modalChecksum').textContent = tokenInfo.checksum || '-';
-
-      if (tokenInfo.profile) {
-        const { user, stripe, usage } = tokenInfo.profile;
-
-        // 设置用户信息
-        document.getElementById('modalEmail').textContent = user.email || '-';
-        document.getElementById('modalName').textContent = user.name || '-';
-        document.getElementById('modalId').textContent = user.id || '-';
-        document.getElementById('modalUpdatedAt').textContent = user.updated_at ? new Date(user.updated_at).toLocaleString() : '-';
-
-        // 设置会员信息
-        document.getElementById('modalMemberType').textContent =
-          formatMembershipType(stripe.membership_type);
-        document.getElementById('modalPaymentId').textContent = stripe.payment_id || '-';
-        document.getElementById('modalTrialDays').textContent =
-          stripe.days_remaining_on_trial > 0 ? `${stripe.days_remaining_on_trial}天` : '-';
-
-        // 处理使用量信息
-        const container = document.getElementById('usageProgressContainer');
-        container.innerHTML = '';
-
+      if (tokenInfo.usage) {
         const models = {
-          'modalPremiumUsage': usage.premium,
-          'modalStandardUsage': usage.standard,
-          'modalUnknownUsage': usage.unknown
+          Premium: tokenInfo.usage.premium,
+          Standard: tokenInfo.usage.standard,
         };
 
-        Object.entries(models).forEach(([elementId, modelData]) => {
-          const element = document.getElementById(elementId);
+        Object.entries(models).forEach(([modelName, modelData]) => {
           if (modelData) {
-            const { requests, tokens, max_requests } = modelData;
+            const div = document.createElement("div");
+            div.style.marginTop = "10px";
 
-            if (max_requests) {
-              const percentage = (requests / max_requests * 100).toFixed(1);
-              element.textContent = `${requests}/${max_requests} requests (${percentage}%), ${tokens} tokens`;
+            const label = document.createElement("strong");
+            label.textContent = `${modelName} 使用量: `;
+            div.appendChild(label);
 
-              const progressDiv = document.createElement('div');
-              progressDiv.className = 'usage-progress-container';
-              const colorClass = getProgressBarClass(parseFloat(percentage));
+            const text = document.createElement("span");
+            if (modelData.max_requests) {
+              const percentage = (
+                (modelData.num_requests / modelData.max_requests) *
+                100
+              ).toFixed(1);
+              text.textContent = `${modelData.num_requests}/${modelData.max_requests} 请求 (${percentage}%), ${modelData.num_tokens} tokens`;
+
+              const progressDiv = document.createElement("div");
+              progressDiv.className = "usage-progress-container";
+              const colorClass =
+                percentage < 50 ? "low" : percentage < 80 ? "medium" : "high";
               progressDiv.innerHTML = `<div class="usage-progress-bar ${colorClass}" style="width: ${percentage}%"></div>`;
-              container.appendChild(progressDiv);
+              div.appendChild(text);
+              div.appendChild(progressDiv);
             } else {
-              element.textContent = `${requests} requests, ${tokens} tokens`;
+              text.textContent = `${modelData.num_requests} 请求, ${modelData.num_tokens} tokens`;
+              div.appendChild(text);
             }
-          } else {
-            element.textContent = '-';
+
+            container.appendChild(div);
           }
         });
-      } else {
-        // 如果没有 profile 信息，清空所有字段
-        [
-          'modalEmail',
-          'modalName',
-          'modalId',
-          'modalUpdatedAt',
-          'modalMemberType',
-          'modalPaymentId',
-          'modalTrialDays',
-          'modalPremiumUsage',
-          'modalStandardUsage',
-          'modalUnknownUsage'
-        ].forEach(id => document.getElementById(id).textContent = '-');
-        document.getElementById('usageProgressContainer').innerHTML = '';
       }
 
-      modal.style.display = 'block';
+      modal.style.display = "block";
     }
 
+    // 格式化简单Token信息用于tooltip
     function formatSimpleTokenInfo(tokenInfo) {
-      if (!tokenInfo.profile) return '无用户信息';
+      if (!tokenInfo) return "无Token信息";
 
-      const { user, stripe, usage } = tokenInfo.profile;
-      const premiumUsage = usage.premium ?
-        `${usage.premium.requests}/${usage.premium.max_requests}` : '-';
+      // 如果有key，优先从缓存获取完整信息
+      let fullTokenInfo = tokenInfo;
+      if (tokenInfo.key && tokenInfoCache[tokenInfo.key]) {
+        fullTokenInfo = { ...tokenInfo, ...tokenInfoCache[tokenInfo.key] };
+      }
 
-      const rows = [
-        ['邮箱', user.email || '-'],
-        ...(user.name ? [['用户名', user.name]] : []),
-        ['会员', formatMembershipType(stripe.membership_type)],
-        ['Premium', premiumUsage]
-      ];
+      const rows = [];
 
-      return rows.map(([label, value]) => `<div class="tooltip-info-row"><span class="label">${label}:</span><span class="value">${value}</span></div>`).join('');
+      if (fullTokenInfo.key) {
+        rows.push(["Key", fullTokenInfo.key]);
+      }
+
+      if (fullTokenInfo.user) {
+        rows.push(["邮箱", fullTokenInfo.user.email || "-"]);
+        if (fullTokenInfo.user.name) {
+          rows.push(["用户名", fullTokenInfo.user.name]);
+        }
+      }
+
+      if (fullTokenInfo.stripe) {
+        rows.push([
+          "会员类型",
+          formatMembershipType(fullTokenInfo.stripe.membership_type),
+        ]);
+      }
+
+      if (fullTokenInfo.usage?.premium) {
+        const premium = fullTokenInfo.usage.premium;
+        const usage = premium.max_requests
+          ? `${premium.num_requests}/${premium.max_requests}`
+          : `${premium.num_requests}`;
+        rows.push(["Premium使用", usage]);
+      }
+
+      if (rows.length === 0) {
+        return "无详细信息";
+      }
+
+      return rows
+        .map(
+          ([label, value]) =>
+            `<div class="tooltip-info-row"><span class="label">${label}:</span><span class="value">${value}</span></div>`,
+        )
+        .join("");
+    }
+
+    // 设置时间范围快速选择
+    function setTimeRange(range) {
+      const now = new Date();
+      const toDate = now.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+      let fromDate;
+
+      switch (range) {
+        case "1h":
+          fromDate = new Date(now - 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 16);
+          break;
+        case "24h":
+          fromDate = new Date(now - 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 16);
+          break;
+        case "7d":
+          fromDate = new Date(now - 7 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 16);
+          break;
+        case "30d":
+          fromDate = new Date(now - 30 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 16);
+          break;
+      }
+
+      document.getElementById("fromDate").value = fromDate;
+      document.getElementById("toDate").value = toDate;
+
+      // 自动应用筛选
+      applyFilters();
     }
 
     function initChart() {
-      const ctx = document.getElementById('requestsChart').getContext('2d');
+      const ctx = document.getElementById("requestsChart").getContext("2d");
       requestsChart = new Chart(ctx, {
-        type: 'line',
+        type: "line",
         data: {
           labels: [],
-          datasets: [{
-            label: '每小时请求数',
-            data: [],
-            borderColor: 'rgb(75, 192, 192)',
-            tension: 0.1,
-            fill: false
-          }]
+          datasets: [
+            {
+              label: "每小时请求数",
+              data: [],
+              borderColor: "rgb(75, 192, 192)",
+              tension: 0.1,
+              fill: false,
+            },
+          ],
         },
         options: {
           responsive: true,
@@ -973,17 +1346,17 @@
             y: {
               beginAtZero: true,
               ticks: {
-                stepSize: 10
-              }
-            }
+                stepSize: 10,
+              },
+            },
           },
           plugins: {
             title: {
               display: true,
-              text: '24小时请求统计'
-            }
-          }
-        }
+              text: "24小时请求统计",
+            },
+          },
+        },
       });
     }
 
@@ -1001,22 +1374,22 @@
       // 初始化24小时的时间段
       for (let i = 0; i < 24; i++) {
         const hour = new Date(now - i * 60 * 60 * 1000);
-        const hourKey = hour.toLocaleString('zh-CN', {
-          month: 'numeric',
-          day: 'numeric',
-          hour: 'numeric'
+        const hourKey = hour.toLocaleString("zh-CN", {
+          month: "numeric",
+          day: "numeric",
+          hour: "numeric",
         });
         hourlyStats.set(hourKey, 0);
       }
 
       // 统计每小时的请求数
-      data.logs.forEach(log => {
+      data.logs.forEach((log) => {
         const logTime = new Date(log.timestamp);
         if (logTime >= past24Hours) {
-          const hourKey = logTime.toLocaleString('zh-CN', {
-            month: 'numeric',
-            day: 'numeric',
-            hour: 'numeric'
+          const hourKey = logTime.toLocaleString("zh-CN", {
+            month: "numeric",
+            day: "numeric",
+            hour: "numeric",
           });
           if (hourlyStats.has(hourKey)) {
             hourlyStats.set(hourKey, hourlyStats.get(hourKey) + 1);
@@ -1026,56 +1399,136 @@
 
       // 转换为图表数据
       const sortedHours = Array.from(hourlyStats.keys()).reverse();
-      const counts = sortedHours.map(hour => hourlyStats.get(hour));
+      const counts = sortedHours.map((hour) => hourlyStats.get(hour));
 
       requestsChart.data.labels = sortedHours;
       requestsChart.data.datasets[0].data = counts;
       requestsChart.update();
     }
 
-    function updateTable(data) {
-      const tbody = document.getElementById('logsBody');
+    async function updateTable(data) {
+      const tbody = document.getElementById("logsBody");
       updateStats(data);
       updateChart(data);
 
       // 更新总记录数和分页信息
       totalRecords = data.total;
-      document.getElementById('totalRecords').textContent = totalRecords;
+      document.getElementById("totalRecords").textContent = totalRecords;
       updatePaginationControls();
 
-      tbody.innerHTML = data.logs.map(log => {
-        let delaysDataAttribute = '';
-        if (log.chain && Array.isArray(log.chain.delays) && log.chain.delays.length === 2 && typeof log.chain.delays[0] === 'string' && Array.isArray(log.chain.delays[1])) {
-          try {
-            const originalDelaysJson = JSON.stringify(log.chain.delays);
-            const escapedJsonString = escapeHtml(originalDelaysJson);
-            delaysDataAttribute = `data-delays='${escapedJsonString}'`;
-          } catch (e) {
-            console.error('Failed to stringify delays data:', e, log.chain.delays);
-            delaysDataAttribute = '';
-          }
+      // 收集所有的token keys
+      const tokenKeys = new Set();
+      data.logs.forEach((log) => {
+        if (log.token_info && log.token_info.key) {
+          tokenKeys.add(log.token_info.key);
         }
+      });
 
-        return `<tr>
-          <td>${log.id}</td>
-          <td>${new Date(log.timestamp).toLocaleString()}</td>
-          <td>${log.model}</td>
-          <td><div class="token-info-tooltip"><button class="info-button" onclick='showTokenModal(${JSON.stringify(log.token_info)})'>查看详情<div class="tooltip-content">${formatSimpleTokenInfo(log.token_info)}</div></button></div></td>
-          <td>${log.chain ? `<div class="token-info-tooltip prompt-preview"><button class="info-button view-conversation" data-prompt="${encodeURIComponent(JSON.stringify(log.chain.prompt))}" ${delaysDataAttribute}>查看对话<div class="tooltip-content">${formatDialogPreview(JSON.stringify(log.chain.prompt))}</div></button></div>` : '-'}</td>
-          <td>${formatTiming(log.timing.total)}</td>
-          <td>${formatUsage(log.chain?.usage)}</td>
-          <td>${log.stream ? '是' : '否'}</td>
-          <td>${log.status}</td>
-          <td>${typeof log.error === 'string' ? log.error : log.error?.error ?? '-'}</td>
-        </tr>`;
-      }).join('');
+      // 如果还没有加载过所有token信息，则加载并等待完成
+      if (!allTokensLoaded && tokenKeys.size > 0) {
+        await loadAllTokenInfo(Array.from(tokenKeys));
+      }
+
+      tbody.innerHTML = data.logs
+        .map((log) => {
+          // 准备数据属性
+          let attributes = {};
+
+          // 处理 prompt 属性
+          if (log.chain && typeof log.chain.prompt === "string") {
+            try {
+              const promptJson = JSON.stringify(log.chain.prompt);
+              const escapedPrompt = escapeHtml(promptJson);
+              attributes.prompt = `data-prompt='${escapedPrompt}'`;
+            } catch (e) {
+              console.error(
+                "Failed to process prompt data:",
+                e,
+                log.chain.prompt,
+              );
+            }
+          }
+
+          // 处理 think 属性
+          if (log.chain && typeof log.chain.think === "string") {
+            try {
+              const thinkJson = JSON.stringify(log.chain.think);
+              const escapedThink = escapeHtml(thinkJson);
+              attributes.think = `data-think='${escapedThink}'`;
+            } catch (e) {
+              console.error(
+                "Failed to process think data:",
+                e,
+                log.chain.think,
+              );
+            }
+          }
+
+          // 处理 delays 属性
+          if (
+            log.chain &&
+            Array.isArray(log.chain.delays) &&
+            log.chain.delays.length === 2 &&
+            typeof log.chain.delays[0] === "string" &&
+            Array.isArray(log.chain.delays[1])
+          ) {
+            try {
+              const delaysJson = JSON.stringify(log.chain.delays);
+              const escapedDelays = escapeHtml(delaysJson);
+              attributes.delays = `data-delays='${escapedDelays}'`;
+            } catch (e) {
+              console.error(
+                "Failed to stringify delays data:",
+                e,
+                log.chain.delays,
+              );
+            }
+          }
+
+          // 组合所有属性
+          const allAttributes = Object.values(attributes).join(" ");
+
+          return `<tr>
+    <td>${log.id}</td>
+    <td>${new Date(log.timestamp).toLocaleString()}</td>
+    <td>${log.model}</td>
+    <td><div class="token-info-tooltip"><button class="info-button" onclick='showTokenModal(${JSON.stringify(
+      log.token_info,
+    )})'>查看详情<div class="tooltip-content">${formatSimpleTokenInfo(
+      log.token_info,
+    )}</div></button></div></td>
+    <td>${
+      log.chain
+        ? `<div class="token-info-tooltip prompt-preview"><button class="info-button view-conversation" ${allAttributes}>查看对话<div class="tooltip-content">${formatDialogPreview(
+            JSON.stringify(log.chain.prompt || ""),
+          )}</div></button></div>`
+        : "-"
+    }</td>
+    <td>${formatTiming(log.timing.total)}</td>
+    <td>${formatUsage(log.chain?.usage)}</td>
+    <td>${log.stream ? "是" : "否"}</td>
+    <td>${log.status}</td>
+    <td>${
+      typeof log.error === "string" ? log.error : (log.error?.error ?? "-")
+    }</td>
+  </tr>`;
+        })
+        .join("");
 
       // 添加事件监听器
-      tbody.querySelectorAll('.view-conversation').forEach(button => {
-        button.addEventListener('click', function () {
-          const prompt = decodeURIComponent(this.dataset.prompt);
-          const delays = this.dataset.delays ? JSON.parse(this.dataset.delays) : [];
-          showConversationModal(prompt, delays);
+      tbody.querySelectorAll(".view-conversation").forEach((button) => {
+        button.addEventListener("click", function () {
+          const prompt = this.hasAttribute("data-prompt")
+            ? JSON.parse(this.dataset.prompt)
+            : "";
+          const think = this.hasAttribute("data-think")
+            ? JSON.parse(this.dataset.think)
+            : "";
+          const delays = this.hasAttribute("data-delays")
+            ? JSON.parse(this.dataset.delays)
+            : [];
+
+          showConversationModal(prompt, think, delays);
         });
       });
     }
@@ -1088,31 +1541,37 @@
       try {
         const messages = parsePrompt(promptStr);
         if (!messages || messages.length === 0) {
-          return '无对话内容';
+          return "无对话内容";
         }
 
         // 获取最后一条消息
         const lastMessage = messages[messages.length - 1];
         const roleLabels = {
-          'system': '系统',
-          'user': '用户',
-          'assistant': '助手'
+          system: "系统",
+          user: "用户",
+          assistant: "助手",
         };
 
-        return `<div class="message-meta">最后一条消息 (${roleLabels[lastMessage.role] || lastMessage.role}):</div><div class="last-message">${lastMessage.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>`;
+        return `<div class="message-meta">最后一条消息 (${
+          roleLabels[lastMessage.role] || lastMessage.role
+        }):</div><div class="last-message">${lastMessage.content
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\n/g, "<br>")}</div>`;
       } catch (e) {
-        console.error('预览对话内容失败:', e);
-        return '无法解析对话内容';
+        console.error("预览对话内容失败:", e);
+        return "无法解析对话内容";
       }
     }
 
     // 更新分页控件状态
     function updatePaginationControls() {
-      const prevPageBtn = document.getElementById('prevPage');
-      const nextPageBtn = document.getElementById('nextPage');
-      const currentPageSpan = document.getElementById('currentPage');
-      const pageNumberInput = document.getElementById('pageNumberInput');
-      const customPageSize = document.getElementById('customPageSize');
+      const prevPageBtn = document.getElementById("prevPage");
+      const nextPageBtn = document.getElementById("nextPage");
+      const currentPageSpan = document.getElementById("currentPage");
+      const pageNumberInput = document.getElementById("pageNumberInput");
+      const customPageSize = document.getElementById("customPageSize");
 
       // 计算总页数
       const totalPages = Math.ceil(totalRecords / pageSize) || 1;
@@ -1125,7 +1584,9 @@
       nextPageBtn.disabled = !hasMorePages;
 
       // 更新当前页显示
-      currentPageSpan.textContent = `第 ${currentPageIndex + 1} 页 / 共 ${totalPages} 页`;
+      currentPageSpan.textContent = `第 ${
+        currentPageIndex + 1
+      } 页 / 共 ${totalPages} 页`;
 
       // 同步输入框数值
       pageNumberInput.value = currentPageIndex + 1;
@@ -1143,12 +1604,12 @@
 
     // 跳转到指定页
     function jumpToPage() {
-      const pageNumberInput = document.getElementById('pageNumberInput');
+      const pageNumberInput = document.getElementById("pageNumberInput");
       const pageNumber = parseInt(pageNumberInput.value);
       const totalPages = Math.ceil(totalRecords / pageSize) || 1;
 
       if (isNaN(pageNumber) || pageNumber < 1) {
-        showGlobalMessage('请输入有效的页码', true);
+        showGlobalMessage("请输入有效的页码", true);
         pageNumberInput.value = currentPageIndex + 1;
         return;
       }
@@ -1165,11 +1626,11 @@
 
     // 更改每页显示数量
     function changePageSize() {
-      const customPageSize = document.getElementById('customPageSize');
+      const customPageSize = document.getElementById("customPageSize");
       const newPageSize = parseInt(customPageSize.value);
 
       if (isNaN(newPageSize) || newPageSize < 5 || newPageSize > 100) {
-        showGlobalMessage('每页显示数量必须在5-100之间', true);
+        showGlobalMessage("每页显示数量必须在5-100之间", true);
         customPageSize.value = pageSize;
         return;
       }
@@ -1180,79 +1641,363 @@
       fetchLogs();
     }
 
+    // 获取时间范围筛选
+    function getTimeRangeFilter() {
+      const fromDate = document.getElementById("fromDate").value;
+      const toDate = document.getElementById("toDate").value;
+
+      const filter = {};
+
+      if (fromDate) {
+        // 转换为RFC3339格式
+        filter.from_date = new Date(fromDate).toISOString();
+      }
+
+      if (toDate) {
+        filter.to_date = new Date(toDate).toISOString();
+      }
+
+      return filter;
+    }
+
+    // 获取用户筛选
+    function getUserFilter() {
+      const filter = {};
+
+      const userId = document.getElementById("userId").value.trim();
+      if (userId) filter.user_id = userId;
+
+      const email = document.getElementById("email").value.trim();
+      if (email) filter.email = email;
+
+      const membership = document.getElementById("membershipType").value;
+      if (membership) filter.membership_type = membership;
+
+      return filter;
+    }
+
+    // 获取模型筛选
+    function getModelFilter() {
+      const filter = {};
+
+      const model = document.getElementById("model").value.trim();
+      if (model) filter.model = model;
+
+      const includeModels = document
+        .getElementById("includeModels")
+        .value.trim();
+      if (includeModels) {
+        filter.include_models = includeModels
+          .split(",")
+          .map((m) => m.trim())
+          .filter((m) => m);
+      }
+
+      const excludeModels = document
+        .getElementById("excludeModels")
+        .value.trim();
+      if (excludeModels) {
+        filter.exclude_models = excludeModels
+          .split(",")
+          .map((m) => m.trim())
+          .filter((m) => m);
+      }
+
+      return filter;
+    }
+
+    // 获取性能筛选
+    function getPerformanceFilter() {
+      const filter = {};
+
+      const minTime = parseFloat(
+        document.getElementById("minTotalTime").value,
+      );
+      if (!isNaN(minTime)) filter.min_total_time = minTime;
+
+      const maxTime = parseFloat(
+        document.getElementById("maxTotalTime").value,
+      );
+      if (!isNaN(maxTime)) filter.max_total_time = maxTime;
+
+      const minTokens = parseInt(document.getElementById("minTokens").value);
+      if (!isNaN(minTokens)) filter.min_tokens = minTokens;
+
+      const maxTokens = parseInt(document.getElementById("maxTokens").value);
+      if (!isNaN(maxTokens)) filter.max_tokens = maxTokens;
+
+      return filter;
+    }
+
+    // 获取其他筛选
+    function getOtherFilters() {
+      const filter = {};
+
+      const status = document.getElementById("status").value;
+      if (status) filter.status = status;
+
+      const stream = document.getElementById("stream").value;
+      if (stream) filter.stream = stream === "true";
+
+      const hasError = document.getElementById("hasError").value;
+      if (hasError) filter.has_error = hasError === "true";
+
+      const hasChain = document.getElementById("hasChain").value;
+      if (hasChain) filter.has_chain = hasChain === "true";
+
+      const hasUsage = document.getElementById("hasUsage").value;
+      if (hasUsage) filter.has_usage = hasUsage === "true";
+
+      const error = document.getElementById("errorText").value.trim();
+      if (error) filter.error = error;
+
+      return filter;
+    }
+
     // 应用筛选条件
     function applyFilters() {
       // 重置到第一页
       currentPageIndex = 0;
 
-      // 获取所有筛选值
-      const status = document.getElementById('statusFilter').value;
-      const model = document.getElementById('modelFilter').value;
-      const email = document.getElementById('emailFilter').value;
-      const membership = document.getElementById('membershipFilter').value;
-      const stream = document.getElementById('streamFilter').value;
-      const hasError = document.getElementById('errorFilter').value;
-
-      // 更新每页显示数量（如果在高级筛选中设置了）
-      const pageSizeSelect = document.getElementById('pageSize');
+      // 更新每页显示数量
+      const pageSizeSelect = document.getElementById("pageSize");
       if (pageSizeSelect) {
         pageSize = parseInt(pageSizeSelect.value);
         // 同步自定义输入框
-        document.getElementById('customPageSize').value = pageSize;
+        document.getElementById("customPageSize").value = pageSize;
       }
 
-      // 更新当前筛选条件
-      currentFilters = {};
-
-      if (status) currentFilters.status = status;
-      if (model) currentFilters.model = model;
-      if (email) currentFilters.email = email;
-      if (membership) currentFilters.membership_type = membership;
-      if (stream) currentFilters.stream = stream === 'true';
-      if (hasError) currentFilters.has_error = hasError === 'true';
-
       // 获取筛选后的数据
+      fetchLogs();
+    }
+
+    // 重置筛选条件
+    function resetFilters() {
+      // 重置所有输入框
+      document.getElementById("fromDate").value = "";
+      document.getElementById("toDate").value = "";
+      document.getElementById("userId").value = "";
+      document.getElementById("email").value = "";
+      document.getElementById("membershipType").value = "";
+      document.getElementById("model").value = "";
+      document.getElementById("includeModels").value = "";
+      document.getElementById("excludeModels").value = "";
+      document.getElementById("minTotalTime").value = "";
+      document.getElementById("maxTotalTime").value = "";
+      document.getElementById("minTokens").value = "";
+      document.getElementById("maxTokens").value = "";
+      document.getElementById("status").value = "";
+      document.getElementById("stream").value = "";
+      document.getElementById("hasError").value = "";
+      document.getElementById("hasChain").value = "";
+      document.getElementById("hasUsage").value = "";
+      document.getElementById("reverse").value = "false";
+      document.getElementById("pageSize").value = "20";
+      document.getElementById("errorText").value = "";
+
+      // 重置页码
+      currentPageIndex = 0;
+      pageSize = 20;
+
+      // 刷新数据
       fetchLogs();
     }
 
     async function fetchLogs() {
       // 构建查询参数
       const query = {
+        // 分页参数
         limit: pageSize,
         offset: currentPageIndex * pageSize,
-        ...currentFilters
+        reverse: document.getElementById("reverse").value === "true",
+
+        // 时间范围
+        ...getTimeRangeFilter(),
+
+        // 用户筛选
+        ...getUserFilter(),
+
+        // 模型筛选
+        ...getModelFilter(),
+
+        // 性能筛选
+        ...getPerformanceFilter(),
+
+        // 其他筛选
+        ...getOtherFilters(),
       };
 
-      // 发送请求
-      const data = await makeAuthenticatedRequest('/logs', {
-        method: 'POST',
-        body: JSON.stringify({ query })
+      // 发送请求到新的API端点
+      const data = await makeAuthenticatedRequest("/logs/get", {
+        body: JSON.stringify({ query }),
       });
 
       if (data) {
         updateTable(data);
-        showGlobalMessage('日志获取成功');
+        showGlobalMessage("日志获取成功");
       }
     }
 
-    // 自动刷新控制
-    document.getElementById('autoRefresh').addEventListener('change', function (e) {
-      if (e.target.checked) {
-        refreshInterval = setInterval(fetchLogs, 60000);
-      } else {
-        clearInterval(refreshInterval);
+    // 获取Token详细信息
+    async function fetchTokenDetails(tokens) {
+      const data = await makeAuthenticatedRequest("/logs/tokens/get", {
+        body: JSON.stringify(tokens),
+      });
+
+      if (data) {
+        return data.tokens;
       }
-    });
+
+      return null;
+    }
+
+    // 批量加载所有Token信息到缓存
+    async function loadAllTokenInfo(tokenKeys) {
+      if (tokenKeys.length === 0) return;
+
+      console.log(`正在加载 ${tokenKeys.length} 个token的详细信息...`);
+
+      try {
+        const detailsData = await fetchTokenDetails(tokenKeys);
+        if (detailsData) {
+          // 将所有token信息存入缓存
+          Object.entries(detailsData).forEach(([key, info]) => {
+            tokenInfoCache[key] = info;
+          });
+
+          allTokensLoaded = true;
+          console.log(
+            `成功加载 ${Object.keys(detailsData).length} 个token的详细信息`,
+          );
+          showGlobalMessage(
+            `已缓存 ${Object.keys(detailsData).length} 个Token信息`,
+          );
+        }
+      } catch (error) {
+        console.error("加载Token信息失败:", error);
+      }
+    }
+
+    // 导出日志数据
+    async function exportLogs() {
+      // 获取当前筛选条件下的所有数据
+      const query = {
+        // 不限制数量，导出所有数据
+        limit: 10000,
+        offset: 0,
+        reverse: document.getElementById("reverse").value === "true",
+
+        // 时间范围
+        ...getTimeRangeFilter(),
+
+        // 用户筛选
+        ...getUserFilter(),
+
+        // 模型筛选
+        ...getModelFilter(),
+
+        // 性能筛选
+        ...getPerformanceFilter(),
+
+        // 其他筛选
+        ...getOtherFilters(),
+      };
+
+      const data = await makeAuthenticatedRequest("/logs/get", {
+        method: "POST",
+        body: JSON.stringify({ query }),
+      });
+
+      if (data) {
+        // 创建CSV格式的数据
+        const csvContent = createCSVFromLogs(data.logs);
+
+        // 下载CSV文件
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `logs_${new Date().toISOString()}.csv`);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showGlobalMessage(`成功导出 ${data.logs.length} 条日志记录`);
+      }
+    }
+
+    // 创建CSV内容
+    function createCSVFromLogs(logs) {
+      const headers = [
+        "ID",
+        "时间",
+        "模型",
+        "Token Key",
+        "用户邮箱",
+        "会员类型",
+        "耗时(秒)",
+        "输入Tokens",
+        "输出Tokens",
+        "流式",
+        "状态",
+        "错误信息",
+      ];
+
+      const rows = logs.map((log) => {
+        const tokenInfo = log.token_info || {};
+        const stripe = tokenInfo.stripe || {};
+        const usage = log.chain?.usage || {};
+        const user = tokenInfo.user || {};
+
+        return [
+          log.id,
+          new Date(log.timestamp).toLocaleString(),
+          log.model,
+          tokenInfo.key || "-",
+          user.email || "-",
+          stripe.membership_type || "-",
+          log.timing.total.toFixed(2),
+          usage.input || 0,
+          usage.output || 0,
+          log.stream ? "是" : "否",
+          log.status,
+          typeof log.error === "string" ? log.error : log.error?.error || "-",
+        ];
+      });
+
+      // 转换为CSV格式
+      const csvRows = [headers, ...rows].map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+      );
+
+      return csvRows.join("\n");
+    }
+
+    // 自动刷新控制
+    document
+      .getElementById("autoRefresh")
+      .addEventListener("change", function (e) {
+        if (e.target.checked) {
+          refreshInterval = setInterval(fetchLogs, 60000);
+        } else {
+          clearInterval(refreshInterval);
+        }
+      });
 
     // 页面加载完成后自动获取日志
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener("DOMContentLoaded", () => {
       const authToken = getAuthToken();
       if (authToken) {
-        document.getElementById('authToken').value = authToken;
+        document.getElementById("authToken").value = authToken;
 
         // 设置默认页大小
-        pageSize = parseInt(document.getElementById('pageSize').value || "20");
-        document.getElementById('customPageSize').value = pageSize;
+        pageSize = parseInt(
+          document.getElementById("pageSize").value || "20",
+        );
+        document.getElementById("customPageSize").value = pageSize;
 
         fetchLogs();
       }
@@ -1260,42 +2005,46 @@
       refreshInterval = setInterval(fetchLogs, 60000);
 
       // 添加页码输入框回车键支持
-      document.getElementById('pageNumberInput').addEventListener('keyup', function (event) {
-        if (event.key === 'Enter') {
-          jumpToPage();
-        }
-      });
+      document
+        .getElementById("pageNumberInput")
+        .addEventListener("keyup", function (event) {
+          if (event.key === "Enter") {
+            jumpToPage();
+          }
+        });
 
       // 添加页面大小输入框回车键支持
-      document.getElementById('customPageSize').addEventListener('keyup', function (event) {
-        if (event.key === 'Enter') {
-          changePageSize();
-        }
-      });
+      document
+        .getElementById("customPageSize")
+        .addEventListener("keyup", function (event) {
+          if (event.key === "Enter") {
+            changePageSize();
+          }
+        });
     });
 
     // 初始化 token 处理
-    initializeTokenHandling('authToken');
+    initializeTokenHandling("authToken");
 
     // 添加清理逻辑
-    window.addEventListener('beforeunload', () => {
+    window.addEventListener("beforeunload", () => {
       if (refreshInterval) {
         clearInterval(refreshInterval);
       }
     });
 
     // 添加模态框关闭逻辑
-    document.querySelectorAll('.modal .close').forEach(closeBtn => {
+    document.querySelectorAll(".modal .close").forEach((closeBtn) => {
       closeBtn.onclick = function () {
-        this.closest('.modal').style.display = 'none';
-      }
+        this.closest(".modal").style.display = "none";
+      };
     });
 
     window.onclick = function (event) {
-      if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
+      if (event.target.classList.contains("modal")) {
+        event.target.style.display = "none";
       }
-    }
+    };
 
     /**
      * 解析对话内容
@@ -1311,9 +2060,9 @@
 
         // 如果是已解析的格式
         if (Array.isArray(parsed)) {
-          return parsed.map(msg => ({
+          return parsed.map((msg) => ({
             role: msg.role,
-            content: msg.content
+            content: msg.content,
           }));
         }
       } catch (e) {
@@ -1321,14 +2070,14 @@
       }
 
       const messages = [];
-      const lines = promptStr.split('\n');
-      let currentRole = '';
-      let currentContent = '';
+      const lines = promptStr.split("\n");
+      let currentRole = "";
+      let currentContent = "";
 
       const roleMap = {
-        'BEGIN_SYSTEM': 'system',
-        'BEGIN_USER': 'user',
-        'BEGIN_ASSISTANT': 'assistant'
+        BEGIN_SYSTEM: "system",
+        BEGIN_USER: "user",
+        BEGIN_ASSISTANT: "assistant",
       };
 
       for (let i = 0; i < lines.length; i++) {
@@ -1342,20 +2091,20 @@
             if (currentRole && currentContent.trim()) {
               messages.push({
                 role: currentRole,
-                content: currentContent.trim()
+                content: currentContent.trim(),
               });
             }
             // 设置新角色
             currentRole = role;
-            currentContent = '';
+            currentContent = "";
             foundRole = true;
             break;
           }
         }
 
         // 如果不是角色标记行且不是END标记行，则添加到当前内容
-        if (!foundRole && !line.includes('END_')) {
-          currentContent += line + '\n';
+        if (!foundRole && !line.includes("END_")) {
+          currentContent += line + "\n";
         }
       }
 
@@ -1363,7 +2112,7 @@
       if (currentRole && currentContent.trim()) {
         messages.push({
           role: currentRole,
-          content: currentContent.trim()
+          content: currentContent.trim(),
         });
       }
 
@@ -1373,29 +2122,29 @@
     function escapeHtml(content) {
       // 先转义HTML特殊字符
       const escaped = content
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
       return escaped;
     }
 
     function escapeHtmlAndControlChars(content) {
       // 先转义HTML特殊字符
       let escaped = content
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 
       // 然后转义控制字符
       escaped = escaped
-        .replace(/\\/g, '\\\\')
-        .replace(/\n/g, '\\n')
-        .replace(/\t/g, '\\t')
-        .replace(/\r/g, '\\r');
+        .replace(/\\/g, "\\\\")
+        .replace(/\n/g, "\\n")
+        .replace(/\t/g, "\\t")
+        .replace(/\r/g, "\\r");
 
       return escaped;
     }
@@ -1407,37 +2156,57 @@
      */
     function formatPromptToTable(messages) {
       if (!messages || messages.length === 0) {
-        return '<p>无对话内容</p>';
+        return "<p>无对话内容</p>";
       }
 
       const roleLabels = {
-        'system': '系统',
-        'user': '用户',
-        'assistant': '助手'
+        system: "系统",
+        user: "用户",
+        assistant: "助手",
       };
 
-      return `<table class="message-table"><thead><tr><th>角色</th><th>内容</th></tr></thead><tbody>${messages.map(msg =>
-        `<tr><td>${roleLabels[msg.role] || msg.role}</td><td>${escapeHtml(msg.content).replace(/\n/g, '<br>')}</td></tr>`
-      ).join('')}</tbody></table>`;
+      return `<table class="message-table"><thead><tr><th>角色</th><th>内容</th></tr></thead><tbody>${messages
+        .map(
+          (msg) =>
+            `<tr><td>${roleLabels[msg.role] || msg.role}</td><td>${escapeHtml(
+              msg.content,
+            ).replace(/\n/g, "<br>")}</td></tr>`,
+        )
+        .join("")}</tbody></table>`;
     }
 
     /**
      * 显示对话详情弹窗
      * @param {string} promptStr - 对话提示字符串
+     * @param {string} thinkStr - 思考过程字符串
      * @param {Array} delaysTuple - 延迟数据数组
      */
-    function showConversationModal(promptStr, delaysTuple) {
+    function showConversationModal(promptStr, thinkStr, delaysTuple) {
       try {
-        const modal = document.getElementById('conversationModal');
-        const dialogContent = document.getElementById('dialogContent');
-        const delaysContent = document.getElementById('delaysContent');
-        const tabPrompt = document.getElementById('tab-prompt');
-        const tabDelays = document.getElementById('tab-delays');
-        const delaysTableBody = document.querySelector('#delaysTable tbody');
-        const delayChartContainer = document.querySelector('.delay-chart-container');
+        const modal = document.getElementById("conversationModal");
+        const dialogContent = document.getElementById("dialogContent");
+        const thinkContent = document.getElementById("thinkContent");
+        const delaysContent = document.getElementById("delaysContent");
+        const tabPrompt = document.getElementById("tab-prompt");
+        const tabThink = document.getElementById("tab-think");
+        const tabDelays = document.getElementById("tab-delays");
+        const delaysTableBody = document.querySelector("#delaysTable tbody");
+        const delayChartContainer = document.querySelector(
+          ".delay-chart-container",
+        );
 
-        if (!modal || !dialogContent || !delaysContent || !tabPrompt || !tabDelays || !delaysTableBody || !delayChartContainer) {
-          console.error('Modal elements not found');
+        if (
+          !modal ||
+          !dialogContent ||
+          !thinkContent ||
+          !delaysContent ||
+          !tabPrompt ||
+          !tabThink ||
+          !tabDelays ||
+          !delaysTableBody ||
+          !delayChartContainer
+        ) {
+          console.error("Modal elements not found");
           return;
         }
 
@@ -1446,80 +2215,107 @@
           const messages = parsePrompt(promptStr);
           dialogContent.innerHTML = formatPromptToTable(messages);
         } catch (e) {
-          console.error('解析 Prompt 数据失败:', e);
-          dialogContent.innerHTML = '<p>无法加载对话内容。</p>';
+          console.error("解析 Prompt 数据失败:", e);
+          dialogContent.innerHTML = "<p>无法加载对话内容。</p>";
+        }
+
+        // 处理思考过程
+        if (thinkStr && typeof thinkStr === "string") {
+          document.getElementById("thinkText").textContent = thinkStr;
+          tabThink.style.display = "";
+        } else {
+          document.getElementById("thinkText").textContent = "无思考过程";
+          tabThink.style.display = "none";
         }
 
         // 处理 Delays
-        delaysTableBody.innerHTML = '';
+        delaysTableBody.innerHTML = "";
         delayChartContainer.innerHTML = '<canvas id="delayChart"></canvas>';
 
-        let fullText = '';
+        let fullText = "";
         let delayPoints = [];
-        let chartDataPoints = [{ time: 0, chars: 0, text: '' }];
+        let chartDataPoints = [{ time: 0, chars: 0, text: "" }];
 
         if (delaysTuple) {
-          if (Array.isArray(delaysTuple) && delaysTuple.length === 2 && typeof delaysTuple[0] === 'string' && Array.isArray(delaysTuple[1])) {
+          if (
+            Array.isArray(delaysTuple) &&
+            delaysTuple.length === 2 &&
+            typeof delaysTuple[0] === "string" &&
+            Array.isArray(delaysTuple[1])
+          ) {
             fullText = delaysTuple[0];
             delayPoints = delaysTuple[1];
           } else {
-            console.warn('Delays data format is incorrect:', delaysTuple);
+            console.warn("Delays data format is incorrect:", delaysTuple);
           }
         }
 
         if (delayPoints.length > 0) {
+          const textChars = Array.from(fullText);
           let currentIndex = 0;
           let totalChars = 0;
           let totalTime = 0;
 
           delayPoints.forEach(([length, deltaTime], index) => {
-            if (typeof length !== 'number' || typeof deltaTime !== 'number' || length < 0 || deltaTime < 0) {
-              console.warn(`Skipping invalid delay point at index ${index}:`, [length, deltaTime]);
+            if (
+              typeof length !== "number" ||
+              typeof deltaTime !== "number" ||
+              length < 0 ||
+              deltaTime < 0
+            ) {
+              console.warn(
+                `Skipping invalid delay point at index ${index}:`,
+                [length, deltaTime],
+              );
               return;
             }
 
-            const chunkText = fullText.substring(currentIndex, currentIndex + length);
+            const chunkChars = textChars.slice(currentIndex, currentIndex + length);
+            const chunkText = chunkChars.join('');
             currentIndex += length;
             totalChars += length;
             totalTime += deltaTime;
 
-            const rate = deltaTime > 0 ? (length / deltaTime) : Infinity;
-            const avgRate = totalTime > 0 ? (totalChars / totalTime) : Infinity;
+            const rate = deltaTime > 0 ? length / deltaTime : Infinity;
+            const avgRate = totalTime > 0 ? totalChars / totalTime : Infinity;
 
-            const row = document.createElement('tr');
+            const row = document.createElement("tr");
             row.innerHTML = `
-              <td>${index + 1}</td>
-              <td>${escapeHtmlAndControlChars(chunkText)}</td>
-              <td>${deltaTime.toFixed(3)}</td>
-              <td>${isFinite(rate) ? rate.toFixed(1) : 'N/A'} (平均: ${isFinite(avgRate) ? avgRate.toFixed(1) : 'N/A'})</td>
-            `;
+            <td>${index + 1}</td>
+            <td>${escapeHtmlAndControlChars(chunkText)}</td>
+            <td>${deltaTime.toFixed(3)}</td>
+            <td>${isFinite(rate) ? rate.toFixed(1) : "N/A"} (平均: ${
+              isFinite(avgRate) ? avgRate.toFixed(1) : "N/A"
+            })</td>
+          `;
             delaysTableBody.appendChild(row);
 
             chartDataPoints.push({
               time: totalTime,
               chars: totalChars,
-              text: chunkText
+              text: chunkText,
             });
           });
 
           initDelayChart(chartDataPoints);
-          tabDelays.style.display = '';
-
+          tabDelays.style.display = "";
         } else {
-          delaysTableBody.innerHTML = '<tr><td colspan="4">无延迟数据</td></tr>';
-          delayChartContainer.innerHTML = '<div style="text-align: center; padding: 20px;">无延迟数据可供分析</div>';
-          tabDelays.style.display = 'none';
+          delaysTableBody.innerHTML =
+            '<tr><td colspan="4">无延迟数据</td></tr>';
+          delayChartContainer.innerHTML =
+            '<div style="text-align: center; padding: 20px;">无延迟数据可供分析</div>';
+          tabDelays.style.display = "none";
         }
 
         // 设置标签页
-        tabPrompt.onclick = () => setActiveTab('prompt');
-        tabDelays.onclick = () => setActiveTab('delays');
+        tabPrompt.onclick = () => setActiveTab("prompt");
+        tabThink.onclick = () => setActiveTab("think");
+        tabDelays.onclick = () => setActiveTab("delays");
 
-        setActiveTab('prompt');
-        modal.style.display = 'block';
-
+        setActiveTab("prompt");
+        modal.style.display = "block";
       } catch (e) {
-        console.error('显示对话详情失败:', e);
+        console.error("显示对话详情失败:", e);
       }
     }
 
@@ -1528,26 +2324,46 @@
      * @param {string} tabName - 标签页名称 ('prompt' 或 'delays')
      */
     function setActiveTab(tabName) {
-      const dialogContent = document.getElementById('dialogContent');
-      const delaysContent = document.getElementById('delaysContent');
-      const tabPrompt = document.getElementById('tab-prompt');
-      const tabDelays = document.getElementById('tab-delays');
+      const dialogContent = document.getElementById("dialogContent");
+      const thinkContent = document.getElementById("thinkContent");
+      const delaysContent = document.getElementById("delaysContent");
+      const tabPrompt = document.getElementById("tab-prompt");
+      const tabThink = document.getElementById("tab-think");
+      const tabDelays = document.getElementById("tab-delays");
 
-      if (!dialogContent || !delaysContent || !tabPrompt || !tabDelays) {
-        console.error('Tab elements not found');
+      if (
+        !dialogContent ||
+        !thinkContent ||
+        !delaysContent ||
+        !tabPrompt ||
+        !tabThink ||
+        !tabDelays
+      ) {
+        console.error("Tab elements not found");
         return;
       }
 
-      if (tabName === 'prompt') {
-        dialogContent.classList.add('active');
-        delaysContent.classList.remove('active');
-        tabPrompt.classList.add('active');
-        tabDelays.classList.remove('active');
+      if (tabName === "prompt") {
+        dialogContent.classList.add("active");
+        thinkContent.classList.remove("active");
+        delaysContent.classList.remove("active");
+        tabPrompt.classList.add("active");
+        tabThink.classList.remove("active");
+        tabDelays.classList.remove("active");
+      } else if (tabName === "think") {
+        dialogContent.classList.remove("active");
+        thinkContent.classList.add("active");
+        delaysContent.classList.remove("active");
+        tabPrompt.classList.remove("active");
+        tabThink.classList.add("active");
+        tabDelays.classList.remove("active");
       } else {
-        dialogContent.classList.remove('active');
-        delaysContent.classList.add('active');
-        tabPrompt.classList.remove('active');
-        tabDelays.classList.add('active');
+        dialogContent.classList.remove("active");
+        thinkContent.classList.remove("active");
+        delaysContent.classList.add("active");
+        tabPrompt.classList.remove("active");
+        tabThink.classList.remove("active");
+        tabDelays.classList.add("active");
       }
     }
 
@@ -1557,16 +2373,17 @@
      */
     function initDelayChart(chartDataPoints) {
       if (!chartDataPoints || chartDataPoints.length <= 1) {
-        const container = document.querySelector('.delay-chart-container');
+        const container = document.querySelector(".delay-chart-container");
         if (container) {
-          container.innerHTML = '<div style="text-align: center; padding: 20px;">延迟数据不足，无法绘制图表</div>';
+          container.innerHTML =
+            '<div style="text-align: center; padding: 20px;">延迟数据不足，无法绘制图表</div>';
         }
         return;
       }
 
-      const ctx = document.getElementById('delayChart');
+      const ctx = document.getElementById("delayChart");
       if (!ctx) {
-        console.error('找不到图表canvas元素');
+        console.error("找不到图表canvas元素");
         return;
       }
 
@@ -1586,7 +2403,10 @@
 
         for (let i = 1; i < maxPoints - 1; i++) {
           const rawIndex = Math.round(i * interval);
-          const actualIndex = Math.min(rawIndex + 1, chartDataPoints.length - 2);
+          const actualIndex = Math.min(
+            rawIndex + 1,
+            chartDataPoints.length - 2,
+          );
           sampledPoints.push(chartDataPoints[actualIndex]);
         }
 
@@ -1594,21 +2414,23 @@
       }
 
       new Chart(ctx, {
-        type: 'line',
+        type: "line",
         data: {
-          datasets: [{
-            label: '累计输出字符数',
-            data: sampledPoints.map(point => ({
-              x: point.time,
-              y: point.chars
-            })),
-            borderColor: 'rgb(75,192,192)',
-            backgroundColor: 'rgba(75,192,192,0.2)',
-            tension: 0.1,
-            fill: true,
-            pointRadius: 3,
-            pointHoverRadius: 5
-          }]
+          datasets: [
+            {
+              label: "累计输出字符数",
+              data: sampledPoints.map((point) => ({
+                x: point.time,
+                y: point.chars,
+              })),
+              borderColor: "rgb(75,192,192)",
+              backgroundColor: "rgba(75,192,192,0.2)",
+              tension: 0.1,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+            },
+          ],
         },
         options: {
           responsive: true,
@@ -1616,65 +2438,80 @@
           plugins: {
             title: {
               display: true,
-              text: '字符输出进度'
+              text: "字符输出进度",
             },
             tooltip: {
               callbacks: {
                 title: function (context) {
                   const pointIndex = context[0].dataIndex;
                   if (pointIndex < sampledPoints.length) {
-                    return `用时: ${sampledPoints[pointIndex].time.toFixed(1)}秒`;
+                    return `用时: ${sampledPoints[pointIndex].time.toFixed(
+                      1,
+                    )}秒`;
                   }
-                  return '';
+                  return "";
                 },
                 label: function (context) {
                   const pointIndex = context.dataIndex;
                   if (pointIndex < sampledPoints.length) {
                     const point = sampledPoints[pointIndex];
-                    const prevPoint = pointIndex > 0 ? sampledPoints[pointIndex - 1] : { time: 0, chars: 0, text: '' };
+                    const prevPoint =
+                      pointIndex > 0
+                        ? sampledPoints[pointIndex - 1]
+                        : { time: 0, chars: 0, text: "" };
 
                     const deltaTime = point.time - prevPoint.time;
                     const deltaChars = point.chars - prevPoint.chars;
-                    const currentRate = deltaTime > 0 ? (deltaChars / deltaTime).toFixed(1) : 'N/A';
-                    const avgRate = point.time > 0 ? (point.chars / point.time).toFixed(1) : 'N/A';
+                    const currentRate =
+                      deltaTime > 0
+                        ? (deltaChars / deltaTime).toFixed(1)
+                        : "N/A";
+                    const avgRate =
+                      point.time > 0
+                        ? (point.chars / point.time).toFixed(1)
+                        : "N/A";
 
-                    const chunkText = point.text || '';
+                    const chunkText = point.text || "";
 
                     return [
                       `累计字符: ${point.chars}`,
                       `平均速率: ${avgRate} 字符/秒`,
                       `当前块速率: ${currentRate} 字符/秒`,
-                      `当前块文本: ${escapeHtmlAndControlChars(chunkText.length > 50 ? chunkText.substring(0, 50) + '...' : chunkText)}`
+                      `当前块文本: ${escapeHtmlAndControlChars(
+                        chunkText.length > 50
+                          ? chunkText.substring(0, 50) + "..."
+                          : chunkText,
+                      )}`,
                     ];
                   }
-                  return '';
-                }
-              }
-            }
+                  return "";
+                },
+              },
+            },
           },
           scales: {
             y: {
               beginAtZero: true,
               title: {
                 display: true,
-                text: '累计字符数'
-              }
+                text: "累计字符数",
+              },
             },
             x: {
-              type: 'linear',
+              type: "linear",
               beginAtZero: true,
               title: {
                 display: true,
-                text: '累计用时（秒）'
+                text: "累计用时（秒）",
               },
               ticks: {
                 callback: function (value) {
-                  return value.toFixed(1) + 's';
-                }
-              }
-            }
-          }
-        }
+                  return value.toFixed(1) + "s";
+                },
+              },
+            },
+          },
+        },
       });
     }
 
@@ -1684,10 +2521,9 @@
      * @returns {string} 格式化后的字符串
      */
     function formatUsage(usage) {
-      if (!usage) return '-';
+      if (!usage) return "-";
       return `${usage.input} / ${usage.output}`;
     }
   </script>
 </body>
-
 </html>
