@@ -102,7 +102,7 @@ pub fn header_value_ua_cursor_latest() -> http::header::HeaderValue {
 pub fn initialize_cursor_version() {
     use ::core::ops::Deref as _;
 
-    let version = crate::common::utils::parse_string_from_env(
+    let version = crate::common::utils::parse_from_env(
         ENV_CURSOR_CLIENT_VERSION,
         DEFAULT_CLIENT_VERSION,
     );

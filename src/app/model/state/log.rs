@@ -79,7 +79,7 @@ impl LogManager {
     /// 从存储中加载日志
     #[inline(never)]
     pub async fn load() -> Result<Self, Box<dyn std::error::Error>> {
-        let logs_limit = RequestLogsLimit::from_usize(crate::common::utils::parse_usize_from_env(
+        let logs_limit = RequestLogsLimit::from_usize(crate::common::utils::parse_from_env(
             "REQUEST_LOGS_LIMIT",
             100,
         ));

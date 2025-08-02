@@ -1,7 +1,8 @@
+use ::bytes::{Buf as _, BytesMut};
+use ::prost::Message as _;
+
 use super::decompress_gzip;
 use crate::core::{aiserver::v1::StreamCppResponse, error::StreamError};
-use bytes::{Buf as _, BytesMut};
-use prost::Message as _;
 
 #[derive(::serde::Serialize, PartialEq, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]

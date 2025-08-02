@@ -9,7 +9,7 @@ static mut BYPASS_MODEL_VALIDATION: bool = false;
 pub fn init_resolver() {
     unsafe {
         BYPASS_MODEL_VALIDATION =
-            crate::common::utils::parse_bool_from_env("BYPASS_MODEL_VALIDATION", false)
+            crate::common::utils::parse_from_env("BYPASS_MODEL_VALIDATION", false)
     }
 }
 

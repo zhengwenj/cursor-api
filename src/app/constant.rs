@@ -229,7 +229,7 @@ pub fn init_thinking_tags() {
             return;
         }
 
-        let tag = crate::common::utils::parse_string_from_env("THINKING_TAG", DEFAULT_THINKING_TAG);
+        let tag = crate::common::utils::parse_from_env("THINKING_TAG", DEFAULT_THINKING_TAG);
 
         if tag == DEFAULT_THINKING_TAG {
             return;

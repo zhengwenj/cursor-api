@@ -1,5 +1,11 @@
 pub mod log;
 
+use ::std::{
+    borrow::Cow,
+    path::PathBuf,
+    sync::{LazyLock, OnceLock},
+};
+
 use super::{
     constant::{
         CURSOR_API2_HOST, CURSOR_API4_HOST, CURSOR_GCPP_ASIA_HOST, CURSOR_GCPP_EU_HOST,
@@ -7,12 +13,7 @@ use super::{
     },
     model::{DateTime, GcppHost},
 };
-use crate::common::utils::{parse_bool_from_env, parse_string_from_env, parse_usize_from_env};
-use std::{
-    borrow::Cow,
-    path::PathBuf,
-    sync::{LazyLock, OnceLock},
-};
+use crate::common::utils::parse_from_env;
 
 macro_rules! def_pub_static {
     // 基础版本：直接存储 String
@@ -23,7 +24,7 @@ macro_rules! def_pub_static {
     // 环境变量版本
     ($name:ident,env: $env_key:expr,default: $default:expr) => {
         pub static $name: LazyLock<Cow<'static, str>> =
-            LazyLock::new(|| parse_string_from_env($env_key, $default));
+            LazyLock::new(|| parse_from_env($env_key, $default));
     };
 }
 
@@ -38,7 +39,7 @@ pub fn get_start_time() -> &'static chrono::NaiveDateTime {
 
 pub static GENERAL_TIMEZONE: LazyLock<chrono_tz::Tz> = LazyLock::new(|| {
     use std::str::FromStr as _;
-    let tz = parse_string_from_env("GENERAL_TIMEZONE", EMPTY_STRING);
+    let tz = parse_from_env("GENERAL_TIMEZONE", EMPTY_STRING);
     if tz.is_empty() {
         __eprintln!(
             "未配置时区，请在环境变量GENERAL_TIMEZONE中设置，格式如'Asia/Shanghai'\n将使用默认时区: Asia/Shanghai"
@@ -64,7 +65,7 @@ pub fn get_default_instructions(now_with_tz: chrono::DateTime<chrono_tz::Tz>) ->
 }
 
 pub static GENERAL_GCPP_HOST: LazyLock<GcppHost> = LazyLock::new(|| {
-    let gcpp_host = parse_string_from_env("GENERAL_GCPP_HOST", EMPTY_STRING);
+    let gcpp_host = parse_from_env("GENERAL_GCPP_HOST", EMPTY_STRING);
     let gcpp_host = gcpp_host.trim();
     if gcpp_host.is_empty() {
         __eprintln!(
@@ -276,7 +277,7 @@ def_cursor_api_url!(
 );
 
 static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-    let data_dir = parse_string_from_env("DATA_DIR", "data");
+    let data_dir = parse_from_env("DATA_DIR", "data");
     let path = std::env::current_exe()
         .ok()
         .and_then(|exe_path| exe_path.parent().map(|p| p.to_path_buf()))
@@ -306,7 +307,7 @@ const DEFAULT_TCP_KEEPALIVE: usize = 90;
 const MAX_TCP_KEEPALIVE: u64 = 600;
 
 pub static TCP_KEEPALIVE: LazyLock<u64> = LazyLock::new(|| {
-    let keepalive = parse_usize_from_env("TCP_KEEPALIVE", DEFAULT_TCP_KEEPALIVE);
+    let keepalive = parse_from_env("TCP_KEEPALIVE", DEFAULT_TCP_KEEPALIVE);
     u64::try_from(keepalive)
         .map(|t| t.min(MAX_TCP_KEEPALIVE))
         .unwrap_or(DEFAULT_TCP_KEEPALIVE as u64)
@@ -316,13 +317,13 @@ const DEFAULT_SERVICE_TIMEOUT: usize = 30;
 const MAX_SERVICE_TIMEOUT: u64 = 600;
 
 pub static SERVICE_TIMEOUT: LazyLock<u64> = LazyLock::new(|| {
-    let timeout = parse_usize_from_env("SERVICE_TIMEOUT", DEFAULT_SERVICE_TIMEOUT);
+    let timeout = parse_from_env("SERVICE_TIMEOUT", DEFAULT_SERVICE_TIMEOUT);
     u64::try_from(timeout)
         .map(|t| t.min(MAX_SERVICE_TIMEOUT))
         .unwrap_or(DEFAULT_SERVICE_TIMEOUT as u64)
 });
 
-pub static REAL_USAGE: LazyLock<bool> = LazyLock::new(|| parse_bool_from_env("REAL_USAGE", true));
+pub static REAL_USAGE: LazyLock<bool> = LazyLock::new(|| parse_from_env("REAL_USAGE", true));
 
 // pub static TOKEN_VALIDITY_RANGE: LazyLock<TokenValidityRange> = LazyLock::new(|| {
 //     let short = if let Ok(Ok(validity)) = std::env::var("TOKEN_SHORT_VALIDITY")

@@ -12,7 +12,7 @@ use ::std::borrow::Cow;
 
 mod private {
     use std::borrow::Cow;
-    pub trait Sealed {}
+    pub trait Sealed: Sized {}
 
     impl Sealed for &str {}
     impl Sealed for String {}
@@ -22,9 +22,9 @@ mod private {
 
 /// A trait representing types that can be appended to a `StringBuilder`.
 /// This is a sealed trait and cannot be implemented for types outside this crate.
-pub trait StringPart<'a>: private::Sealed + Into<Cow<'a, str>> + Debug + Clone {}
+pub trait StringPart<'a>: private::Sealed + Into<Cow<'a, str>> {}
 
-impl<'a, T> StringPart<'a> for T where T: private::Sealed + Into<Cow<'a, str>> + Debug + Clone {}
+impl<'a, T> StringPart<'a> for T where T: private::Sealed + Into<Cow<'a, str>> {}
 
 /// Internal storage state for StringBuilder
 ///

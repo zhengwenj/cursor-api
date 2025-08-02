@@ -1,10 +1,6 @@
-use std::{
-    borrow::Cow,
-    sync::{Arc, atomic::AtomicU64},
-    time::Duration,
-};
-
-use tokio::{
+use ::core::{sync::atomic::AtomicU64, time::Duration};
+use ::std::{borrow::Cow, sync::Arc};
+use ::tokio::{
     fs::File,
     io::AsyncWriteExt as _,
     sync::{
@@ -15,10 +11,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::{
-    common::utils::{parse_bool_from_env, parse_string_from_env},
-    leak::manually_init::ManuallyInit,
-};
+use crate::{common::utils::parse_from_env, leak::manually_init::ManuallyInit};
 
 // --- 全局配置 ---
 
@@ -30,8 +23,8 @@ static DEBUG_LOG_FILE: ManuallyInit<Cow<'static, str>> = ManuallyInit::new();
 #[forbid(unused)]
 pub fn init() {
     unsafe {
-        DEBUG.init(parse_bool_from_env("DEBUG", true));
-        DEBUG_LOG_FILE.init(parse_string_from_env("DEBUG_LOG_FILE", "debug.log"));
+        DEBUG.init(parse_from_env("DEBUG", true));
+        DEBUG_LOG_FILE.init(parse_from_env("DEBUG_LOG_FILE", "debug.log"));
     }
 }
 

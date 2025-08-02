@@ -1,6 +1,6 @@
-// use bytes::{Buf as _, BytesMut};
+// use ::bytes::{Buf as _, BytesMut};
 
-use std::borrow::Cow;
+use ::std::borrow::Cow;
 
 use super::{
     decompress_gzip,
@@ -45,7 +45,7 @@ use super::{
 
 //                 if let Ok(msg) = T::decode(&self.buf[..]) {
 //                     return Ok(Some(DecodedMessage::Protobuf(msg)));
-//                 } else if let Some(text) = String::from_utf8(self.buf.to_vec()) {
+//                 } else if let Ok(text) = String::from_utf8(self.buf.to_vec()) {
 //                     return Ok(Some(DecodedMessage::Text(text)));
 //                 }
 //             }
@@ -92,7 +92,7 @@ pub fn decode<T: ProtobufMessage>(data: &[u8]) -> Result<DecodedMessage<T>, Deco
 
             if let Ok(msg) = T::decode(&*decompressed) {
                 return Ok(DecodedMessage::Protobuf(msg));
-            } else if let Some(text) = super::utils::string_from_utf8_cow(decompressed) {
+            } else if let Some(text) = super::utils::string_from_utf8(decompressed) {
                 return Ok(DecodedMessage::Text(text));
             }
         }

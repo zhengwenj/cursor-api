@@ -13,7 +13,7 @@ use crate::{
         lazy::CONFIG_FILE_PATH,
         model::FetchMode,
     },
-    common::utils::{parse_bool_from_env, parse_string_from_env},
+    common::utils::parse_from_env,
     leak::manually_init::ManuallyInit,
 };
 
@@ -123,16 +123,15 @@ impl AppConfig {
 
         let mut config = APP_CONFIG.write();
         config.vision_ability =
-            VisionAbility::from_str(&parse_string_from_env("VISION_ABILITY", EMPTY_STRING));
-        config.slow_pool = parse_bool_from_env("ENABLE_SLOW_POOL", false);
-        config.long_context = parse_bool_from_env("ENABLE_LONG_CONTEXT", false);
-        config.usage_check =
-            UsageCheck::from_str(&parse_string_from_env("USAGE_CHECK", EMPTY_STRING));
-        config.dynamic_key = parse_bool_from_env("DYNAMIC_KEY", false);
-        config.share_token = parse_string_from_env("SHARED_TOKEN", EMPTY_STRING).into_owned();
-        config.web_refs = parse_bool_from_env("INCLUDE_WEB_REFERENCES", false);
+            VisionAbility::from_str(&parse_from_env("VISION_ABILITY", EMPTY_STRING));
+        config.slow_pool = parse_from_env("ENABLE_SLOW_POOL", false);
+        config.long_context = parse_from_env("ENABLE_LONG_CONTEXT", false);
+        config.usage_check = UsageCheck::from_str(&parse_from_env("USAGE_CHECK", EMPTY_STRING));
+        config.dynamic_key = parse_from_env("DYNAMIC_KEY", false);
+        config.share_token = parse_from_env("SHARED_TOKEN", EMPTY_STRING).into_owned();
+        config.web_refs = parse_from_env("INCLUDE_WEB_REFERENCES", false);
         config.fetch_models =
-            FetchMode::from_str(&parse_string_from_env("FETCH_RAW_MODELS", EMPTY_STRING));
+            FetchMode::from_str(&parse_from_env("FETCH_RAW_MODELS", EMPTY_STRING));
     }
 
     config_methods! {

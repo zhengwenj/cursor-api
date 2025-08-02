@@ -1,4 +1,4 @@
-use prost::Message;
+use ::prost::Message;
 
 /// 表示可以被Protobuf编解码并可创建默认实例的消息类型
 pub trait ProtobufMessage: Message + Default {}
@@ -32,6 +32,7 @@ pub enum DecodedMessage<T: ProtobufMessage> {
 }
 
 // impl<T: ProtobufMessage> DecodedMessage<T> {
+//     #[inline]
 //     pub fn encode(&self) -> Vec<u8>
 //     where
 //         Self: Sized,
@@ -43,8 +44,8 @@ pub enum DecodedMessage<T: ProtobufMessage> {
 //     }
 // }
 
-// impl<T: ProtobufMessage> std::fmt::Debug for DecodedMessage<T> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+// impl<T: ProtobufMessage> ::core::fmt::Debug for DecodedMessage<T> {
+//     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
 //         match self {
 //             Self::Protobuf(msg) => write!(f, "\n{msg:#?}"),
 //             Self::Text(s) => write!(f, "\n{s:?}"),
@@ -52,8 +53,8 @@ pub enum DecodedMessage<T: ProtobufMessage> {
 //     }
 // }
 
-// impl<T: ProtobufMessage + serde::Serialize> std::fmt::Display for DecodedMessage<T> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+// impl<T: ProtobufMessage + ::serde::Serialize> ::core::fmt::Display for DecodedMessage<T> {
+//     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
 //         match self {
 //             Self::Protobuf(msg) => write!(f, "\n{}", serde_json::to_string(msg).unwrap()),
 //             Self::Text(s) => write!(f, "\n{s}"),

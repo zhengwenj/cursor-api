@@ -1,16 +1,16 @@
-use rand::{
+use ::core::{fmt, str::FromStr};
+use ::rand::{
     RngCore as _,
     distr::{Distribution, StandardUniform},
 };
-use sha2::Digest as _;
-use std::{fmt, str::FromStr};
+use ::sha2::Digest as _;
 
 use crate::common::utils::hex::HEX_CHARS;
 
 static mut SAFE_HASH: bool = false;
 
 pub(super) fn init_hash() {
-    unsafe { SAFE_HASH = crate::common::utils::parse_bool_from_env("SAFE_HASH", true) }
+    unsafe { SAFE_HASH = crate::common::utils::parse_from_env("SAFE_HASH", true) }
 }
 
 #[derive(Debug)]

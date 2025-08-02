@@ -18,7 +18,7 @@ use std::{
     time::Instant,
 };
 
-pub trait InstantExt {
+pub trait InstantExt: Sized {
     fn duration_as_secs_f32(&mut self) -> f32;
 }
 

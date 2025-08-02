@@ -5,7 +5,8 @@
     hasher_prefixfree_extras,
     const_trait_impl,
     const_default,
-    core_intrinsics
+    core_intrinsics,
+    associated_type_defaults
 )]
 #![allow(clippy::redundant_static_lifetimes)]
 
@@ -18,6 +19,34 @@ mod core;
 mod leak;
 mod natural_args;
 
+use ::axum::{
+    Router, middleware,
+    routing::{get, post},
+};
+use ::tokio::signal;
+use ::tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer};
+
+use app::{
+    config::handle_config_update,
+    constant::{
+        EMPTY_STRING, EXE_NAME, ROUTE_ABOUT_PATH, ROUTE_API_PATH, ROUTE_BUILD_KEY_PATH,
+        ROUTE_CONFIG_PATH, ROUTE_CONFIG_VERSION_GET_PATH, ROUTE_CPP_CONFIG_PATH,
+        ROUTE_CPP_MODELS_PATH, ROUTE_CPP_STREAM_PATH, ROUTE_ENV_EXAMPLE_PATH, ROUTE_FILE_SYNC_PATH,
+        ROUTE_FILE_UPLOAD_PATH, ROUTE_GEN_CHECKSUM, ROUTE_GEN_HASH, ROUTE_GEN_TOKEN,
+        ROUTE_GEN_UUID, ROUTE_GET_TIMESTAMP_HEADER, ROUTE_HEALTH_PATH, ROUTE_LOGS_GET_PATH,
+        ROUTE_LOGS_PATH, ROUTE_LOGS_TOKENS_GET_PATH, ROUTE_PROXIES_ADD_PATH,
+        ROUTE_PROXIES_DELETE_PATH, ROUTE_PROXIES_GET_PATH, ROUTE_PROXIES_PATH,
+        ROUTE_PROXIES_SET_GENERAL_PATH, ROUTE_PROXIES_SET_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH,
+        ROUTE_STATIC_PATH, ROUTE_TOKENS_ADD_PATH, ROUTE_TOKENS_ALIAS_SET_PATH,
+        ROUTE_TOKENS_CONFIG_VERSION_UPDATE_PATH, ROUTE_TOKENS_DELETE_PATH, ROUTE_TOKENS_GET_PATH,
+        ROUTE_TOKENS_PATH, ROUTE_TOKENS_PROFILE_UPDATE_PATH, ROUTE_TOKENS_PROXY_SET_PATH,
+        ROUTE_TOKENS_REFRESH_PATH, ROUTE_TOKENS_SET_PATH, ROUTE_TOKENS_STATUS_SET_PATH,
+        ROUTE_TOKENS_TIMEZONE_SET_PATH, VERSION,
+    },
+    lazy::AUTH_TOKEN,
+    model::{AppConfig, AppState},
+};
+use common::utils::parse_from_env;
 use core::{
     middleware::{admin_auth_middleware, cpp_auth_middleware, v1_auth_middleware},
     route::{
@@ -40,34 +69,7 @@ use core::{
         handle_chat_completions, handle_messages, handle_models, handle_raw_models,
     },
 };
-use app::{
-    config::handle_config_update,
-    constant::{
-        EMPTY_STRING, EXE_NAME, ROUTE_ABOUT_PATH, ROUTE_API_PATH, ROUTE_BUILD_KEY_PATH,
-        ROUTE_CONFIG_PATH, ROUTE_CONFIG_VERSION_GET_PATH, ROUTE_CPP_CONFIG_PATH,
-        ROUTE_CPP_MODELS_PATH, ROUTE_CPP_STREAM_PATH, ROUTE_ENV_EXAMPLE_PATH, ROUTE_FILE_SYNC_PATH,
-        ROUTE_FILE_UPLOAD_PATH, ROUTE_GEN_CHECKSUM, ROUTE_GEN_HASH, ROUTE_GEN_TOKEN,
-        ROUTE_GEN_UUID, ROUTE_GET_TIMESTAMP_HEADER, ROUTE_HEALTH_PATH, ROUTE_LOGS_GET_PATH,
-        ROUTE_LOGS_PATH, ROUTE_LOGS_TOKENS_GET_PATH, ROUTE_PROXIES_ADD_PATH,
-        ROUTE_PROXIES_DELETE_PATH, ROUTE_PROXIES_GET_PATH, ROUTE_PROXIES_PATH,
-        ROUTE_PROXIES_SET_GENERAL_PATH, ROUTE_PROXIES_SET_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH,
-        ROUTE_STATIC_PATH, ROUTE_TOKENS_ADD_PATH, ROUTE_TOKENS_ALIAS_SET_PATH,
-        ROUTE_TOKENS_CONFIG_VERSION_UPDATE_PATH, ROUTE_TOKENS_DELETE_PATH, ROUTE_TOKENS_GET_PATH,
-        ROUTE_TOKENS_PATH, ROUTE_TOKENS_PROFILE_UPDATE_PATH, ROUTE_TOKENS_PROXY_SET_PATH,
-        ROUTE_TOKENS_REFRESH_PATH, ROUTE_TOKENS_SET_PATH, ROUTE_TOKENS_STATUS_SET_PATH,
-        ROUTE_TOKENS_TIMEZONE_SET_PATH, VERSION,
-    },
-    lazy::AUTH_TOKEN,
-    model::{AppConfig, AppState},
-};
-use axum::{
-    Router, middleware,
-    routing::{get, post},
-};
-use common::utils::{parse_string_from_env, parse_usize_from_env};
 use natural_args::{DEFAULT_LISTEN_HOST, ENV_HOST, ENV_PORT};
-use tokio::signal;
-use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer};
 
 #[tokio::main]
 async fn main() {
@@ -219,7 +221,6 @@ async fn main() {
             route_chat_completions_path,
             route_messages_path,
         ) = {
-            let route_prefix = parse_string_from_env("ROUTE_PREFIX", EMPTY_STRING);
             define_typed_constants! {
                 &'static str => {
                     RAW_MODELS_PATH = "/raw/models",
@@ -228,9 +229,9 @@ async fn main() {
                     MESSAGES_PATH = "/v1/messages",
                 }
             }
+            use ::std::borrow::Cow;
 
-            use std::borrow::Cow;
-
+            let route_prefix = parse_from_env("ROUTE_PREFIX", EMPTY_STRING);
             if route_prefix.is_empty() {
                 (
                     Cow::Borrowed(RAW_MODELS_PATH),
@@ -361,7 +362,7 @@ async fn main() {
                 post(handle_get_config_version),
             )
             // .route(ROUTE_TOKEN_UPGRADE_PATH, post(handle_token_upgrade))
-            .layer(RequestBodyLimitLayer::new(parse_usize_from_env(
+            .layer(RequestBodyLimitLayer::new(parse_from_env(
                 "REQUEST_BODY_LIMIT",
                 2_000_000,
             )))
@@ -379,7 +380,7 @@ async fn main() {
                 .unwrap_or(3000)
         };
         let addr = SocketAddr::new(
-            IpAddr::parse_ascii(parse_string_from_env(ENV_HOST, DEFAULT_LISTEN_HOST).as_bytes())
+            IpAddr::parse_ascii(parse_from_env(ENV_HOST, DEFAULT_LISTEN_HOST).as_bytes())
                 .unwrap_or_else(|e| {
                     __cold_path!(); // IP解析失败是错误路径
                     eprintln!("无法解析IP: {e}");

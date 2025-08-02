@@ -28,7 +28,7 @@ use reqwest::{
     },
 };
 
-trait RequestBuilderExt {
+trait RequestBuilderExt: Sized {
     fn opt_header<K, V>(self, key: K, value: Option<V>) -> Self
     where
         http::HeaderName: TryFrom<K>,

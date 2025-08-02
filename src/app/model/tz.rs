@@ -1,11 +1,11 @@
-use crate::{common::utils::parse_string_from_env, leak::manually_init::ManuallyInit};
+use crate::{common::utils::parse_from_env, leak::manually_init::ManuallyInit};
 
 pub static TZ: ManuallyInit<chrono_tz::Tz> = ManuallyInit::new();
 
 #[inline(always)]
 pub fn __init() {
     use std::str::FromStr as _;
-    let tz = match chrono_tz::Tz::from_str(&parse_string_from_env("TZ", super::EMPTY_STRING)) {
+    let tz = match chrono_tz::Tz::from_str(&parse_from_env("TZ", super::EMPTY_STRING)) {
         Ok(tz) => tz,
         Err(_e) => chrono_tz::Tz::UTC,
     };
