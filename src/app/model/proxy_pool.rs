@@ -52,7 +52,6 @@ pub struct Proxies {
 }
 
 impl Default for Proxies {
-    #[inline]
     fn default() -> Self {
         Self {
             proxies: HashMap::from_iter([(SYS_PROXY.to_string(), SingleProxy::Sys)]),

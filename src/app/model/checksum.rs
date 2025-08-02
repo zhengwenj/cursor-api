@@ -47,7 +47,7 @@ pub struct Checksum {
 }
 
 impl Default for Checksum {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self { Self::random() }
 }
 

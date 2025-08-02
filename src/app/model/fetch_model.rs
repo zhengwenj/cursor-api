@@ -25,7 +25,7 @@ impl FetchMode {
     /// 从字符串解析获取模式
     #[inline]
     pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
+        match s.to_ascii_lowercase().as_str() {
             Self::TRUNCATE => Self::Truncate,
             Self::APPEND_TRUNCATE => Self::AppendTruncate,
             Self::APPEND => Self::Append,
@@ -44,8 +44,7 @@ impl FetchMode {
     }
 }
 
-impl Default for FetchMode {
-    /// 获取默认模式
+impl const Default for FetchMode {
     #[inline(always)]
     fn default() -> Self { Self::Truncate }
 }

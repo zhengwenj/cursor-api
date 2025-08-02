@@ -1,4 +1,3 @@
-// src/natural_args.rs
 #![allow(unsafe_op_in_unsafe_fn)]
 
 use crate::common::utils::StringBuilder;
@@ -7,7 +6,7 @@ use std::{env, process::exit};
 
 // 常量定义
 crate::define_typed_constants! {
-    pub &str => {
+    pub &'static str => {
         // Token 关键字
         TOKEN_IMPORT = "import",
         TOKEN_ENV = "env",

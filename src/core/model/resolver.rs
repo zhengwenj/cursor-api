@@ -1,13 +1,12 @@
+use super::Models;
 use crate::{
     app::model::{AppConfig, UsageCheck},
     core::constant::{FREE_MODELS, get_static_id},
 };
 
-use super::Models;
-
 static mut BYPASS_MODEL_VALIDATION: bool = false;
 
-pub fn init_model() {
+pub fn init_resolver() {
     unsafe {
         BYPASS_MODEL_VALIDATION =
             crate::common::utils::parse_bool_from_env("BYPASS_MODEL_VALIDATION", false)

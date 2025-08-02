@@ -70,16 +70,16 @@ pub enum DecoderError {
     Internal(&'static str),
 }
 
-impl std::fmt::Display for DecoderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            // DecoderError::ChatError(s) => write!(f, "{s}"),
-            // DecoderError::DataLengthLessThan5 => write!(f, "data length less than 5"),
-            // DecoderError::EmptyStream => write!(f, "empty stream"),
-            DecoderError::Internal(s) => write!(f, "{s}"),
-        }
-    }
-}
+// impl std::fmt::Display for DecoderError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             // DecoderError::ChatError(s) => write!(f, "{s}"),
+//             // DecoderError::DataLengthLessThan5 => write!(f, "data length less than 5"),
+//             // DecoderError::EmptyStream => write!(f, "empty stream"),
+//             DecoderError::Internal(s) => write!(f, "{s}"),
+//         }
+//     }
+// }
 
 // impl core::error::Error for DecoderError {}
 

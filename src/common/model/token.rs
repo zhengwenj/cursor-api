@@ -12,7 +12,7 @@ impl ::serde::Serialize for StringI64 {
     where
         S: ::serde::Serializer,
     {
-        serializer.collect_str(&format_args!("{}", self.0))
+        serializer.collect_str(&self.0)
     }
 }
 
@@ -34,7 +34,7 @@ impl<'de> ::serde::Deserialize<'de> for StringI64 {
             where
                 E: ::serde::de::Error,
             {
-                match i64::from_str_radix(value, 10) {
+                match str::parse(value) {
                     Ok(i) => Ok(StringI64(i)),
                     Err(e) => Err(E::custom(e)),
                 }

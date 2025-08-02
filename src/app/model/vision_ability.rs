@@ -20,7 +20,7 @@ impl VisionAbility {
 
     #[inline]
     pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
+        match s.to_ascii_lowercase().as_str() {
             Self::NONE | Self::NONE_ALIAS => Self::None,
             Self::BASE64 | Self::BASE64_ALIAS => Self::Base64,
             Self::ALL | Self::ALL_ALIAS => Self::All,
@@ -42,7 +42,7 @@ impl VisionAbility {
     }
 }
 
-impl Default for VisionAbility {
+impl const Default for VisionAbility {
     #[inline(always)]
     fn default() -> Self { Self::Base64 }
 }

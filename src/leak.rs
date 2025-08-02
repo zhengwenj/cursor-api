@@ -10,6 +10,15 @@ pub use arc::ArcStr;
 
 use crate::{app::constant::EMPTY_STRING, leak::manually_init::ManuallyInit};
 
+// 全局实例
+static STATIC_POOL: ManuallyInit<Mutex<StaticPool>> = ManuallyInit::new();
+
+#[forbid(unused)]
+pub unsafe fn init_pool() {
+    STATIC_POOL.init(Mutex::new(StaticPool::default()));
+    arc::__init();
+}
+
 // 静态字符串池
 #[derive(Default)]
 #[repr(transparent)]
@@ -56,17 +65,6 @@ impl StaticPool {
             self.pool.insert(leaked);
             leaked
         }
-    }
-}
-
-// 全局实例
-static STATIC_POOL: ManuallyInit<Mutex<StaticPool>> = ManuallyInit::new();
-
-#[forbid(unused)]
-pub fn init_pool() {
-    unsafe {
-        STATIC_POOL.init(Mutex::new(StaticPool::default()));
-        arc::__init();
     }
 }
 

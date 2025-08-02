@@ -128,11 +128,11 @@ fn extract_web_references_info(text: &str) -> (String, Vec<WebReference>, bool) 
     }
 }
 
-trait ToOpt: Copy {
+const trait ToOpt: Copy {
     fn to_opt(self) -> Option<Self>;
 }
 
-impl ToOpt for bool {
+impl const ToOpt for bool {
     #[inline(always)]
     fn to_opt(self) -> Option<Self> { if self { Some(true) } else { None } }
 }

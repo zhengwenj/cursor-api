@@ -32,16 +32,7 @@ pub enum UsageCheck {
 impl UsageCheck {
     #[inline]
     pub fn from_str(s: &str) -> Self {
-        let s = s.trim();
-
-        // 快速路径：空字符串
-        if s.is_empty() {
-            return Self::default();
-        }
-
-        // 转小写并匹配预定义类型
-        let lower = s.to_lowercase();
-        match lower.as_str() {
+        match s.to_ascii_lowercase().as_str() {
             TYPE_NONE | TYPE_DISABLED => Self::None,
             TYPE_DEFAULT => Self::Default,
             TYPE_ALL | TYPE_EVERYTHING => Self::All,
@@ -100,7 +91,7 @@ impl UsageCheck {
     }
 }
 
-impl Default for UsageCheck {
+impl const Default for UsageCheck {
     #[inline(always)]
     fn default() -> Self { Self::Default }
 }

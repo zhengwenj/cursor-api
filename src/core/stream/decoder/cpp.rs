@@ -299,7 +299,7 @@ impl StreamDecoder {
         if msg_data.len() == 2 {
             return Ok(Some(StreamMessage::StreamEnd));
         }
-        if let Ok(text) = String::from_utf8(msg_data.to_vec()) {
+        if let Some(text) = super::utils::string_from_utf8(msg_data) {
             // if let Ok(error) = serde_json::from_str::<ChatError>(&text) {
             //     return Err(StreamError::ChatError(error));
             // }

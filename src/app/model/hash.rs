@@ -75,8 +75,8 @@ impl Hash {
     }
 }
 
-impl Default for Hash {
-    #[inline]
+impl const Default for Hash {
+    #[inline(always)]
     fn default() -> Self { Self::nil() }
 }
 

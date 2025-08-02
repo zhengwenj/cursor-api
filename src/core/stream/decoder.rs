@@ -1,6 +1,7 @@
 pub mod cpp;
 pub mod direct;
 pub mod types;
+mod utils;
 
 use crate::core::{
     aiserver::v1::{
@@ -415,10 +416,10 @@ impl StreamDecoder {
             return Ok(Some(StreamMessage::StreamEnd));
         }
         // let count = self.counter.fetch_add(1, Ordering::SeqCst);
-        if let Ok(text) = String::from_utf8(msg_data.to_vec()) {
+        if let Some(text) = utils::string_from_utf8(msg_data) {
             // crate::debug!("JSON消息 [hex: {}]: {}", hex::encode(msg_data), text);
             // crate::debug!("{count}: {text:?}");
-            if let Ok(error) = serde_json::from_str::<CursorError>(&text) {
+            if let Ok(error) = ::serde_json::from_str::<CursorError>(&text) {
                 return Err(StreamError::Upstream(error));
             }
         }

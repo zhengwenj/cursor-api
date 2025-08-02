@@ -89,8 +89,8 @@ impl Randomness {
   }
 }
 
-impl Default for Randomness {
-  #[inline]
+impl const Default for Randomness {
+  #[inline(always)]
   fn default() -> Self { Self(0) }
 }
 
@@ -419,7 +419,6 @@ pub enum TokenError {
   InvalidHeader,
   InvalidFormat,
   InvalidBase64(base64::DecodeError),
-  InvalidUtf8(std::string::FromUtf8Error),
   InvalidJson(io::Error),
   InvalidSubject(SubjectError),
   InvalidRandomness(RandomnessError),
@@ -434,7 +433,6 @@ impl fmt::Display for TokenError {
       Self::InvalidHeader => f.write_str("Invalid token header"),
       Self::InvalidFormat => f.write_str("Invalid token format"),
       Self::InvalidBase64(e) => write!(f, "Invalid base64: {e}"),
-      Self::InvalidUtf8(e) => write!(f, "Invalid UTF-8: {e}"),
       Self::InvalidJson(e) => write!(f, "Invalid JSON: {e}"),
       Self::InvalidSubject(e) => write!(f, "Invalid subject: {e}"),
       Self::InvalidRandomness(e) => write!(f, "Invalid randomness: {e}"),
@@ -541,9 +539,7 @@ impl FromStr for RawToken {
       .map_err(|_| TokenError::InvalidSignatureLength)?;
 
     // 3. 解析payload
-    let payload_str = String::from_utf8(payload).map_err(TokenError::InvalidUtf8)?;
-
-    let payload: TokenPayload = serde_json::from_str(&payload_str).map_err(|e| {
+    let payload: TokenPayload = serde_json::from_slice(&payload).map_err(|e| {
       let e: io::Error = e.into();
       match e.downcast::<SubjectError>() {
         Ok(e) => TokenError::InvalidSubject(e),

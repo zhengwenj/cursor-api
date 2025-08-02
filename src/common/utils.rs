@@ -331,7 +331,7 @@ pub async fn get_token_usage(
   let maybe_token = ext_token
     .secondary_token
     .as_ref()
-    .unwrap_or_else(|| &ext_token.primary_token);
+    .unwrap_or(&ext_token.primary_token);
 
   let mut buf = [0; 31];
   let user_id = maybe_token.raw().subject.id.to_str(&mut buf) as &str;
@@ -353,8 +353,7 @@ pub async fn get_token_usage(
     )
     .await?;
 
-    if let Some(usage) = res.usage_events_display.get(0)?.token_usage {
-        tokio::time::sleep(::core::time::Duration::from_millis(POLL_INTERVAL_MS)).await;
+    if let Some(usage) = res.usage_events_display.first()?.token_usage {
       token_usage = Some(usage);
       break;
     };
@@ -883,7 +882,6 @@ pub async fn get_sessions(
     .map(|r| r.sessions)
 }
 
-#[allow(unused)]
 pub async fn get_aggregated_usage_events(
   client: &Client,
   user_id: &str,

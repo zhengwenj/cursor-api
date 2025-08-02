@@ -39,7 +39,7 @@ use crate::{
         stream::decoder::{
             cpp::{StreamDecoder, StreamMessage},
             direct,
-            types::DecodedMessage,
+            types::{DecodedMessage, DecoderError},
         },
     },
 };
@@ -74,9 +74,9 @@ pub async fn handle_cpp_config(
                     .header(CONTENT_LENGTH, s.len())
                     .body(Body::from(s))
             )),
-            Err(e) => Err((
+            Err(DecoderError::Internal(e)) => Err((
                 StatusCode::BAD_GATEWAY,
-                Json(ChatError::RequestFailed(Cow::Owned(e.to_string())).to_generic()),
+                Json(ChatError::RequestFailed(Cow::Borrowed(e)).to_generic()),
             )
                 .into_response()),
         },
@@ -123,9 +123,9 @@ pub async fn handle_cpp_models(
                     .header(CONTENT_LENGTH, s.len())
                     .body(Body::from(s))
             )),
-            Err(e) => Err((
+            Err(DecoderError::Internal(e)) => Err((
                 StatusCode::BAD_GATEWAY,
-                Json(ChatError::RequestFailed(Cow::Owned(e.to_string())).to_generic()),
+                Json(ChatError::RequestFailed(Cow::Borrowed(e)).to_generic()),
             )
                 .into_response()),
         },
@@ -200,9 +200,9 @@ pub async fn handle_upload_file(
                                 .header(CONTENT_LENGTH, s.len())
                                 .body(Body::from(s))
                         )),
-                        Err(e) => Err((
+                        Err(DecoderError::Internal(e)) => Err((
                             StatusCode::BAD_GATEWAY,
-                            Json(ChatError::RequestFailed(Cow::Owned(e.to_string())).to_generic()),
+                            Json(ChatError::RequestFailed(Cow::Borrowed(e)).to_generic()),
                         )
                             .into_response()),
                     };
@@ -272,9 +272,9 @@ pub async fn handle_sync_file(
                                 .header(CONTENT_LENGTH, s.len())
                                 .body(Body::from(s))
                         )),
-                        Err(e) => Err((
+                        Err(DecoderError::Internal(e)) => Err((
                             StatusCode::BAD_GATEWAY,
-                            Json(ChatError::RequestFailed(Cow::Owned(e.to_string())).to_generic()),
+                            Json(ChatError::RequestFailed(Cow::Borrowed(e)).to_generic()),
                         )
                             .into_response()),
                     };
@@ -345,7 +345,7 @@ pub async fn handle_stream_cpp(
     where
         I: Iterator<Item = StreamMessage>,
     {
-        let mut response_data = Vec::with_capacity(64);
+        let mut response_data = Vec::with_capacity(128);
 
         for message in messages {
             let event = match message {

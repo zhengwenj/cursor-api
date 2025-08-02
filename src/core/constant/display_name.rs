@@ -1,14 +1,14 @@
-use ahash::HashMap;
-use std::sync::LazyLock;
+use ::ahash::HashMap;
+use ::parking_lot::Mutex;
 
-use parking_lot::Mutex;
+use crate::{app::constant::EMPTY_STRING, leak::manually_init::ManuallyInit};
 
-use crate::app::constant::EMPTY_STRING;
+static DISPLAY_NAME_CACHE: ManuallyInit<Mutex<HashMap<&'static str, &'static str>>> =
+    ManuallyInit::new();
 
-const GPT: &str = "GPT";
-
-static DISPLAY_NAME_CACHE: LazyLock<Mutex<HashMap<&'static str, &'static str>>> =
-    LazyLock::new(|| Mutex::new(HashMap::default()));
+pub fn init_display_name_cache() {
+    unsafe { DISPLAY_NAME_CACHE.init(Mutex::new(HashMap::default())) }
+}
 
 /// 计算 AI 模型标识符的显示名称。
 ///
@@ -55,6 +55,8 @@ pub fn calculate_display_name_v4(identifier: &'static str) -> &'static str {
 
 #[inline(always)]
 fn calculate_display_name_internal(identifier: &'static str) -> &'static str {
+    const GPT: &str = "GPT";
+
     if identifier.is_empty() {
         return EMPTY_STRING;
     }

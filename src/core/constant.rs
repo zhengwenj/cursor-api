@@ -11,12 +11,11 @@ use ::std::{
     time::{Duration, Instant},
 };
 
+use super::model::Model;
 use crate::{
     app::{constant::UNKNOWN, lazy::get_start_time, model::DateTime},
     leak::manually_init::ManuallyInit,
 };
-
-use super::model::Model;
 
 macro_rules! def_pri_const {
     ($($name:ident => $value:expr),+ $(,)?) => {
@@ -224,21 +223,10 @@ macro_rules! create_models {
 
             let mut cached_ids = Vec::new();
             for model in &models {
-                cached_ids.push(model.id);
-                cached_ids.push(crate::leak::intern_static(format!(
-                    "{}-online",
-                    model.id
-                )));
+                push_ids(&mut cached_ids, model.id);
 
                 if model.is_max && model.is_non_max {
-                    cached_ids.push(crate::leak::intern_static(format!(
-                        "{}-max",
-                        model.id
-                    )));
-                    cached_ids.push(crate::leak::intern_static(format!(
-                        "{}-max-online",
-                        model.id
-                    )));
+                    push_ids(&mut cached_ids, crate::leak::intern_static(format!("{}-max", model.id)));
                 }
             }
             let find_ids = HashMap::from_iter(models.iter().enumerate().map(|(i, m)| (m.id, i)));
@@ -266,6 +254,7 @@ pub struct Models {
 }
 
 impl Models {
+    #[inline(always)]
     pub fn get() -> ::parking_lot::RwLockReadGuard<'static, Self> { INSTANCE.read() }
 
     pub fn to_arc() -> Arc<Vec<Model>> { Self::get().models.clone() }
@@ -521,15 +510,10 @@ impl Models {
 
         // 只为新增的模型创建ID组合
         for model in to_add {
-            cached_ids.push(model.id);
-            cached_ids.push(crate::leak::intern_static(format!("{}-online", model.id)));
+            push_ids(&mut cached_ids, model.id);
 
-            if model.is_max {
-                cached_ids.push(crate::leak::intern_static(format!("{}-max", model.id)));
-                cached_ids.push(crate::leak::intern_static(format!(
-                    "{}-max-online",
-                    model.id
-                )));
+            if model.is_max && model.is_non_max {
+                push_ids(&mut cached_ids, crate::leak::intern_static(format!("{}-max", model.id)));
             }
         }
 
@@ -541,6 +525,12 @@ impl Models {
 
         Ok(())
     }
+}
+
+#[inline]
+fn push_ids(ids: &mut Vec<&'static str>, id: &'static str) {
+    ids.push(id);
+    ids.push(crate::leak::intern_static(format!("{id}-online")));
 }
 
 create_models! {

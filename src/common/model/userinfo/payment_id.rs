@@ -49,7 +49,7 @@ impl ::serde::Serialize for PaymentId {
     where
         S: ::serde::Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        serializer.collect_str(self)
     }
 }
 

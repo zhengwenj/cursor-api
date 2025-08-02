@@ -1,8 +1,11 @@
 // use bytes::{Buf as _, BytesMut};
 
-use super::decompress_gzip;
+use std::borrow::Cow;
 
-use super::types::{DecodedMessage, DecoderError, ProtobufMessage};
+use super::{
+    decompress_gzip,
+    types::{DecodedMessage, DecoderError, ProtobufMessage},
+};
 
 // #[derive(Clone)]
 // pub struct DirectDecoder<T: ProtobufMessage> {
@@ -24,18 +27,8 @@ use super::types::{DecodedMessage, DecoderError, ProtobufMessage};
 //         // 首先尝试按带头部的格式处理
 //         if self.buf.len() >= 5 && self.buf[0] <= 1 {
 //             // 检查头部
-//             let is_compressed;
-//             let msg_len;
-
-//             unsafe {
-//                 is_compressed = self.buf[0] == 1;
-//                 msg_len = u32::from_be_bytes([
-//                     *self.buf.get_unchecked(1),
-//                     *self.buf.get_unchecked(2),
-//                     *self.buf.get_unchecked(3),
-//                     *self.buf.get_unchecked(4),
-//                 ]) as usize;
-//             }
+//             let is_compressed = data[0] == 1;
+//             let msg_len = u32::from_be_bytes([data[1], data[2], data[3], data[4]]) as usize;
 
 //             // 如果数据完整，按带头部格式处理
 //             if self.buf.len() == 5 + msg_len {
@@ -52,7 +45,7 @@ use super::types::{DecodedMessage, DecoderError, ProtobufMessage};
 
 //                 if let Ok(msg) = T::decode(&self.buf[..]) {
 //                     return Ok(Some(DecodedMessage::Protobuf(msg)));
-//                 } else if let Ok(text) = String::from_utf8(self.buf.to_vec()) {
+//                 } else if let Some(text) = String::from_utf8(self.buf.to_vec()) {
 //                     return Ok(Some(DecodedMessage::Text(text)));
 //                 }
 //             }
@@ -90,16 +83,16 @@ pub fn decode<T: ProtobufMessage>(data: &[u8]) -> Result<DecodedMessage<T>, Deco
 
             let decompressed = if is_compressed {
                 match decompress_gzip(payload) {
-                    Some(data) => data,
+                    Some(data) => Cow::Owned(data),
                     None => return Err(DecoderError::Internal("decompress error")),
                 }
             } else {
-                payload.to_vec()
+                Cow::Borrowed(payload)
             };
 
-            if let Ok(msg) = T::decode(&decompressed[..]) {
+            if let Ok(msg) = T::decode(&*decompressed) {
                 return Ok(DecodedMessage::Protobuf(msg));
-            } else if let Ok(text) = String::from_utf8(decompressed) {
+            } else if let Some(text) = super::utils::string_from_utf8_cow(decompressed) {
                 return Ok(DecodedMessage::Text(text));
             }
         }
@@ -108,7 +101,7 @@ pub fn decode<T: ProtobufMessage>(data: &[u8]) -> Result<DecodedMessage<T>, Deco
     // 尝试解析
     if let Ok(msg) = T::decode(data) {
         Ok(DecodedMessage::Protobuf(msg))
-    } else if let Ok(text) = String::from_utf8(data.to_vec()) {
+    } else if let Some(text) = super::utils::string_from_utf8(data) {
         Ok(DecodedMessage::Text(text))
     } else {
         Err(DecoderError::Internal("decode error"))

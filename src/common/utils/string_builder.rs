@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! High-performance string builders for efficient string concatenation.
 //!
 //! This crate provides a flexible `StringBuilder` that optimizes storage:
@@ -40,10 +42,10 @@ enum Storage<'a> {
 }
 
 impl<'a> Storage<'a> {
-    #[inline(always)]
-    fn new_borrowed() -> Self { Self::Borrowed(MaybeUninit::new(Vec::new())) }
+    #[inline]
+    const fn new_borrowed() -> Self { Self::Borrowed(MaybeUninit::new(Vec::new())) }
 
-    #[inline(always)]
+    #[inline]
     fn new_borrowed_with_capacity(cap: usize) -> Self {
         Self::Borrowed(MaybeUninit::new(Vec::with_capacity(cap)))
     }
@@ -63,7 +65,7 @@ impl<'a> Clone for Storage<'a> {
     }
 }
 
-impl<'a> Default for Storage<'a> {
+impl<'a> const Default for Storage<'a> {
     #[inline]
     fn default() -> Self { Self::new_borrowed() }
 }
@@ -76,14 +78,14 @@ pub struct StringBuilder<'a> {
 }
 
 impl<'a> StringBuilder<'a> {
-    // /// Creates a new, empty `StringBuilder` in `Borrowed` state.
-    // #[inline(always)]
-    // pub fn new() -> Self {
-    //     StringBuilder {
-    //         storage: Storage::Borrowed(Vec::new()),
-    //         total_len: 0,
-    //     }
-    // }
+    /// Creates a new, empty `StringBuilder` in `Borrowed` state.
+    #[inline(always)]
+    pub fn new() -> Self {
+        StringBuilder {
+            storage: Storage::Borrowed(MaybeUninit::new(Vec::new())),
+            total_len: 0,
+        }
+    }
 
     /// Creates a new `StringBuilder` with capacity, in `Borrowed` state.
     #[inline]
@@ -171,180 +173,179 @@ impl<'a> StringBuilder<'a> {
         }
     }
 
-    // #[inline(always)]
-    // pub const fn len(&self) -> usize {
-    //     self.total_len
-    // }
+    #[inline(always)]
+    pub const fn len(&self) -> usize { self.total_len }
 
     #[inline(always)]
     pub const fn is_empty(&self) -> bool { self.total_len == 0 }
 
-    // /// Clears the builder and resets state to `Borrowed`.
-    // #[inline]
-    // pub fn clear(&mut self) {
-    //     self.storage = Storage::Borrowed(Vec::new());
-    //     self.total_len = 0;
-    // }
+    /// Clears the builder and resets state to `Borrowed`.
+    #[inline]
+    pub fn clear(&mut self) {
+        self.storage = Storage::Borrowed(MaybeUninit::new(Vec::new()));
+        self.total_len = 0;
+    }
 
-    // /// Reserves capacity.
-    // #[inline]
-    // pub fn reserve(&mut self, additional: usize) {
-    //     match &mut self.storage {
-    //         Storage::Borrowed(vec) => vec.reserve(additional),
-    //         Storage::Mixed(vec) => vec.reserve(additional),
-    //     }
-    // }
+    /// Reserves capacity.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        match &mut self.storage {
+            Storage::Borrowed(vec) => unsafe { vec.assume_init_mut().reserve(additional) },
+            Storage::Mixed(vec) => vec.reserve(additional),
+        }
+    }
 
-    // fn parts_len(&self) -> usize {
-    //     match &self.storage {
-    //         Storage::Borrowed(vec) => vec.len(),
-    //         Storage::Mixed(vec) => vec.len(),
-    //     }
-    // }
+    fn parts_len(&self) -> usize {
+        match &self.storage {
+            Storage::Borrowed(vec) => unsafe { vec.assume_init_ref().len() },
+            Storage::Mixed(vec) => vec.len(),
+        }
+    }
 
-    // /// Adds a string separator between each part when building.
-    // #[inline]
-    // pub fn join<S>(self, separator: S) -> JoinBuilder<'a>
-    // where
-    //     S: StringPart<'a>,
-    // {
-    //     let sep: Cow<'a, str> = separator.into();
-    //     let sep_len = sep.len();
-    //     let parts_count = self.parts_len();
+    /// Adds a string separator between each part when building.
+    #[inline]
+    pub fn join<S>(self, separator: S) -> JoinBuilder<'a>
+    where
+        S: StringPart<'a>,
+    {
+        let sep: Cow<'a, str> = separator.into();
+        let sep_len = sep.len();
+        let parts_count = self.parts_len();
 
-    //     let total_sep_len = if parts_count > 0 {
-    //         sep_len.saturating_mul(parts_count.saturating_sub(1))
-    //     } else {
-    //         0
-    //     };
+        let total_sep_len = if parts_count > 0 {
+            sep_len.saturating_mul(parts_count.saturating_sub(1))
+        } else {
+            0
+        };
 
-    //     JoinBuilder {
-    //         builder: self,
-    //         separator: sep,
-    //         separator_total_len: total_sep_len,
-    //     }
-    // }
+        JoinBuilder {
+            builder: self,
+            separator: sep,
+            separator_total_len: total_sep_len,
+        }
+    }
 }
 
-// /// A specialized builder that joins string parts with a separator.
-// #[derive(Debug, Clone)]
-// pub struct JoinBuilder<'a> {
-//     builder: StringBuilder<'a>,
-//     separator: Cow<'a, str>,
-//     separator_total_len: usize,
-// }
+/// A specialized builder that joins string parts with a separator.
+#[derive(Debug, Clone)]
+pub struct JoinBuilder<'a> {
+    builder: StringBuilder<'a>,
+    separator: Cow<'a, str>,
+    separator_total_len: usize,
+}
 
-// impl<'a> JoinBuilder<'a> {
-//     /// Builds the final string with separators, consuming the builder.
-//     #[inline]
-//     pub fn build(self) -> String {
-//         if self.builder.is_empty() {
-//             return String::new();
-//         }
-//         if self.builder.parts_len() == 1 {
-//             return self.builder.build();
-//         }
+impl<'a> JoinBuilder<'a> {
+    /// Builds the final string with separators, consuming the builder.
+    #[inline]
+    pub fn build(self) -> String {
+        if self.builder.is_empty() {
+            return String::new();
+        }
+        if self.builder.parts_len() == 1 {
+            return self.builder.build();
+        }
 
-//         let mut result = String::with_capacity(self.builder.total_len + self.separator_total_len);
-//         let separator_str: &str = &self.separator;
+        let mut result = String::with_capacity(self.builder.total_len + self.separator_total_len);
+        let separator_str: &str = &self.separator;
 
-//         match self.builder.storage {
-//             Storage::Borrowed(parts) => {
-//                 let mut iter = parts.into_iter();
-//                 if let Some(first) = iter.next() {
-//                     result.push_str(first);
-//                 }
-//                 for part in iter {
-//                     result.push_str(separator_str);
-//                     result.push_str(part);
-//                 }
-//             }
-//             Storage::Mixed(parts) => {
-//                 let mut iter = parts.into_iter();
-//                 if let Some(first) = iter.next() {
-//                     result.push_str(&first);
-//                 }
-//                 for part in iter {
-//                     result.push_str(separator_str);
-//                     result.push_str(&part);
-//                 }
-//             }
-//         }
-//         result
-//     }
-// }
+        match self.builder.storage {
+            Storage::Borrowed(parts) => {
+                let mut iter = unsafe { parts.assume_init_read().into_iter() };
+                if let Some(first) = iter.next() {
+                    result.push_str(first);
+                }
+                for part in iter {
+                    result.push_str(separator_str);
+                    result.push_str(part);
+                }
+            }
+            Storage::Mixed(parts) => {
+                let mut iter = parts.into_iter();
+                if let Some(first) = iter.next() {
+                    result.push_str(&first);
+                }
+                for part in iter {
+                    result.push_str(separator_str);
+                    result.push_str(&part);
+                }
+            }
+        }
+        result
+    }
+}
 
-// /// Joins an iterator of string parts with a separator.
-// #[inline]
-// pub fn join<'a, S, I, T>(separator: S, iter: I) -> String
-// where
-//     S: StringPart<'a> + Clone,
-//     I: IntoIterator<Item = T>,
-//     T: StringPart<'a>,
-// {
-//     let iterator = iter.into_iter();
-//     let mut builder = StringBuilder::new();
-//     let (lower, _) = iterator.size_hint();
-//     builder.reserve(lower);
+/// Joins an iterator of string parts with a separator.
+#[inline]
+pub fn join<'a, S, I, T>(separator: S, iter: I) -> String
+where
+    S: StringPart<'a> + Clone,
+    I: IntoIterator<Item = T>,
+    T: StringPart<'a>,
+{
+    let iterator = iter.into_iter();
+    let mut builder = StringBuilder::new();
+    let (lower, _) = iterator.size_hint();
+    builder.reserve(lower);
 
-//     for item in iterator {
-//         builder.append_mut(item);
-//     }
-//     builder.join(separator).build()
-// }
+    for item in iterator {
+        builder.append_mut(item);
+    }
+    builder.join(separator).build()
+}
 
-// /// Concatenates an iterator of string parts without a separator.
-// #[inline]
-// pub fn concat<'a, I, T>(iter: I) -> String
-// where
-//     I: IntoIterator<Item = T>,
-//     T: StringPart<'a>,
-// {
-//     let iterator = iter.into_iter();
-//     let mut builder = StringBuilder::new();
-//     let (lower, _) = iterator.size_hint();
-//     builder.reserve(lower);
-//     for item in iterator {
-//         builder.append_mut(item);
-//     }
-//     builder.build()
-// }
+/// Concatenates an iterator of string parts without a separator.
+#[inline]
+pub fn concat<'a, I, T>(iter: I) -> String
+where
+    I: IntoIterator<Item = T>,
+    T: StringPart<'a>,
+{
+    let iterator = iter.into_iter();
+    let mut builder = StringBuilder::new();
+    let (lower, _) = iterator.size_hint();
+    builder.reserve(lower);
+    for item in iterator {
+        builder.append_mut(item);
+    }
+    builder.build()
+}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::borrow::Cow;
+
+    use super::*;
 
     impl<'a> StringBuilder<'a> {
         fn is_borrowed_state(&self) -> bool { matches!(self.storage, Storage::Borrowed(_)) }
         fn is_mixed_state(&self) -> bool { matches!(self.storage, Storage::Mixed(_)) }
     }
 
-    // #[test]
-    // fn test_state_transition() {
-    //     let mut builder = StringBuilder::new();
-    //     assert!(builder.is_borrowed_state());
-    //     builder.append_mut("hello");
-    //     assert!(builder.is_borrowed_state());
-    //     builder.append_mut(String::from(" world"));
-    //     assert!(builder.is_mixed_state());
-    //     builder.append_mut("!");
-    //     assert!(builder.is_mixed_state());
-    //     assert_eq!(builder.build(), "hello world!");
-    // }
+    #[test]
+    fn test_state_transition() {
+        let mut builder = StringBuilder::new();
+        assert!(builder.is_borrowed_state());
+        builder.append_mut("hello");
+        assert!(builder.is_borrowed_state());
+        builder.append_mut(String::from(" world"));
+        assert!(builder.is_mixed_state());
+        builder.append_mut("!");
+        assert!(builder.is_mixed_state());
+        assert_eq!(builder.build(), "hello world!");
+    }
 
-    // #[test]
-    // fn test_clear_resets_state() {
-    //     let mut builder = StringBuilder::new();
-    //     builder.append_mut(String::from(" world"));
-    //     assert!(builder.is_mixed_state());
-    //     builder.clear();
-    //     assert!(builder.is_borrowed_state());
-    //     assert!(builder.is_empty());
-    //     builder.append_mut("borrowed again");
-    //     assert!(builder.is_borrowed_state());
-    //     assert_eq!(builder.build(), "borrowed again");
-    // }
+    #[test]
+    fn test_clear_resets_state() {
+        let mut builder = StringBuilder::new();
+        builder.append_mut(String::from(" world"));
+        assert!(builder.is_mixed_state());
+        builder.clear();
+        assert!(builder.is_borrowed_state());
+        assert!(builder.is_empty());
+        builder.append_mut("borrowed again");
+        assert!(builder.is_borrowed_state());
+        assert_eq!(builder.build(), "borrowed again");
+    }
 
     #[test]
     fn test_basic_builder_borrowed_only() {
@@ -367,42 +368,42 @@ mod tests {
         assert_eq!(builder.build(), "prefix: owned suffix");
     }
 
-    // #[test]
-    // fn test_builder_join_borrowed() {
-    //     let parts = ["apple", "banana", "cherry"];
-    //     let sep = ", ";
-    //     let builder = StringBuilder::with_capacity(3)
-    //         .append(parts[0])
-    //         .append(parts[1])
-    //         .append(parts[2]);
-    //     assert!(builder.is_borrowed_state());
-    //     let result = builder.join(sep).build();
-    //     assert_eq!(result, "apple, banana, cherry");
-    // }
+    #[test]
+    fn test_builder_join_borrowed() {
+        let parts = ["apple", "banana", "cherry"];
+        let sep = ", ";
+        let builder = StringBuilder::with_capacity(3)
+            .append(parts[0])
+            .append(parts[1])
+            .append(parts[2]);
+        assert!(builder.is_borrowed_state());
+        let result = builder.join(sep).build();
+        assert_eq!(result, "apple, banana, cherry");
+    }
 
-    // #[test]
-    // fn test_builder_join_mixed() {
-    //     let parts = ["apple", "banana", "cherry"];
-    //     let sep = String::from(", ");
-    //     let builder = StringBuilder::with_capacity(3)
-    //         .append(parts[0])
-    //         .append(String::from(parts[1]))
-    //         .append(parts[2]);
-    //     assert!(builder.is_mixed_state());
-    //     let result = builder.join(&sep).build();
-    //     assert_eq!(result, "apple, banana, cherry");
+    #[test]
+    fn test_builder_join_mixed() {
+        let parts = ["apple", "banana", "cherry"];
+        let sep = String::from(", ");
+        let builder = StringBuilder::with_capacity(3)
+            .append(parts[0])
+            .append(String::from(parts[1]))
+            .append(parts[2]);
+        assert!(builder.is_mixed_state());
+        let result = builder.join(&sep).build();
+        assert_eq!(result, "apple, banana, cherry");
 
-    //     let result_single = StringBuilder::new().append("apple").join(", ").build();
-    //     assert_eq!(result_single, "apple");
-    //     let result_single_owned = StringBuilder::new()
-    //         .append(String::from("apple"))
-    //         .join(", ")
-    //         .build();
-    //     assert_eq!(result_single_owned, "apple");
+        let result_single = StringBuilder::new().append("apple").join(", ").build();
+        assert_eq!(result_single, "apple");
+        let result_single_owned = StringBuilder::new()
+            .append(String::from("apple"))
+            .join(", ")
+            .build();
+        assert_eq!(result_single_owned, "apple");
 
-    //     let result_empty = StringBuilder::new().join(", ").build();
-    //     assert_eq!(result_empty, "");
-    // }
+        let result_empty = StringBuilder::new().join(", ").build();
+        assert_eq!(result_empty, "");
+    }
 
     #[test]
     fn test_mixed_types_transition() {
@@ -427,27 +428,27 @@ mod tests {
         assert_eq!(builder.build(), "Hello, world! start");
     }
 
-    // #[test]
-    // fn test_single_optimizations() {
-    //     let b1 = StringBuilder::new().append("borrowed");
-    //     assert!(b1.is_borrowed_state());
-    //     assert_eq!(b1.build(), "borrowed");
+    #[test]
+    fn test_single_optimizations() {
+        let b1 = StringBuilder::new().append("borrowed");
+        assert!(b1.is_borrowed_state());
+        assert_eq!(b1.build(), "borrowed");
 
-    //     let owned = String::from("Hello, world!");
-    //     let b2 = StringBuilder::new().append(owned.clone());
-    //     assert!(b2.is_mixed_state());
-    //     assert_eq!(b2.build(), owned);
+        let owned = String::from("Hello, world!");
+        let b2 = StringBuilder::new().append(owned.clone());
+        assert!(b2.is_mixed_state());
+        assert_eq!(b2.build(), owned);
 
-    //     let owned_cow: Cow<'static, str> = Cow::Owned(String::from("Hello, world!"));
-    //     let b3 = StringBuilder::new().append(owned_cow.clone());
-    //     assert!(b3.is_mixed_state());
-    //     assert_eq!(b3.build(), "Hello, world!");
+        let owned_cow: Cow<'static, str> = Cow::Owned(String::from("Hello, world!"));
+        let b3 = StringBuilder::new().append(owned_cow.clone());
+        assert!(b3.is_mixed_state());
+        assert_eq!(b3.build(), "Hello, world!");
 
-    //     let borrowed_cow: Cow<'static, str> = Cow::Borrowed("Hello, world!");
-    //     let b4 = StringBuilder::new().append(borrowed_cow.clone());
-    //     assert!(b4.is_borrowed_state());
-    //     assert_eq!(b4.build(), "Hello, world!");
-    // }
+        let borrowed_cow: Cow<'static, str> = Cow::Borrowed("Hello, world!");
+        let b4 = StringBuilder::new().append(borrowed_cow.clone());
+        assert!(b4.is_borrowed_state());
+        assert_eq!(b4.build(), "Hello, world!");
+    }
 
     #[test]
     fn test_format() {
@@ -547,48 +548,48 @@ mod tests {
         assert_eq!(cloned_empty.build(), "");
     }
 
-    // #[test]
-    // fn test_free_join() {
-    //     let items = vec!["apple", "banana"];
-    //     let s = String::from("cherry");
-    //     let iter = items.iter().cloned().chain(std::iter::once(s.as_str()));
-    //     assert_eq!(join(", ", iter), "apple, banana, cherry");
+    #[test]
+    fn test_free_join() {
+        let items = vec!["apple", "banana"];
+        let s = String::from("cherry");
+        let iter = items.iter().cloned().chain(std::iter::once(s.as_str()));
+        assert_eq!(join(", ", iter), "apple, banana, cherry");
 
-    //     let items_owned = vec![String::from("a"), String::from("b")];
-    //     assert_eq!(join(String::from("-"), items_owned.into_iter()), "a-b");
+        let items_owned = vec![String::from("a"), String::from("b")];
+        assert_eq!(join(String::from("-"), items_owned.into_iter()), "a-b");
 
-    //     assert_eq!(join(",", Vec::<&str>::new()), "");
-    //     assert_eq!(join(",", vec!["single"]), "single");
-    // }
+        assert_eq!(join(",", Vec::<&str>::new()), "");
+        assert_eq!(join(",", vec!["single"]), "single");
+    }
 
-    // #[test]
-    // fn test_free_concat() {
-    //     let items = vec!["Hello", ", "];
-    //     let s = String::from("world!");
-    //     let iter = items.iter().cloned().chain(std::iter::once(s.as_str()));
-    //     assert_eq!(concat(iter), "Hello, world!");
+    #[test]
+    fn test_free_concat() {
+        let items = vec!["Hello", ", "];
+        let s = String::from("world!");
+        let iter = items.iter().cloned().chain(std::iter::once(s.as_str()));
+        assert_eq!(concat(iter), "Hello, world!");
 
-    //     let items_mixed: Vec<Cow<str>> = vec!["Hello".into(), String::from(", world!").into()];
-    //     assert_eq!(concat(items_mixed), "Hello, world!");
+        let items_mixed: Vec<Cow<str>> = vec!["Hello".into(), String::from(", world!").into()];
+        assert_eq!(concat(items_mixed), "Hello, world!");
 
-    //     assert_eq!(concat(Vec::<&str>::new()), "");
-    // }
+        assert_eq!(concat(Vec::<&str>::new()), "");
+    }
 
-    // #[test]
-    // fn test_clear_and_len() {
-    //     let mut builder = StringBuilder::new();
-    //     assert!(builder.is_empty());
-    //     assert_eq!(builder.len(), 0);
-    //     builder.append_mut("hello");
-    //     assert!(builder.is_borrowed_state());
-    //     builder.append_mut(String::from(" world"));
-    //     assert!(builder.is_mixed_state());
-    //     assert!(!builder.is_empty());
-    //     assert_eq!(builder.len(), 11);
-    //     builder.clear();
-    //     assert!(builder.is_borrowed_state());
-    //     assert!(builder.is_empty());
-    //     assert_eq!(builder.len(), 0);
-    //     assert_eq!(builder.build(), "");
-    // }
+    #[test]
+    fn test_clear_and_len() {
+        let mut builder = StringBuilder::new();
+        assert!(builder.is_empty());
+        assert_eq!(builder.len(), 0);
+        builder.append_mut("hello");
+        assert!(builder.is_borrowed_state());
+        builder.append_mut(String::from(" world"));
+        assert!(builder.is_mixed_state());
+        assert!(!builder.is_empty());
+        assert_eq!(builder.len(), 11);
+        builder.clear();
+        assert!(builder.is_borrowed_state());
+        assert!(builder.is_empty());
+        assert_eq!(builder.len(), 0);
+        assert_eq!(builder.build(), "");
+    }
 }

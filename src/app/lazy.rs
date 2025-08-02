@@ -157,7 +157,7 @@ macro_rules! def_cursor_api_url {
     };
 
     // 批量API URL定义
-    ([$($name:ident),+], $api_host:ident, [$($path:expr),+]) => {
+    ([$($name:ident),+ $(,)?], $api_host:ident, [$($path:expr),+ $(,)?]) => {
         $(
             def_cursor_api_url!($name, $api_host, $path);
         )+
@@ -229,13 +229,15 @@ def_cursor_api_url!(
     [
         asia_upload_file_url,
         asia_sync_file_url,
-        asia_stream_cpp_url // asia_next_cursor_prediction_url
+        asia_stream_cpp_url,
+        // asia_next_cursor_prediction_url
     ],
     CURSOR_GCPP_ASIA_HOST,
     [
         "/aiserver.v1.FileSyncService/FSUploadFile",
         "/aiserver.v1.FileSyncService/FSSyncFile",
-        "/aiserver.v1.AiService/StreamCpp" // "/aiserver.v1.AiService/StreamNextCursorPrediction"
+        "/aiserver.v1.AiService/StreamCpp",
+        // "/aiserver.v1.AiService/StreamNextCursorPrediction"
     ]
 );
 
@@ -244,13 +246,15 @@ def_cursor_api_url!(
     [
         eu_upload_file_url,
         eu_sync_file_url,
-        eu_stream_cpp_url // eu_next_cursor_prediction_url
+        eu_stream_cpp_url,
+        // eu_next_cursor_prediction_url
     ],
     CURSOR_GCPP_EU_HOST,
     [
         "/aiserver.v1.FileSyncService/FSUploadFile",
         "/aiserver.v1.FileSyncService/FSSyncFile",
-        "/aiserver.v1.AiService/StreamCpp" // "/aiserver.v1.AiService/StreamNextCursorPrediction"
+        "/aiserver.v1.AiService/StreamCpp",
+        // "/aiserver.v1.AiService/StreamNextCursorPrediction"
     ]
 );
 
@@ -259,13 +263,15 @@ def_cursor_api_url!(
     [
         us_upload_file_url,
         us_sync_file_url,
-        us_stream_cpp_url // us_next_cursor_prediction_url
+        us_stream_cpp_url,
+        // us_next_cursor_prediction_url
     ],
     CURSOR_GCPP_US_HOST,
     [
         "/aiserver.v1.FileSyncService/FSUploadFile",
         "/aiserver.v1.FileSyncService/FSSyncFile",
-        "/aiserver.v1.AiService/StreamCpp" // "/aiserver.v1.AiService/StreamNextCursorPrediction"
+        "/aiserver.v1.AiService/StreamCpp",
+        // "/aiserver.v1.AiService/StreamNextCursorPrediction"
     ]
 );
 

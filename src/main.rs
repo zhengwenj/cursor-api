@@ -1,5 +1,12 @@
 #![allow(internal_features)]
-#![feature(addr_parse_ascii, cold_path, hasher_prefixfree_extras, core_intrinsics)]
+#![feature(
+    addr_parse_ascii,
+    cold_path,
+    hasher_prefixfree_extras,
+    const_trait_impl,
+    const_default,
+    core_intrinsics
+)]
 #![allow(clippy::redundant_static_lifetimes)]
 
 #[macro_use]
@@ -11,31 +18,6 @@ mod core;
 mod leak;
 mod natural_args;
 
-use app::{
-    config::handle_config_update,
-    constant::{
-        EMPTY_STRING, PKG_NAME, ROUTE_ABOUT_PATH, ROUTE_API_PATH, ROUTE_BUILD_KEY_PATH,
-        ROUTE_CONFIG_PATH, ROUTE_CONFIG_VERSION_GET_PATH, ROUTE_CPP_CONFIG_PATH,
-        ROUTE_CPP_MODELS_PATH, ROUTE_CPP_STREAM_PATH, ROUTE_ENV_EXAMPLE_PATH, ROUTE_FILE_SYNC_PATH,
-        ROUTE_FILE_UPLOAD_PATH, ROUTE_GEN_CHECKSUM, ROUTE_GEN_HASH, ROUTE_GEN_TOKEN,
-        ROUTE_GEN_UUID, ROUTE_GET_TIMESTAMP_HEADER, ROUTE_HEALTH_PATH, ROUTE_LOGS_GET_PATH,
-        ROUTE_LOGS_PATH, ROUTE_LOGS_TOKENS_GET_PATH, ROUTE_PROXIES_ADD_PATH,
-        ROUTE_PROXIES_DELETE_PATH, ROUTE_PROXIES_GET_PATH, ROUTE_PROXIES_PATH,
-        ROUTE_PROXIES_SET_GENERAL_PATH, ROUTE_PROXIES_SET_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH,
-        ROUTE_STATIC_PATH, ROUTE_TOKENS_ADD_PATH, ROUTE_TOKENS_ALIAS_SET_PATH,
-        ROUTE_TOKENS_CONFIG_VERSION_UPDATE_PATH, ROUTE_TOKENS_DELETE_PATH, ROUTE_TOKENS_GET_PATH,
-        ROUTE_TOKENS_PATH, ROUTE_TOKENS_PROFILE_UPDATE_PATH, ROUTE_TOKENS_PROXY_SET_PATH,
-        ROUTE_TOKENS_REFRESH_PATH, ROUTE_TOKENS_SET_PATH, ROUTE_TOKENS_STATUS_SET_PATH,
-        ROUTE_TOKENS_TIMEZONE_SET_PATH, VERSION,
-    },
-    lazy::AUTH_TOKEN,
-    model::{AppConfig, AppState},
-};
-use axum::{
-    Router, middleware,
-    routing::{get, post},
-};
-use common::utils::{parse_string_from_env, parse_usize_from_env};
 use core::{
     middleware::{admin_auth_middleware, cpp_auth_middleware, v1_auth_middleware},
     route::{
@@ -58,6 +40,31 @@ use core::{
         handle_chat_completions, handle_messages, handle_models, handle_raw_models,
     },
 };
+use app::{
+    config::handle_config_update,
+    constant::{
+        EMPTY_STRING, EXE_NAME, ROUTE_ABOUT_PATH, ROUTE_API_PATH, ROUTE_BUILD_KEY_PATH,
+        ROUTE_CONFIG_PATH, ROUTE_CONFIG_VERSION_GET_PATH, ROUTE_CPP_CONFIG_PATH,
+        ROUTE_CPP_MODELS_PATH, ROUTE_CPP_STREAM_PATH, ROUTE_ENV_EXAMPLE_PATH, ROUTE_FILE_SYNC_PATH,
+        ROUTE_FILE_UPLOAD_PATH, ROUTE_GEN_CHECKSUM, ROUTE_GEN_HASH, ROUTE_GEN_TOKEN,
+        ROUTE_GEN_UUID, ROUTE_GET_TIMESTAMP_HEADER, ROUTE_HEALTH_PATH, ROUTE_LOGS_GET_PATH,
+        ROUTE_LOGS_PATH, ROUTE_LOGS_TOKENS_GET_PATH, ROUTE_PROXIES_ADD_PATH,
+        ROUTE_PROXIES_DELETE_PATH, ROUTE_PROXIES_GET_PATH, ROUTE_PROXIES_PATH,
+        ROUTE_PROXIES_SET_GENERAL_PATH, ROUTE_PROXIES_SET_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH,
+        ROUTE_STATIC_PATH, ROUTE_TOKENS_ADD_PATH, ROUTE_TOKENS_ALIAS_SET_PATH,
+        ROUTE_TOKENS_CONFIG_VERSION_UPDATE_PATH, ROUTE_TOKENS_DELETE_PATH, ROUTE_TOKENS_GET_PATH,
+        ROUTE_TOKENS_PATH, ROUTE_TOKENS_PROFILE_UPDATE_PATH, ROUTE_TOKENS_PROXY_SET_PATH,
+        ROUTE_TOKENS_REFRESH_PATH, ROUTE_TOKENS_SET_PATH, ROUTE_TOKENS_STATUS_SET_PATH,
+        ROUTE_TOKENS_TIMEZONE_SET_PATH, VERSION,
+    },
+    lazy::AUTH_TOKEN,
+    model::{AppConfig, AppState},
+};
+use axum::{
+    Router, middleware,
+    routing::{get, post},
+};
+use common::utils::{parse_string_from_env, parse_usize_from_env};
 use natural_args::{DEFAULT_LISTEN_HOST, ENV_HOST, ENV_PORT};
 use tokio::signal;
 use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer};
@@ -86,16 +93,16 @@ async fn main() {
                 .ok_or("filename")
         );
         let expect = __unwrap_panic!(current_exe.parent().ok_or("parent"))
-            .join(PKG_NAME)
+            .join(EXE_NAME)
             .is_file();
 
-        if file_name != PKG_NAME {
+        if file_name != EXE_NAME {
             if expect {
                 println!(
-                    "Oh, I see you already have a {PKG_NAME} sitting there. Multiple versions? How adventurous of you!"
+                    "Oh, I see you already have a {EXE_NAME} sitting there. Multiple versions? How adventurous of you!"
                 )
             } else {
-                println!("{file_name}? Really? *{PKG_NAME}* was literally right there!");
+                println!("{file_name}? Really? *{EXE_NAME}* was literally right there!");
             };
         }
 

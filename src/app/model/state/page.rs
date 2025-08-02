@@ -30,7 +30,7 @@ pub enum PageContent {
     Js(String),        // Js内容
 }
 
-impl Default for PageContent {
+impl const Default for PageContent {
     #[inline(always)]
     fn default() -> Self { Self::Default }
 }

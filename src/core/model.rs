@@ -1,10 +1,11 @@
 pub mod anthropic;
 pub mod openai;
-mod parser;
-pub use parser::{ExtModel, init_model};
+mod resolver;
+
+pub(crate) use resolver::{ExtModel, init_resolver};
+use serde::{Serialize, ser::SerializeStruct as _};
 
 use super::constant::Models;
-use serde::{Serialize, ser::SerializeStruct as _};
 
 #[derive(
     ::serde::Serialize,

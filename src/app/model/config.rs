@@ -1,7 +1,8 @@
-use memmap2::{MmapMut, MmapOptions};
-use parking_lot::RwLock;
-use std::{fs::OpenOptions, sync::LazyLock};
+use ::memmap2::{MmapMut, MmapOptions};
+use ::parking_lot::RwLock;
+use ::std::fs::OpenOptions;
 
+use super::{PageContent, Pages, UsageCheck, VisionAbility};
 use crate::{
     app::{
         constant::{
@@ -13,9 +14,8 @@ use crate::{
         model::FetchMode,
     },
     common::utils::{parse_bool_from_env, parse_string_from_env},
+    leak::manually_init::ManuallyInit,
 };
-
-use super::{PageContent, Pages, UsageCheck, VisionAbility};
 
 // 静态配置
 #[derive(Default, Clone)]
@@ -32,8 +32,7 @@ pub struct AppConfig {
 }
 
 // 全局配置实例
-static APP_CONFIG: LazyLock<RwLock<AppConfig>> =
-    LazyLock::new(|| RwLock::new(AppConfig::default()));
+static APP_CONFIG: ManuallyInit<RwLock<AppConfig>> = ManuallyInit::new();
 
 macro_rules! config_methods {
     ($($field:ident: $type:ty, $default:expr;)*) => {
@@ -104,16 +103,24 @@ macro_rules! config_methods_clone {
 
 impl AppConfig {
     pub fn init() {
-        crate::leak::init_pool();
-        unsafe { super::token::__init() };
-        super::tz::__init();
-        super::token::parse_providers();
-        super::super::lazy::log::init();
-        super::hash::init_hash();
-        super::super::constant::initialize_cursor_version();
-        super::super::constant::init_thinking_tags();
-        crate::core::model::init_model();
+        // base
+        unsafe {
+            crate::leak::init_pool();
+            super::token::__init()
+        };
+        // env
+        {
+            super::tz::__init();
+            super::token::parse_providers();
+            super::super::lazy::log::init();
+            super::hash::init_hash();
+            super::super::constant::initialize_cursor_version();
+            super::super::constant::init_thinking_tags();
+            crate::core::model::init_resolver();
+        }
         crate::core::constant::create_models();
+        unsafe { APP_CONFIG.init(RwLock::new(AppConfig::default())) };
+
         let mut config = APP_CONFIG.write();
         config.vision_ability =
             VisionAbility::from_str(&parse_string_from_env("VISION_ABILITY", EMPTY_STRING));

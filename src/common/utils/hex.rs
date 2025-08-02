@@ -1,10 +1,10 @@
-#![allow(unsafe_op_in_unsafe_fn)]
+#![allow(unsafe_op_in_unsafe_fn, dead_code)]
 
 //! 高性能十六进制编解码工具
 
-// ASCII 十六进制解码表，只需要 128 个元素
-pub const HEX_DECODE_TABLE: [u8; 128] = {
-    let mut table = [0xFF; 128];
+// ASCII 十六进制解码表
+pub const HEX_DECODE_TABLE: [u8; 256] = {
+    let mut table = [0xFF; 256];
     let mut i = 0;
     while i < 10 {
         table[b'0' as usize + i] = i as u8;
@@ -32,18 +32,15 @@ pub fn byte_to_hex(byte: u8, out: &mut [u8; 2]) {
 /// 解码两个十六进制字符为一个字节（带边界检查）
 #[inline(always)]
 pub const fn hex_to_byte(hi: u8, lo: u8) -> Option<u8> {
-    if hi >= 128 || lo >= 128 {
+    let high = HEX_DECODE_TABLE[hi as usize];
+    if high == 0xFF {
         return None;
     }
-
-    let high = HEX_DECODE_TABLE[hi as usize];
     let low = HEX_DECODE_TABLE[lo as usize];
-
-    if high == 0xFF || low == 0xFF {
-        None
-    } else {
-        Some((high << 4) | low)
+    if low == 0xFF {
+        return None;
     }
+    Some((high << 4) | low)
 }
 
 // /// 解码两个十六进制字符为一个字节（无边界检查）
@@ -51,7 +48,7 @@ pub const fn hex_to_byte(hi: u8, lo: u8) -> Option<u8> {
 // /// # Safety
 // /// 调用者必须保证 hi 和 lo 都是有效的十六进制字符
 // #[inline(always)]
-// pub unsafe fn hex_to_byte_unchecked(hi: u8, lo: u8) -> u8 {
+// pub const unsafe fn hex_to_byte_unchecked(hi: u8, lo: u8) -> u8 {
 //     debug_assert!(hi < 128 && lo < 128);
 //     let high = *HEX_DECODE_TABLE.get_unchecked(hi as usize);
 //     let low = *HEX_DECODE_TABLE.get_unchecked(lo as usize);

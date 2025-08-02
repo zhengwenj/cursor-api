@@ -301,7 +301,7 @@ static EXTENSION_TO_MIME: phf::Map<&'static str, &'static str> = phf::phf_map! {
 pub fn get_content_type_by_extension(extension: &str) -> http::header::HeaderValue {
     http::header::HeaderValue::from_static(
         EXTENSION_TO_MIME
-            .get(&extension.to_lowercase())
+            .get(&extension.to_ascii_lowercase())
             .copied()
             .unwrap_or(APPLICATION_OCTET_STREAM),
     )

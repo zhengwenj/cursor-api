@@ -68,7 +68,11 @@ pub use crate::common::build::BUILD_VERSION;
 // Package related constants
 def_pub_const!(
     PKG_VERSION => env!("CARGO_PKG_VERSION"),
-    PKG_NAME => env!("CARGO_PKG_NAME")
+    PKG_NAME => env!("CARGO_PKG_NAME"),
+    #[cfg(windows)]
+    EXE_NAME => concat!(env!("CARGO_PKG_NAME"), ".exe"),
+    #[cfg(not(windows))]
+    EXE_NAME => PKG_NAME
     // PKG_DESCRIPTION => env!("CARGO_PKG_DESCRIPTION"),
     // PKG_AUTHORS => env!("CARGO_PKG_AUTHORS"),
     // PKG_REPOSITORY => env!("CARGO_PKG_REPOSITORY")
