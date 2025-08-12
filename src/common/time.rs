@@ -10,7 +10,7 @@ pub use super::build::BUILD_EPOCH;
 /// Unix 系统的时间基准点（2024-12-23 01:30:48 UTC）
 #[cfg(unix)]
 pub const EPOCH: std::time::SystemTime = unsafe {
-    #[repr(C)]
+    #[allow(dead_code)]
     struct UnixSystemTime {
         tv_sec: i64,
         tv_nsec: u32,
@@ -25,7 +25,7 @@ pub const EPOCH: std::time::SystemTime = unsafe {
 /// Windows 系统的时间基准点（2024-12-23 01:30:48 UTC）
 #[cfg(windows)]
 pub const EPOCH: std::time::SystemTime = unsafe {
-    #[repr(C)]
+    #[allow(dead_code)]
     struct WindowsFileTime {
         dw_low_date_time: u32,
         dw_high_date_time: u32,

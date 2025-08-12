@@ -253,7 +253,7 @@ pub fn init_thinking_tags() {
         let open_len = tag_len + 2;
 
         // 分配开始标签
-        let open_layout = ::core::alloc::Layout::array::<u8>(open_len).unwrap();
+        let open_layout = ::core::alloc::Layout::array::<u8>(open_len).unwrap_unchecked();
         let open_ptr = ::std::alloc::alloc(open_layout);
         if open_ptr.is_null() {
             ::std::alloc::handle_alloc_error(open_layout);
@@ -269,7 +269,7 @@ pub fn init_thinking_tags() {
         let close_len = tag_len + 3;
 
         // 分配结束标签
-        let close_layout = ::core::alloc::Layout::array::<u8>(close_len).unwrap();
+        let close_layout = ::core::alloc::Layout::array::<u8>(close_len).unwrap_unchecked();
         let close_ptr = ::std::alloc::alloc(close_layout);
         if close_ptr.is_null() {
             ::std::alloc::handle_alloc_error(close_layout);

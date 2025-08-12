@@ -1,3 +1,11 @@
+use ::reqwest::{
+    Client, RequestBuilder,
+    header::{
+        ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, AUTHORIZATION, CACHE_CONTROL, CONNECTION,
+        CONTENT_LENGTH, CONTENT_TYPE, COOKIE, DNT, HOST, ORIGIN, PRAGMA, REFERER, TE, USER_AGENT,
+    },
+};
+
 use crate::{
     app::{
         constant::{
@@ -19,13 +27,6 @@ use crate::{
         model::ExtToken,
     },
     common::utils::StringBuilder,
-};
-use reqwest::{
-    Client, RequestBuilder,
-    header::{
-        ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, AUTHORIZATION, CACHE_CONTROL, CONNECTION,
-        CONTENT_LENGTH, CONTENT_TYPE, COOKIE, DNT, HOST, ORIGIN, PRAGMA, REFERER, TE, USER_AGENT,
-    },
 };
 
 trait RequestBuilderExt: Sized {

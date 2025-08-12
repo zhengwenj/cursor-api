@@ -31,5 +31,4 @@ Cargo.lock
 /*.sh
 /*.tar.gz
 /src/core/model/a.rs
-/src/core/aiserver/v1/lite.proto
 .cargo/config.toml

@@ -4,6 +4,7 @@ use ::core::{
     alloc::Layout,
     hash::Hasher,
     marker::PhantomData,
+    mem::SizedTypeProperties as _,
     ptr::NonNull,
     sync::atomic::{AtomicUsize, Ordering},
 };
@@ -132,7 +133,6 @@ impl TokenKey {
 /// | string data...       | UTF-8 字符串表示
 /// +----------------------+
 /// ```
-#[repr(C)]
 struct TokenInner {
     /// 原始 token 数据
     raw: RawToken,
@@ -143,6 +143,11 @@ struct TokenInner {
 }
 
 impl TokenInner {
+    const STRING_MAX_LEN: usize = {
+        let layout = Self::LAYOUT;
+        isize::MAX as usize + 1 - layout.align() - layout.size()
+    };
+
     /// 获取字符串数据的起始地址
     #[inline(always)]
     const unsafe fn string_ptr(&self) -> *const u8 { (self as *const Self).add(1) as *const u8 }
@@ -157,11 +162,17 @@ impl TokenInner {
 
     /// 计算存储指定长度字符串所需的内存布局
     fn layout_for_string(string_len: usize) -> Layout {
-        Layout::new::<Self>()
-            .extend(__unwrap!(Layout::array::<u8>(string_len)))
-            .unwrap()
-            .0
-            .pad_to_align()
+        if string_len > Self::STRING_MAX_LEN {
+            __cold_path!();
+            panic!("string is too long");
+        }
+        unsafe {
+            Layout::new::<Self>()
+                .extend(Layout::array::<u8>(string_len).unwrap_unchecked())
+                .unwrap_unchecked()
+                .0
+                .pad_to_align()
+        }
     }
 
     /// 在指定内存位置写入结构体和字符串数据

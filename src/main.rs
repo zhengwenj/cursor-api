@@ -6,7 +6,8 @@
     const_trait_impl,
     const_default,
     core_intrinsics,
-    associated_type_defaults
+    associated_type_defaults,
+    sized_type_properties
 )]
 #![allow(clippy::redundant_static_lifetimes)]
 

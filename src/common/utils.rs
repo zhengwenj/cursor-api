@@ -40,7 +40,7 @@ use crate::{
     },
 };
 
-mod private {
+mod sealed {
     pub trait Sealed: Sized {}
 
     impl Sealed for bool {}
@@ -48,7 +48,7 @@ mod private {
     impl Sealed for usize {}
 }
 
-pub trait ParseFromEnv: private::Sealed {
+pub trait ParseFromEnv: sealed::Sealed {
     type Result = Self;
     fn parse_from_env(key: &str, default: Self) -> Self::Result;
 }
@@ -324,8 +324,9 @@ pub async fn get_user_profile(
 pub async fn get_available_models(
     ext_token: ExtToken,
     is_pri: bool,
-    request: AvailableModelsRequest,
+    mut request: AvailableModelsRequest,
 ) -> Option<AvailableModelsResponse> {
+    request.exclude_max_named_models = true;
     let response = {
         let client = super::client::build_client_request(super::client::AiServiceRequest {
             ext_token,
@@ -545,7 +546,7 @@ fn compress_gzip(data: &[u8]) -> Result<Vec<u8>, std::io::Error> {
 #[allow(clippy::uninit_vec)]
 #[inline(always)]
 pub fn encode_message(
-    message: &impl prost::Message,
+    message: &impl ::prost::Message,
     maybe_stream: bool,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
     const COMPRESSION_THRESHOLD: usize = 1024; // 1KB
@@ -928,7 +929,7 @@ pub async fn get_aggregated_usage_events(
         aggregated_usage_events_url,
         is_pri,
         bytes::Bytes::from(__unwrap!(serde_json::to_vec(&{
-            const DELTA: chrono::TimeDelta = chrono::TimeDelta::new(2629743, 765840000).unwrap();
+            const DELTA: chrono::TimeDelta = __unwrap!(chrono::TimeDelta::new(2629743, 765840000));
             let now = DateTime::utc_now();
             let start_date = now - DELTA;
             GetAggregatedUsageEventsRequest {
@@ -959,10 +960,10 @@ pub struct FilteredUsageArgs {
 impl From<FilteredUsageArgs> for GetFilteredUsageEventsRequest {
     #[inline]
     fn from(args: FilteredUsageArgs) -> Self {
-        const TZ: chrono::FixedOffset = chrono::FixedOffset::west_opt(16 * 3600).unwrap();
-        const TIME: chrono::NaiveTime = chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+        const TZ: chrono::FixedOffset = __unwrap!(chrono::FixedOffset::west_opt(16 * 3600));
+        const TIME: chrono::NaiveTime = __unwrap!(chrono::NaiveTime::from_hms_opt(0, 0, 0));
         const START: chrono::TimeDelta = chrono::TimeDelta::days(-7);
-        const END: chrono::TimeDelta = chrono::TimeDelta::new(86399, 999000000).unwrap();
+        const END: chrono::TimeDelta = __unwrap!(chrono::TimeDelta::new(86399, 999000000));
 
         let (start_date, end_date) = if let (Some(a), Some(b)) = (args.start, args.end) {
             (a.timestamp_millis(), b.timestamp_millis())

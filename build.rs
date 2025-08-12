@@ -261,6 +261,8 @@ fn main() -> Result<()> {
                 ".aiserver.v1.IRange",
                 ".aiserver.v1.BlockDiffPatch",
                 ".aiserver.v1.AvailableModelsRequest",
+                ".aiserver.v1.GetFilteredUsageEventsResponse",
+                ".aiserver.v1.GetAggregatedUsageEventsResponse",
             ],
             attributes: [
                 "#[derive(::serde::Deserialize)]",
@@ -279,6 +281,9 @@ fn main() -> Result<()> {
                 ".aiserver.v1.CppConfigResponse",
                 ".aiserver.v1.AvailableCppModelsResponse",
                 ".aiserver.v1.AvailableModelsResponse",
+                ".aiserver.v1.CustomErrorDetails",
+                ".aiserver.v1.GetFilteredUsageEventsRequest",
+                ".aiserver.v1.GetAggregatedUsageEventsRequest",
             ],
             attributes: [
                 "#[derive(::serde::Serialize)]",

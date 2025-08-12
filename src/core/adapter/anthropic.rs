@@ -264,7 +264,7 @@ async fn process_message_params(
         }),
       },
       all_thinking_blocks,
-      unified_mode: Some(stream_unified_chat_request::UnifiedMode::Chat as i32),
+      unified_mode: Some(if is_agentic { stream_unified_chat_request::UnifiedMode::Agent } else { stream_unified_chat_request::UnifiedMode::Chat } as i32),
       supported_tools: vec![],
       external_links,
       use_web,
@@ -290,14 +290,13 @@ async fn process_message_params(
             composer_capability_request::ToolCallCapability {
               custom_instructions: t.description,
               tool_schemas: vec![composer_capability_request::ToolSchema {
-                r#type: composer_capability_request::ToolType::Iterate as i32,
+                r#type: composer_capability_request::ToolType::Unspecified as i32,
                 name: t.name,
                 properties: unsafe {
                   ::core::intrinsics::transmute_unchecked(t.input_schema.properties)
                 },
                 required: t.input_schema.required,
               }],
-              ..Default::default()
             },
           )),
         })
@@ -429,15 +428,14 @@ pub async fn encode_message_params(
         request: Some(crate::core::aiserver::v1::stream_unified_chat_request_with_tools::Request::StreamUnifiedChatRequest(Box::new(StreamUnifiedChatRequest {
             conversation: messages,
             full_conversation_headers_only: messages_headers,
-            allow_long_file_scan: Some(false),
+            // allow_long_file_scan: Some(false),
             explicit_context,
-            can_handle_filenames_after_language_ids: Some(false),
+            // can_handle_filenames_after_language_ids: Some(false),
             model_details: Some(ModelDetails {
                 model_name: Some(model.id.to_string()),
                 azure_state: Some(AzureState::default()),
                 enable_slow_pool: enable_slow_pool.to_opt(),
                 max_mode: Some(model.max),
-                ..Default::default()
             }),
             use_web: if model.web {
                 Some(WEB_SEARCH_MODE.to_string())
@@ -454,7 +452,6 @@ pub async fn encode_message_params(
                     start_position: Some(CursorPosition { line: 0, column: 0 }),
                     end_position: Some(CursorPosition { line: 0, column: 0 }),
                 }),
-                ..Default::default()
             }),
             use_reference_composer_diff_prompt: Some(false),
             use_new_compression_scheme: Some(false),
@@ -473,7 +470,7 @@ pub async fn encode_message_params(
             is_resume: Some(false),
             allow_model_fallbacks: Some(false),
             number_of_times_shown_fallback_model_warning: Some(0),
-            unified_mode: Some(stream_unified_chat_request::UnifiedMode::Chat as i32),
+            unified_mode: Some(if is_agentic { stream_unified_chat_request::UnifiedMode::Agent } else { stream_unified_chat_request::UnifiedMode::Chat } as i32),
             tools_requiring_accepted_return: supported_tools,
             should_disable_tools: Some(is_chat),
             thinking_level: Some(if model.is_thinking {
@@ -484,7 +481,6 @@ pub async fn encode_message_params(
             uses_rules: Some(false),
             mode_uses_auto_apply: Some(false),
             unified_mode_name: Some(if is_chat { ASK_MODE_NAME } else { AGENT_MODE_NAME }.to_string()),
-            ..Default::default()
         })))
     };
 

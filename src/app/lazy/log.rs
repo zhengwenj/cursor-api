@@ -129,7 +129,7 @@ pub async fn ensure_logger_initialized() -> &'static LoggerState {
                         _ = interval.tick() => {
                             // 定时刷新时，如果有积压的消息且等待时间过长，强制写入
                             if !pending_messages.is_empty() {
-                                let oldest_seq = *pending_messages.keys().next().unwrap();
+                                let oldest_seq = *__unwrap!(pending_messages.keys().next());
                                 // 如果最旧的消息序号与期望序号相差太大，可能有消息丢失
                                 if oldest_seq > next_seq + 100 {
                                     eprintln!("日志系统警告：检测到可能的消息丢失，跳过序号 {next_seq} 到 {}", oldest_seq - 1);

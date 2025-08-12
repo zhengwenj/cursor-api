@@ -4,6 +4,7 @@ use ::core::{
     alloc::Layout,
     hash::{Hash, Hasher},
     marker::PhantomData,
+    mem::SizedTypeProperties as _,
     ptr::NonNull,
     sync::atomic::{AtomicUsize, Ordering},
 };
@@ -23,7 +24,6 @@ use super::manually_init::ManuallyInit;
 /// | string data... |  UTF-8 字符串数据
 /// +----------------+
 /// ```
-#[repr(C)]
 struct ArcStrInner {
     /// 原子引用计数
     count: AtomicUsize,
@@ -32,6 +32,11 @@ struct ArcStrInner {
 }
 
 impl ArcStrInner {
+    const MAX_LEN: usize = {
+        let layout = Self::LAYOUT;
+        isize::MAX as usize + 1 - layout.align() - layout.size()
+    };
+
     /// 获取字符串数据的起始地址
     ///
     /// # Safety
@@ -54,11 +59,17 @@ impl ArcStrInner {
 
     /// 计算存储指定长度字符串所需的内存布局
     fn layout_for_string(string_len: usize) -> Layout {
-        Layout::new::<Self>()
-            .extend(Layout::array::<u8>(string_len).unwrap())
-            .unwrap()
-            .0
-            .pad_to_align()
+        if string_len > Self::MAX_LEN {
+            __cold_path!();
+            panic!("string is too long");
+        }
+        unsafe {
+            Layout::new::<Self>()
+                .extend(Layout::array::<u8>(string_len).unwrap_unchecked())
+                .unwrap_unchecked()
+                .0
+                .pad_to_align()
+        }
     }
 
     /// 在指定内存位置写入结构体和字符串数据
@@ -442,8 +453,9 @@ pub fn clear_pool_for_test() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::{thread, time::Duration};
+
+    use super::*;
 
     /// 运行隔离的测试，确保池状态不会相互影响
     fn run_isolated_test<F: FnOnce()>(f: F) {

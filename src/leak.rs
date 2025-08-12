@@ -39,7 +39,7 @@ impl StaticPool {
         }
 
         // 计算布局，字符串不需要特殊对齐
-        let layout = ::core::alloc::Layout::array::<u8>(len).unwrap();
+        let layout = __unwrap!(::core::alloc::Layout::array::<u8>(len));
 
         // 分配内存
         let ptr = ::std::alloc::alloc(layout);

@@ -160,9 +160,9 @@ impl<'a> StringBuilder<'a> {
                 }
                 result
             }
-            Storage::Mixed(parts) => {
+            Storage::Mixed(mut parts) => {
                 if parts.len() == 1 {
-                    return parts.into_iter().next().unwrap().into_owned();
+                    return unsafe { parts.pop().unwrap_unchecked().into_owned() };
                 }
                 let mut result = String::with_capacity(self.total_len);
                 for part in parts {

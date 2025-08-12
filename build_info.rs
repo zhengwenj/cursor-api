@@ -39,8 +39,7 @@ fn update_version() -> Result<()> {
     // 版本号加1
     let new_version = version_num + 1;
     println!(
-        "cargo:warning=Release build - bumping version from {} to {}",
-        version_num, new_version
+        "cargo:warning=Release build - bumping version from {version_num} to {new_version}",
     );
 
     // 写回文件
@@ -71,9 +70,9 @@ fn generate_build_info() -> Result<()> {
     #[cfg(not(debug_assertions))]
     let out_dir = "target/release/build/build_info.rs";
     let dest_path = Path::new(out_dir);
-    if dest_path.is_file() {
-        return Ok(());
-    }
+    // if dest_path.is_file() {
+    //     return Ok(());
+    // }
 
     let build_timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -108,7 +107,7 @@ pub const IS_DEBUG: bool = {is_debug};
 
 #[cfg(unix)]
 pub const BUILD_EPOCH: std::time::SystemTime = unsafe {{
-    #[repr(C)]
+    #[allow(dead_code)]
     struct UnixSystemTime {{
         tv_sec: i64,
         tv_nsec: u32,
@@ -122,7 +121,7 @@ pub const BUILD_EPOCH: std::time::SystemTime = unsafe {{
 
 #[cfg(windows)]
 pub const BUILD_EPOCH: std::time::SystemTime = unsafe {{
-    #[repr(C)]
+    #[allow(dead_code)]
     struct WindowsFileTime {{
         dw_low_date_time: u32,
         dw_high_date_time: u32,

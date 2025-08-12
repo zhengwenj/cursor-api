@@ -241,12 +241,12 @@ async fn process_chat_inputs(
       server_bubble_id: server_bubble_id.clone(),
       is_capability_iteration: None,
       is_agentic: false,
-      existed_subsequent_terminal_command: false,
-      existed_previous_terminal_command: false,
+      // existed_subsequent_terminal_command: false,
+      // existed_previous_terminal_command: false,
       web_references,
-      git_context: None,
-      cached_conversation_summary: None,
-      attached_human_changes: false,
+      // git_context: None,
+      // cached_conversation_summary: None,
+      // attached_human_changes: false,
       thinking: None,
       unified_mode: Some(stream_unified_chat_request::UnifiedMode::Chat as i32),
       external_links,
@@ -376,15 +376,14 @@ pub async fn encode_chat_message(
         request: Some(crate::core::aiserver::v1::stream_unified_chat_request_with_tools::Request::StreamUnifiedChatRequest(Box::new(StreamUnifiedChatRequest {
             conversation: messages,
             full_conversation_headers_only: messages_headers,
-            allow_long_file_scan: Some(false),
+            // allow_long_file_scan: Some(false),
             explicit_context,
-            can_handle_filenames_after_language_ids: Some(false),
+            // can_handle_filenames_after_language_ids: Some(false),
             model_details: Some(ModelDetails {
                 model_name: Some(model.id.to_string()),
                 azure_state: Some(AzureState::default()),
                 enable_slow_pool: enable_slow_pool.to_opt(),
                 max_mode: Some(model.max),
-                ..Default::default()
             }),
             use_web: if model.web {
                 Some(WEB_SEARCH_MODE.to_string())
@@ -401,7 +400,6 @@ pub async fn encode_chat_message(
                     start_position: Some(CursorPosition { line: 0, column: 0 }),
                     end_position: Some(CursorPosition { line: 0, column: 0 }),
                 }),
-                ..Default::default()
             }),
             use_reference_composer_diff_prompt: Some(false),
             use_new_compression_scheme: Some(false),
@@ -410,25 +408,25 @@ pub async fn encode_chat_message(
             environment_info: Some(EnvironmentInfo::default()),
             is_agentic: false,
             supported_tools: vec![],
-            use_unified_chat_prompt: false,
+            // use_unified_chat_prompt: false,
             mcp_tools: vec![],
             use_full_inputs_context: long_context.to_opt(),
             is_resume: Some(false),
             allow_model_fallbacks: Some(false),
             number_of_times_shown_fallback_model_warning: Some(0),
-            is_headless: false,
+            // is_headless: false,
             unified_mode: Some(stream_unified_chat_request::UnifiedMode::Chat as i32),
+            tools_requiring_accepted_return: vec![],
             should_disable_tools: Some(true),
             thinking_level: Some(if model.is_thinking {
                 stream_unified_chat_request::ThinkingLevel::High
             } else {
                 stream_unified_chat_request::ThinkingLevel::Unspecified
             } as i32),
-            should_use_chat_prompt: None,
+            // should_use_chat_prompt: None,
             uses_rules: Some(false),
             mode_uses_auto_apply: Some(false),
             unified_mode_name: Some(ASK_MODE_NAME.to_string()),
-            ..Default::default()
         })))
     };
 
