@@ -356,6 +356,9 @@ pub async fn get_token_usage(
     time: DateTime,
     model_id: &'static str,
 ) -> Option<ChainUsage> {
+    const POLL_MAX_ATTEMPTS: u8 = 4;
+    const POLL_INTERVAL: ::core::time::Duration = ::core::time::Duration::from_millis(1500);
+
     let maybe_token = ext_token
         .secondary_token
         .as_ref()
@@ -365,8 +368,8 @@ pub async fn get_token_usage(
     let user_id = maybe_token.raw().subject.id.to_str(&mut buf) as &str;
     let mut token_usage = None;
 
-    for _ in 0..5 {
-        tokio::time::sleep(::core::time::Duration::from_millis(POLL_INTERVAL_MS)).await;
+    for _ in 0..POLL_MAX_ATTEMPTS {
+        tokio::time::sleep(POLL_INTERVAL).await;
         let res = get_filtered_usage_events(
             &ext_token.get_client(),
             user_id,
@@ -387,13 +390,7 @@ pub async fn get_token_usage(
         };
     }
 
-    token_usage.map(|token_usage| ChainUsage {
-        input: token_usage.input_tokens,
-        output: token_usage.output_tokens,
-        cache_write: token_usage.cache_write_tokens,
-        cache_read: token_usage.cache_read_tokens,
-        cents: token_usage.total_cents,
-    })
+    unsafe { ::core::mem::transmute(token_usage) }
 }
 
 // pub fn validate_token_and_checksum(auth_token: &str) -> Option<(String, Checksum)> {
@@ -539,7 +536,7 @@ fn compress_gzip(data: &[u8]) -> Result<Vec<u8>, ::std::io::Error> {
     const LEVEL: Compression = Compression::new(6);
 
     // 预分配容量，gzip压缩后通常会变小，但预留一些空间给gzip头部
-    let estimated_size = data.len() / 2 + 64;
+    let estimated_size = data.len() / 2 + 18;
     let mut encoder = GzEncoder::new(Vec::with_capacity(estimated_size), LEVEL);
     encoder.write_all(data)?;
     encoder.finish()
@@ -640,9 +637,6 @@ fn generate_pkce_pair() -> ([u8; 43], [u8; 43]) {
     (code_verifier, code_challenge)
 }
 
-const POLL_MAX_ATTEMPTS: u8 = 5;
-const POLL_INTERVAL_MS: u64 = 1000;
-
 pub async fn get_new_token(ext_token: &mut ExtToken, is_pri: bool) -> bool {
     let is_session = ext_token.primary_token.is_session();
 
@@ -666,6 +660,9 @@ pub async fn get_new_token(ext_token: &mut ExtToken, is_pri: bool) -> bool {
 }
 
 async fn upgrade_token(ext_token: &ExtToken, is_pri: bool) -> Option<(RawToken, String)> {
+    const POLL_MAX_ATTEMPTS: u8 = 5;
+    const POLL_INTERVAL: ::core::time::Duration = ::core::time::Duration::from_secs(1);
+
     #[derive(::serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct PollResponse {
@@ -729,7 +726,7 @@ async fn upgrade_token(ext_token: &ExtToken, is_pri: bool) -> Option<(RawToken, 
                 return parse_token(token);
             }
             reqwest::StatusCode::NOT_FOUND => {
-                tokio::time::sleep(::core::time::Duration::from_millis(POLL_INTERVAL_MS)).await;
+                tokio::time::sleep(POLL_INTERVAL).await;
             }
             _ => return None,
         }

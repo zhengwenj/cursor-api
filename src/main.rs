@@ -33,12 +33,12 @@ use app::{
         EMPTY_STRING, EXE_NAME, ROUTE_ABOUT_PATH, ROUTE_API_PATH, ROUTE_BUILD_KEY_PATH,
         ROUTE_CONFIG_PATH, ROUTE_CONFIG_VERSION_GET_PATH, ROUTE_CPP_CONFIG_PATH,
         ROUTE_CPP_MODELS_PATH, ROUTE_CPP_STREAM_PATH, ROUTE_ENV_EXAMPLE_PATH, ROUTE_FILE_SYNC_PATH,
-        ROUTE_FILE_UPLOAD_PATH, ROUTE_GEN_CHECKSUM, ROUTE_GEN_HASH, ROUTE_GEN_TOKEN,
-        ROUTE_GEN_UUID, ROUTE_GET_TIMESTAMP_HEADER, ROUTE_HEALTH_PATH, ROUTE_LOGS_GET_PATH,
-        ROUTE_LOGS_PATH, ROUTE_LOGS_TOKENS_GET_PATH, ROUTE_PROXIES_ADD_PATH,
-        ROUTE_PROXIES_DELETE_PATH, ROUTE_PROXIES_GET_PATH, ROUTE_PROXIES_PATH,
-        ROUTE_PROXIES_SET_GENERAL_PATH, ROUTE_PROXIES_SET_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH,
-        ROUTE_STATIC_PATH, ROUTE_TOKENS_ADD_PATH, ROUTE_TOKENS_ALIAS_SET_PATH,
+        ROUTE_FILE_UPLOAD_PATH, ROUTE_GEN_CHECKSUM, ROUTE_GEN_HASH, ROUTE_GEN_UUID,
+        ROUTE_GET_TIMESTAMP_HEADER, ROUTE_HEALTH_PATH, ROUTE_LOGS_GET_PATH, ROUTE_LOGS_PATH,
+        ROUTE_LOGS_TOKENS_GET_PATH, ROUTE_PROXIES_ADD_PATH, ROUTE_PROXIES_DELETE_PATH,
+        ROUTE_PROXIES_GET_PATH, ROUTE_PROXIES_PATH, ROUTE_PROXIES_SET_GENERAL_PATH,
+        ROUTE_PROXIES_SET_PATH, ROUTE_README_PATH, ROUTE_ROOT_PATH, ROUTE_STATIC_PATH,
+        ROUTE_TOKENS_ADD_PATH, ROUTE_TOKENS_ALIAS_SET_PATH,
         ROUTE_TOKENS_CONFIG_VERSION_UPDATE_PATH, ROUTE_TOKENS_DELETE_PATH, ROUTE_TOKENS_GET_PATH,
         ROUTE_TOKENS_PATH, ROUTE_TOKENS_PROFILE_UPDATE_PATH, ROUTE_TOKENS_PROXY_SET_PATH,
         ROUTE_TOKENS_REFRESH_PATH, ROUTE_TOKENS_SET_PATH, ROUTE_TOKENS_STATUS_SET_PATH,
@@ -53,14 +53,14 @@ use core::{
     route::{
         handle_about, handle_add_proxy, handle_add_tokens, handle_api_page, handle_build_key,
         handle_build_key_page, handle_config_page, handle_delete_proxies, handle_delete_tokens,
-        handle_env_example, handle_gen_checksum, handle_gen_hash, handle_gen_token,
-        handle_gen_uuid, handle_get_config_version, handle_get_logs, handle_get_logs_tokens,
-        handle_get_proxies, handle_get_timestamp_header, handle_get_tokens, handle_health,
-        handle_logs, handle_options, handle_proxies_page, handle_readme, handle_refresh_tokens,
-        handle_root, handle_set_general_proxy, handle_set_proxies, handle_set_tokens,
-        handle_set_tokens_alias, handle_set_tokens_proxy, handle_set_tokens_status,
-        handle_set_tokens_timezone, handle_static, handle_tokens_page,
-        handle_update_tokens_config_version, handle_update_tokens_profile,
+        handle_env_example, handle_gen_checksum, handle_gen_hash, handle_gen_uuid,
+        handle_get_config_version, handle_get_logs, handle_get_logs_tokens, handle_get_proxies,
+        handle_get_timestamp_header, handle_get_tokens, handle_health, handle_logs, handle_options,
+        handle_proxies_page, handle_readme, handle_refresh_tokens, handle_root,
+        handle_set_general_proxy, handle_set_proxies, handle_set_tokens, handle_set_tokens_alias,
+        handle_set_tokens_proxy, handle_set_tokens_status, handle_set_tokens_timezone,
+        handle_static, handle_tokens_page, handle_update_tokens_config_version,
+        handle_update_tokens_profile,
     },
     service::{
         cpp::{
@@ -350,7 +350,6 @@ async fn main() {
             .route(ROUTE_GEN_UUID, get(handle_gen_uuid))
             .route(ROUTE_GEN_HASH, get(handle_gen_hash))
             .route(ROUTE_GEN_CHECKSUM, get(handle_gen_checksum))
-            .route(ROUTE_GEN_TOKEN, get(handle_gen_token))
             .route(ROUTE_GET_TIMESTAMP_HEADER, get(handle_get_timestamp_header))
             // .route(ROUTE_BASIC_CALIBRATION_PATH, post(handle_basic_calibration))
             // .route(ROUTE_USER_INFO_PATH, post(handle_user_info))

@@ -2,12 +2,11 @@
 
 use std::{fmt, str::FromStr};
 
-use crate::common::utils::hex::HEX_DECODE_TABLE;
-
 use super::{
     hash::{Hash, HashError},
     timestamp_header::TimestampHeader,
 };
+use crate::common::utils::hex::HEX_DECODE_TABLE;
 
 #[derive(Debug)]
 pub enum ChecksumError {
@@ -175,10 +174,7 @@ impl Checksum {
         // SAFETY: `buf` is guaranteed to be at least `LEN` bytes
         // SAFETY: The encoded buffer is ASCII encoded
         unsafe {
-            ::core::ptr::write_unaligned(
-                buf.as_mut_ptr() as *mut TimestampHeader,
-                TimestampHeader::get_global(),
-            );
+            ::core::ptr::copy_nonoverlapping(TimestampHeader::as_ptr(), buf.as_mut_ptr(), 8);
 
             self.first.to_str(&mut *(dst.add(8) as *mut [u8; 64]));
             *dst.add(72) = b'/';

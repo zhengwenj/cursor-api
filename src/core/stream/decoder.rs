@@ -57,7 +57,7 @@ fn decompress_gzip(data: &[u8]) -> Option<Vec<u8>> {
             //
             // Also, since we just wrote a valid value into `tmp`, it is guaranteed
             // to be properly initialized.
-            std::ptr::copy_nonoverlapping(last_four_bytes_ptr, tmp.as_mut_ptr() as *mut u8, SIZE);
+            ::core::ptr::copy_nonoverlapping(last_four_bytes_ptr, tmp.as_mut_ptr() as *mut u8, SIZE);
             tmp.assume_init()
         };
         u32::from_le(raw_isize) as usize

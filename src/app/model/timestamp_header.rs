@@ -1,11 +1,15 @@
-use ::core::{fmt, ops::Deref};
+use ::core::fmt;
 use ::std::sync::atomic::{AtomicU64, Ordering};
 
 // Base64 URL_SAFE_NO_PAD 编码表
 const B64_ENCODE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 // 全局缓存的时间戳头
-pub static TIMESTAMP_HEADER: AtomicU64 = AtomicU64::new(0);
+static TIMESTAMP_HEADER: AtomicU64 = AtomicU64::new(0);
+
+pub static TIMESTAMP_HEADER_STR: &str = unsafe {
+    ::core::str::from_utf8_unchecked(::core::slice::from_raw_parts(TimestampHeader::as_ptr(), 8))
+};
 
 #[derive(Clone, Copy)]
 #[repr(transparent)]
@@ -13,7 +17,7 @@ pub struct TimestampHeader(u64);
 
 impl TimestampHeader {
     #[inline(always)]
-    fn obfuscate_bytes(bytes: &mut [u8; 6]) {
+    const fn obfuscate_bytes(bytes: &mut [u8; 6]) {
         let mut prev = 165u8;
 
         bytes[0] = (bytes[0] ^ prev).wrapping_add(0);
@@ -67,7 +71,7 @@ impl TimestampHeader {
 
     // 从千秒创建
     #[inline]
-    pub fn new(kilo_seconds: u64) -> Self {
+    const fn new(kilo_seconds: u64) -> u64 {
         let mut timestamp_bytes = [
             ((kilo_seconds >> 8) & 0xFF) as u8,
             (kilo_seconds & 0xFF) as u8,
@@ -78,45 +82,27 @@ impl TimestampHeader {
         ];
 
         Self::obfuscate_bytes(&mut timestamp_bytes);
-        Self(u64::from_ne_bytes(Self::encode_base64(&timestamp_bytes)))
+        u64::from_ne_bytes(Self::encode_base64(&timestamp_bytes))
     }
 
+    // 获取全局指针
     #[inline(always)]
-    pub fn as_str(&self) -> &str {
-        unsafe {
-            ::core::str::from_utf8_unchecked(::core::slice::from_raw_parts(
-                &self.0 as *const u64 as *const u8,
-                8,
-            ))
-        }
-    }
+    pub const fn as_ptr() -> *const u8 { &TIMESTAMP_HEADER as *const AtomicU64 as *const u8 }
 
-    // 从全局原子变量获取
-    #[inline]
-    pub fn get_global() -> Self { Self(TIMESTAMP_HEADER.load(Ordering::Relaxed)) }
+    // 获取全局静态字符串引用
+    #[inline(always)]
+    pub const fn as_str() -> &'static str { TIMESTAMP_HEADER_STR }
 
     // 使用指定千秒更新全局原子变量
     #[inline]
     pub fn update_global_with(kilo_seconds: u64) {
-        TIMESTAMP_HEADER.store(Self::new(kilo_seconds).0, Ordering::Relaxed);
+        TIMESTAMP_HEADER.store(Self::new(kilo_seconds), Ordering::Relaxed);
     }
 }
 
 impl fmt::Display for TimestampHeader {
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(self.as_str()) }
-}
-
-impl Deref for TimestampHeader {
-    type Target = str;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target { self.as_str() }
-}
-
-impl AsRef<str> for TimestampHeader {
-    #[inline]
-    fn as_ref(&self) -> &str { self.as_str() }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(Self::as_str()) }
 }
 
 // 编译时断言

@@ -90,12 +90,16 @@ def_const_models!(
     // Anthropic 模型
     CLAUDE_4_OPUS_THINKING => "claude-4-opus-thinking",
     CLAUDE_4_OPUS => "claude-4-opus",
+    CLAUDE_4_1_OPUS_THINKING => "claude-4.1-opus-thinking",
+    CLAUDE_4_1_OPUS => "claude-4.1-opus",
     CLAUDE_4_SONNET_THINKING => "claude-4-sonnet-thinking",
     CLAUDE_4_SONNET => "claude-4-sonnet",
     CLAUDE_3_5_SONNET => "claude-3.5-sonnet",
     CLAUDE_3_7_SONNET => "claude-3.7-sonnet",
     CLAUDE_3_7_SONNET_THINKING => "claude-3.7-sonnet-thinking",
     CLAUDE_3_5_HAIKU => "claude-3.5-haiku",
+    CLAUDE_4_OPUS_LEGACY => "claude-4-opus-legacy",
+    CLAUDE_4_OPUS_THINKING_LEGACY => "claude-4-opus-thinking-legacy",
 
     // Cursor 模型
     CURSOR_SMALL => "cursor-small",
@@ -109,6 +113,14 @@ def_const_models!(
     GEMINI_2_5_FLASH_LATEST => "gemini-2.5-flash-latest",
 
     // OpenAI 模型
+    GPT_5 => "gpt-5",
+    GPT_5_HIGH => "gpt-5-high",
+    GPT_5_LOW => "gpt-5-low",
+    GPT_5_FAST => "gpt-5-fast",
+    GPT_5_HIGH_FAST => "gpt-5-high-fast",
+    GPT_5_LOW_FAST => "gpt-5-low-fast",
+    GPT_5_MINI => "gpt-5-mini",
+    GPT_5_NANO => "gpt-5-nano",
     O3 => "o3",
     GPT_4_1 => "gpt-4.1",
     GPT_4O => "gpt-4o",
@@ -199,6 +211,12 @@ macro_rules! create_models {
                     self.server_id = server_id;
                     self
                 }
+
+                const fn with_same_id(mut self, same_id: &'static str) -> Self {
+                    self.client_id = same_id;
+                    self.server_id = same_id;
+                    self
+                }
             }
 
             let models = vec![
@@ -257,11 +275,16 @@ impl Models {
     #[inline(always)]
     pub fn get() -> ::parking_lot::RwLockReadGuard<'static, Self> { INSTANCE.read() }
 
+    #[inline]
     pub fn to_arc() -> Arc<Vec<Model>> { Self::get().models.clone() }
 
+    #[inline]
     pub fn to_raw_arc() -> Option<Arc<crate::core::aiserver::v1::AvailableModelsResponse>> {
         Self::get().raw_models.clone()
     }
+
+    #[inline]
+    pub fn last_update_elapsed() -> Duration { Self::get().last_update.elapsed() }
 
     // 克隆所有模型
     // pub fn cloned() -> Vec<Model> {
@@ -344,37 +367,47 @@ impl Models {
         ) -> Model {
             let (id, client_id, server_id) = model.extract_ids();
             let owned_by = {
-                let mut chars = server_id.chars();
-                match chars.next() {
-                    Some('g') => match chars.next() {
-                        Some('p') => OPENAI, // g + p → "gp" (gpt)
-                        Some('e') => GOOGLE, // g + e → "ge" (gemini)
-                        Some('r') => XAI,    // g + r → "gr" (grok)
-                        _ => UNKNOWN,
-                    },
-                    Some('o') => match chars.next() {
-                        // o 开头需要二次判断
-                        Some('1') | Some('3') | Some('4') => OPENAI, // o1/o3/o4 系列
-                        _ => UNKNOWN,
-                    },
-                    Some('c') => match chars.next() {
-                        Some('l') => ANTHROPIC, // c + l → "cl" (claude)
-                        Some('u') => CURSOR,    // c + u → "cu" (cursor)
-                        _ => UNKNOWN,
-                    },
-                    Some('d') => match chars.next() {
-                        Some('e') if chars.next() == Some('e') => DEEPSEEK, // d + e + e → "dee" (deepseek)
-                        _ => UNKNOWN,
-                    },
-                    Some('a') =>
-                        if server_id.len() > 26 {
-                            FIREWORKS
-                        } else {
-                            UNKNOWN
+                #[inline]
+                fn inner(server_id: &str) -> Option<&'static str> {
+                    let mut chars = server_id.chars();
+                    let first = chars.next()?;
+
+                    match first {
+                        'g' => match chars.next()? {
+                            'p' => Some(OPENAI), // g + p → "gp" (gpt)
+                            'e' => Some(GOOGLE), // g + e → "ge" (gemini)
+                            'r' => Some(XAI),    // g + r → "gr" (grok)
+                            _ => None,
                         },
-                    // 其他情况
-                    _ => UNKNOWN,
+                        'o' => match chars.next()? {
+                            // o 开头需要二次判断
+                            '1' | '3' | '4' => Some(OPENAI), // o1/o3/o4 系列
+                            _ => None,
+                        },
+                        'c' => match chars.next()? {
+                            'l' => Some(ANTHROPIC), // c + l → "cl" (claude)
+                            'u' => Some(CURSOR),    // c + u → "cu" (cursor)
+                            _ => None,
+                        },
+                        'd' => {
+                            if chars.next()? == 'e' && chars.next()? == 'e' {
+                                Some(DEEPSEEK) // d + e + e → "dee" (deepseek)
+                            } else {
+                                None
+                            }
+                        }
+                        'a' =>
+                            if server_id.len() > 26 {
+                                Some(FIREWORKS)
+                            } else {
+                                None
+                            },
+                        // 其他情况
+                        _ => None,
+                    }
                 }
+
+                inner(server_id).unwrap_or(UNKNOWN)
             };
             let is_thinking = model.supports_thinking();
             let is_image = if server_id == DEFAULT {
@@ -384,7 +417,7 @@ impl Models {
             };
             let is_max = model.supports_max_mode();
             let is_non_max = model.supports_non_max_mode();
-            // let display_name = display_name::calculate_display_name_v4(id);;
+            // let display_name = display_name::calculate_display_name_v4(id);
 
             Model {
                 id,
@@ -513,7 +546,10 @@ impl Models {
             push_ids(&mut cached_ids, model.id);
 
             if model.is_max && model.is_non_max {
-                push_ids(&mut cached_ids, crate::leak::intern_static(format!("{}-max", model.id)));
+                push_ids(
+                    &mut cached_ids,
+                    crate::leak::intern_static(format!("{}-max", model.id)),
+                );
             }
         }
 
@@ -535,84 +571,96 @@ fn push_ids(ids: &mut Vec<&'static str>, id: &'static str) {
 
 create_models! {
     DEFAULT => [
-        ModelIds::new("default"),
+        ModelIds::new(DEFAULT),
     ],
 
     ANTHROPIC => [
-        ModelIds::new("claude-4-opus-thinking"),
-        ModelIds::new("claude-4-opus"),
-        ModelIds::new("claude-4-sonnet-thinking"),
-        ModelIds::new("claude-4-sonnet"),
-        ModelIds::new("claude-3.5-sonnet"),
-        ModelIds::new("claude-3.7-sonnet"),
-        ModelIds::new("claude-3.7-sonnet-thinking"),
-        ModelIds::new("claude-3.5-haiku"),
-        ModelIds::new("claude-3-opus"),
-        ModelIds::new("claude-3-haiku-200k"),
-        ModelIds::new("claude-3.5-sonnet-200k"),
+        ModelIds::new(CLAUDE_4_SONNET_THINKING),
+        ModelIds::new(CLAUDE_4_SONNET),
+        ModelIds::new(CLAUDE_4_OPUS_THINKING)
+            .with_same_id(CLAUDE_4_1_OPUS_THINKING),
+        ModelIds::new(CLAUDE_4_OPUS)
+            .with_same_id(CLAUDE_4_1_OPUS),
+        ModelIds::new(CLAUDE_3_5_SONNET),
+        ModelIds::new(CLAUDE_3_7_SONNET),
+        ModelIds::new(CLAUDE_3_7_SONNET_THINKING),
+        ModelIds::new(CLAUDE_3_5_HAIKU),
+        ModelIds::new(CLAUDE_4_OPUS_LEGACY)
+            .with_same_id(CLAUDE_4_OPUS),
+        ModelIds::new(CLAUDE_4_OPUS_THINKING_LEGACY)
+            .with_same_id(CLAUDE_4_OPUS_THINKING),
+        ModelIds::new(CLAUDE_3_OPUS),
+        ModelIds::new(CLAUDE_3_HAIKU_200K),
+        ModelIds::new(CLAUDE_3_5_SONNET_200K),
     ],
 
     CURSOR => [
-        ModelIds::new("cursor-small"),
-        ModelIds::new("cursor-fast"),
+        ModelIds::new(CURSOR_SMALL),
+        ModelIds::new(CURSOR_FAST),
     ],
 
     GOOGLE => [
-        ModelIds::new("gemini-2.5-pro-preview-05-06")
-            .with_client_id("gemini-2.5-pro")
-            .with_server_id("gemini-2.5-pro-latest"),
-        ModelIds::new("gemini-2.5-pro"),
-        ModelIds::new("gemini-2.5-pro-latest"),
-        ModelIds::new("gemini-2.5-flash-preview-05-20")
-            .with_client_id("gemini-2.5-flash")
-            .with_server_id("gemini-2.5-flash-latest"),
-        ModelIds::new("gemini-2.5-flash"),
-        ModelIds::new("gemini-2.5-flash-latest"),
-        ModelIds::new("gemini-2.5-pro-exp-03-25"),
-        ModelIds::new("gemini-2.5-flash-preview-04-17"),
-        ModelIds::new("gemini-2.5-pro-max"),
-        ModelIds::new("gemini-2.0-flash-thinking-exp"),
-        ModelIds::new("gemini-2.0-flash"),
-        ModelIds::new("gemini-1.5-flash-500k"),
+        ModelIds::new(GEMINI_2_5_PRO_PREVIEW_05_06)
+            .with_same_id(GEMINI_2_5_PRO),
+        ModelIds::new(GEMINI_2_5_PRO),
+        ModelIds::new(GEMINI_2_5_PRO_LATEST),
+        ModelIds::new(GEMINI_2_5_FLASH_PREVIEW_05_20)
+            .with_same_id(GEMINI_2_5_FLASH),
+        ModelIds::new(GEMINI_2_5_FLASH),
+        ModelIds::new(GEMINI_2_5_FLASH_LATEST),
+        ModelIds::new(GEMINI_2_5_PRO_EXP_03_25),
+        ModelIds::new(GEMINI_2_5_FLASH_PREVIEW_04_17),
+        ModelIds::new(GEMINI_2_5_PRO_MAX),
+        ModelIds::new(GEMINI_2_0_FLASH_THINKING_EXP),
+        ModelIds::new(GEMINI_2_0_FLASH),
+        ModelIds::new(GEMINI_1_5_FLASH_500K),
     ],
 
     OPENAI => [
-        ModelIds::new("o3"),
-        ModelIds::new("gpt-4.1"),
-        ModelIds::new("gpt-4o"),
-        ModelIds::new("o4-mini"),
-        ModelIds::new("o3-pro"),
-        ModelIds::new("gpt-4"),
-        ModelIds::new("gpt-4.5-preview"),
-        ModelIds::new("gpt-4-turbo-2024-04-09"),
-        ModelIds::new("gpt-4o-mini"),
-        ModelIds::new("o1-mini"),
-        ModelIds::new("o1-preview"),
-        ModelIds::new("o1"),
-        ModelIds::new("o3-mini"),
-        ModelIds::new("gpt-4o-128k"),
+        ModelIds::new(GPT_5),
+        ModelIds::new(GPT_5_HIGH),
+        ModelIds::new(GPT_5_LOW),
+        ModelIds::new(GPT_5_FAST),
+        ModelIds::new(GPT_5_HIGH_FAST),
+        ModelIds::new(GPT_5_LOW_FAST),
+        ModelIds::new(O3),
+        ModelIds::new(GPT_4_1),
+        ModelIds::new(GPT_5_MINI),
+        ModelIds::new(GPT_5_NANO),
+        ModelIds::new(GPT_4O),
+        ModelIds::new(O4_MINI),
+        ModelIds::new(O3_PRO),
+        ModelIds::new(GPT_4),
+        ModelIds::new(GPT_4_5_PREVIEW),
+        ModelIds::new(GPT_4_TURBO_2024_04_09),
+        ModelIds::new(GPT_4O_MINI),
+        ModelIds::new(O1_MINI),
+        ModelIds::new(O1_PREVIEW),
+        ModelIds::new(O1),
+        ModelIds::new(O3_MINI),
+        ModelIds::new(GPT_4O_128K),
     ],
 
     DEEPSEEK => [
-        ModelIds::new("deepseek-r1-0528"),
-        ModelIds::new("deepseek-v3.1"),
-        ModelIds::new("deepseek-r1"),
-        ModelIds::new("deepseek-v3"),
+        ModelIds::new(DEEPSEEK_R1_0528),
+        ModelIds::new(DEEPSEEK_V3_1),
+        ModelIds::new(DEEPSEEK_R1),
+        ModelIds::new(DEEPSEEK_V3),
     ],
 
     XAI => [
-        ModelIds::new("grok-3-beta")
-            .with_client_id("grok-3"),
-        ModelIds::new("grok-3"),
-        ModelIds::new("grok-3-mini"),
-        ModelIds::new("grok-4")
-            .with_server_id("grok-4-0709"),
-        ModelIds::new("grok-2"),
+        ModelIds::new(GROK_3_BETA)
+            .with_client_id(GROK_3),
+        ModelIds::new(GROK_3),
+        ModelIds::new(GROK_3_MINI),
+        ModelIds::new(GROK_4)
+            .with_server_id(GROK_4_0709),
+        ModelIds::new(GROK_2),
     ],
 
     MOONSHOTAI => [
-        ModelIds::new("kimi-k2-instruct")
-            .with_server_id("accounts/fireworks/models/kimi-k2-instruct"),
+        ModelIds::new(KIMI_K2_INSTRUCT)
+            .with_server_id(ACCOUNTS_FIREWORKS_MODELS_KIMI_K2_INSTRUCT),
     ],
 }
 
@@ -633,26 +681,41 @@ pub(super) const LONG_CONTEXT_MODELS: [&str; 4] = [
 ];
 
 // 支持思考的模型
-const SUPPORTED_THINKING_MODELS: [&str; 10] = [
-    CLAUDE_4_OPUS_THINKING,
+const SUPPORTED_THINKING_MODELS: [&str; 19] = [
+    GPT_5,
+    GPT_5_HIGH,
+    GPT_5_LOW,
+    GPT_5_FAST,
+    GPT_5_HIGH_FAST,
+    GPT_5_LOW_FAST,
     CLAUDE_4_SONNET_THINKING,
+    CLAUDE_4_OPUS_THINKING,
     O3,
     GEMINI_2_5_PRO_PREVIEW_05_06,
     GEMINI_2_5_FLASH_PREVIEW_05_20,
     CLAUDE_3_7_SONNET_THINKING,
+    GPT_5_MINI,
+    GPT_5_NANO,
     O4_MINI,
     DEEPSEEK_R1_0528,
     GROK_4,
     O3_PRO,
+    CLAUDE_4_OPUS_THINKING_LEGACY,
 ];
 
 // 支持图像的模型（DEFAULT 始终支持）
-const SUPPORTED_IMAGE_MODELS: [&str; 18] = [
+const SUPPORTED_IMAGE_MODELS: [&str; 28] = [
     DEFAULT,
-    CLAUDE_4_OPUS_THINKING,
-    CLAUDE_4_OPUS,
+    GPT_5,
+    GPT_5_HIGH,
+    GPT_5_LOW,
+    GPT_5_FAST,
+    GPT_5_HIGH_FAST,
+    GPT_5_LOW_FAST,
     CLAUDE_4_SONNET_THINKING,
     CLAUDE_4_SONNET,
+    CLAUDE_4_OPUS_THINKING,
+    CLAUDE_4_OPUS,
     CLAUDE_3_5_SONNET,
     O3,
     GEMINI_2_5_PRO_PREVIEW_05_06,
@@ -660,16 +723,26 @@ const SUPPORTED_IMAGE_MODELS: [&str; 18] = [
     GPT_4_1,
     CLAUDE_3_7_SONNET,
     CLAUDE_3_7_SONNET_THINKING,
+    GPT_5_MINI,
+    GPT_5_NANO,
     CLAUDE_3_5_HAIKU,
     GEMINI_2_5_PRO_EXP_03_25,
     GPT_4O,
     O4_MINI,
     GROK_4,
     O3_PRO,
+    CLAUDE_4_OPUS_LEGACY,
+    CLAUDE_4_OPUS_THINKING_LEGACY,
 ];
 
 // 支持Max与非Max的模型
-const SUPPORTED_MAX_MODELS: [&str; 13] = [
+const SUPPORTED_MAX_MODELS: [&str; 21] = [
+    GPT_5,
+    GPT_5_HIGH,
+    GPT_5_LOW,
+    GPT_5_FAST,
+    GPT_5_HIGH_FAST,
+    GPT_5_LOW_FAST,
     CLAUDE_4_SONNET_THINKING,
     CLAUDE_4_SONNET,
     CLAUDE_3_5_SONNET,
@@ -680,10 +753,18 @@ const SUPPORTED_MAX_MODELS: [&str; 13] = [
     CLAUDE_3_7_SONNET,
     CLAUDE_3_7_SONNET_THINKING,
     GEMINI_2_5_PRO_EXP_03_25,
+    GPT_5_MINI,
+    GPT_5_NANO,
     O4_MINI,
     GROK_3_BETA,
     GROK_4,
 ];
 
 // 只支持Max的模型
-const MAX_MODELS: [&str; 3] = [CLAUDE_4_OPUS_THINKING, CLAUDE_4_OPUS, O3_PRO];
+const MAX_MODELS: [&str; 5] = [
+    CLAUDE_4_OPUS_THINKING,
+    CLAUDE_4_OPUS,
+    O3_PRO,
+    CLAUDE_4_OPUS_LEGACY,
+    CLAUDE_4_OPUS_THINKING_LEGACY,
+];

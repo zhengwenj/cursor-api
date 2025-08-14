@@ -71,7 +71,7 @@ pub mod key_config {
       /// 签名(\[u8; 32\])
       #[prost(bytes = "vec", tag = "6")]
       pub signature: Vec<u8>,
-      /// 是否是长效令牌
+      /// 是否为会话令牌
       #[prost(bool, tag = "7")]
       pub is_session: bool,
     }

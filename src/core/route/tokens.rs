@@ -419,7 +419,7 @@ pub async fn handle_update_tokens_config_version(
         message_builder
             .append("个令牌更新失败，其中有")
             .append(&short_token_count)
-            .append("个令牌是非长效令牌")
+            .append("个令牌是非会话令牌")
             .build()
     } else {
         message_builder.append(UPDATE_FAILURE_COUNT).build()

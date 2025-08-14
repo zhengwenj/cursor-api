@@ -1280,7 +1280,7 @@ string
 string
 ```
 
-#### 随机生成一个token
+#### 随机生成一个token（已弃用）
 
 * 接口地址: `/gen-token`
 * 请求方法: GET
@@ -1290,9 +1290,9 @@ string
 string
 ```
 
-#### 获取当前的tsheader
+#### 获取当前的timestampheader
 
-* 接口地址: `/get-tsheader`
+* 接口地址: `/get-timestamp-header`
 * 请求方法: GET
 * 响应格式:
 

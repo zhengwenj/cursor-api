@@ -81,6 +81,7 @@ impl PartialEq for Model {
 pub struct ModelsResponse;
 
 impl Serialize for ModelsResponse {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -89,6 +90,25 @@ impl Serialize for ModelsResponse {
 
         state.serialize_field("object", "list")?;
         state.serialize_field("data", &Models::to_arc())?;
+
+        state.end()
+    }
+}
+
+#[repr(transparent)]
+pub struct RawModelsResponse(pub(super) ::std::sync::Arc<crate::core::aiserver::v1::AvailableModelsResponse>);
+
+impl Serialize for RawModelsResponse {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("RawModelsResponse", 3)?;
+
+        state.serialize_field("raw", &self.0)?;
+        state.serialize_field("dur", &Models::last_update_elapsed())?;
+        state.serialize_field("now", &crate::app::model::DateTime::now())?;
 
         state.end()
     }

@@ -685,7 +685,7 @@
       <div class="quick-tools">
         <button onclick="generateHash()" class="secondary">生成 Hash</button>
         <button onclick="generateChecksum()" class="secondary">生成 Checksum</button>
-        <button onclick="generateTSHeader()" class="secondary">生成 TSHeader</button>
+        <button onclick="generateTimestampHeader()" class="secondary">生成 TimestampHeader</button>
       </div>
     </div>
   </div>
@@ -1679,18 +1679,18 @@
       }
     }
 
-    async function generateTSHeader() {
+    async function generateTimestampHeader() {
       try {
-        const response = await fetch('/get-tsheader');
-        const tsheader = await response.text();
+        const response = await fetch('/get-timestamp-header');
+        const timestampHeader = await response.text();
 
-        copyToClipboard(tsheader, {
-          successMessage: 'TSHeader已复制到剪贴板'
+        copyToClipboard(timestampHeader, {
+          successMessage: 'TimestampHeader已复制到剪贴板'
         });
 
-        showGlobalMessage(`生成的TSHeader: ${tsheader}`);
+        showGlobalMessage(`生成的TimestampHeader: ${timestampHeader}`);
       } catch (error) {
-        showGlobalMessage('生成TSHeader失败', true);
+        showGlobalMessage('生成TimestampHeader失败', true);
       }
     }
 

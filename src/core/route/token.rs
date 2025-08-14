@@ -1,10 +1,16 @@
+use ::axum::{
+    Json,
+    http::{HeaderMap, StatusCode, header::AUTHORIZATION},
+};
+use ::prost::Message as _;
+
 use crate::{
     app::{
-        constant::{AUTHORIZATION_BEARER_PREFIX, HEADER_VALUE_TEXT_PLAIN_UTF8},
+        constant::AUTHORIZATION_BEARER_PREFIX,
         lazy::{AUTH_TOKEN, KEY_PREFIX},
         model::{
             AppConfig, BuildKeyRequest, BuildKeyResponse, ExtToken, GetConfigVersionRequest,
-            GetConfigVersionResponse, RawToken, Token, UsageCheckModelType,
+            GetConfigVersionResponse, Token, UsageCheckModelType,
         },
     },
     common::utils::{to_base64, token_to_tokeninfo},
@@ -13,13 +19,6 @@ use crate::{
         constant::ERR_NODATA,
     },
 };
-use axum::{
-    Json,
-    http::{HeaderMap, StatusCode, header::AUTHORIZATION},
-    response::{IntoResponse as _, Response},
-};
-use http::header::CONTENT_TYPE;
-use prost::Message as _;
 
 // 常量定义
 const ERROR_UNAUTHORIZED: &str = "Unauthorized";
@@ -243,12 +242,4 @@ pub async fn handle_get_config_version(
             Json(GetConfigVersionResponse::Error(ERR_NODATA)),
         ),
     }
-}
-
-pub async fn handle_gen_token() -> Response {
-    let token = RawToken::random().to_string();
-
-    let headers = HeaderMap::from_iter([(CONTENT_TYPE, HEADER_VALUE_TEXT_PLAIN_UTF8)]);
-
-    (headers, token).into_response()
 }

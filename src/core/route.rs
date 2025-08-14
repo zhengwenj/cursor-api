@@ -3,15 +3,15 @@ pub use logs::{handle_get_logs, handle_get_logs_tokens, handle_logs};
 mod health;
 pub use health::{handle_health, handle_root};
 mod token;
-pub use token::{handle_build_key, handle_gen_token, handle_get_config_version};
+pub use token::{handle_build_key, handle_get_config_version};
 mod tokens;
 pub use tokens::{
     handle_add_tokens, handle_delete_tokens, handle_get_tokens, handle_refresh_tokens,
     handle_set_tokens, handle_set_tokens_alias, handle_set_tokens_proxy, handle_set_tokens_status,
     handle_set_tokens_timezone, handle_update_tokens_config_version, handle_update_tokens_profile,
 };
-mod checksum;
-pub use checksum::{
+mod r#gen;
+pub use r#gen::{
     handle_gen_checksum, handle_gen_hash, handle_gen_uuid, handle_get_timestamp_header,
 };
 // mod profile;

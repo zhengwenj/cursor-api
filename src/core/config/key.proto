@@ -13,7 +13,7 @@ message KeyConfig {
       int64 start = 4;                // 生成时间（Unix 时间戳）
       int64 end = 5;                  // 过期时间（Unix 时间戳）
       bytes signature = 6;            // 签名([u8; 32])
-      bool is_session = 7;            // 是否是长效令牌
+      bool is_session = 7;            // 是否为会话令牌
     }
     Token token = 1;                  // 令牌
     bytes checksum = 2;               // 校验和([u8; 64])
