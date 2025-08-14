@@ -16,7 +16,7 @@ trait StringFrom: Sized {
 
 impl StringFrom for &[u8] {
     #[inline(always)]
-    fn as_bytes(&self) -> &[u8] { *self }
+    fn as_bytes(&self) -> &[u8] { self }
     #[inline(always)]
     fn into_vec(self) -> Vec<u8> { self.to_vec() }
 }

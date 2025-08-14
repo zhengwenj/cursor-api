@@ -637,10 +637,13 @@ pub mod stream_cpp_request {
             where
                 D: ::serde::Deserializer<'de>,
             {
-                <Option<super::super::ControlToken> as ::serde::Deserialize>::deserialize(
-                    deserializer,
-                )
-                .map(|opt| opt.map(|val| val as i32))
+                unsafe {
+                    ::core::intrinsics::transmute_unchecked(
+                        <Option<super::super::ControlToken> as ::serde::Deserialize>::deserialize(
+                            deserializer,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -845,7 +848,7 @@ pub mod cpp_config_response {
             <Vec<super::Heuristic> as ::serde::Serialize>::serialize(
                 &value
                     .iter()
-                    .map(|val| super::Heuristic::try_from(*val).unwrap_or_default())
+                    .map(|&val| super::Heuristic::try_from(val).unwrap_or_default())
                     .collect(),
                 serializer,
             )
