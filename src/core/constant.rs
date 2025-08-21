@@ -1,4 +1,4 @@
-// mod display_name;
+mod display_name;
 
 use ::ahash::{HashMap, HashSet};
 use ::core::{
@@ -10,6 +10,8 @@ use ::std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+
+use display_name::calculate_display_name;
 
 use super::model::Model;
 use crate::{
@@ -68,7 +70,7 @@ macro_rules! def_const_models {
 
         /// 通过 PHF 快速查找模型 ID
         #[inline]
-        pub fn get_model_const(id: &str) -> Option<&'static str> {
+        fn get_model_const(id: &str) -> Option<&'static str> {
             MODEL_MAP.get(id).copied()
         }
 
@@ -76,8 +78,10 @@ macro_rules! def_const_models {
         #[inline]
         pub fn get_static_id<S: Borrow<str>>(s: S) -> &'static str {
             let id = s.borrow();
-            get_model_const(id)
-                .unwrap_or_else(|| crate::leak::intern_static(id))
+            match get_model_const(id) {
+                Some(id) => id,
+                None => crate::leak::intern_static(id),
+            }
         }
     };
 }
@@ -141,6 +145,9 @@ def_const_models!(
     // MoonshotAI 模型
     KIMI_K2_INSTRUCT => "kimi-k2-instruct",
     ACCOUNTS_FIREWORKS_MODELS_KIMI_K2_INSTRUCT => "accounts/fireworks/models/kimi-k2-instruct",
+
+    // ..
+    SONIC => "sonic",
 
     // Anthropic 模型 (legacy)
     CLAUDE_3_OPUS => "claude-3-opus",
@@ -219,6 +226,8 @@ macro_rules! create_models {
                 }
             }
 
+            display_name::init_display_name_cache();
+
             let models = vec![
                 $($(
                     {
@@ -228,6 +237,7 @@ macro_rules! create_models {
                             id: model_ids.id,
                             server_id: model_ids.server_id,
                             client_id: model_ids.client_id,
+                            display_name: calculate_display_name(model_ids.client_id),
                             owned_by: $owner,
                             is_thinking: SUPPORTED_THINKING_MODELS.contains(&model_ids.id),
                             is_image: SUPPORTED_IMAGE_MODELS.contains(&model_ids.id),
@@ -417,11 +427,12 @@ impl Models {
             };
             let is_max = model.supports_max_mode();
             let is_non_max = model.supports_non_max_mode();
-            // let display_name = display_name::calculate_display_name_v4(id);
+            let display_name = calculate_display_name(client_id);
 
             Model {
                 id,
                 client_id,
+                display_name,
                 owned_by,
                 server_id,
                 is_thinking,
@@ -662,15 +673,20 @@ create_models! {
         ModelIds::new(KIMI_K2_INSTRUCT)
             .with_server_id(ACCOUNTS_FIREWORKS_MODELS_KIMI_K2_INSTRUCT),
     ],
+
+    UNKNOWN => [
+        ModelIds::new(SONIC),
+    ]
 }
 
-pub(super) const FREE_MODELS: [&str; 6] = [
+pub(super) const FREE_MODELS: [&str; 7] = [
     GPT_4O_MINI,
     CURSOR_FAST,
     CURSOR_SMALL,
     DEEPSEEK_V3,
     DEEPSEEK_V3_1,
     GROK_3_MINI,
+    SONIC,
 ];
 
 pub(super) const LONG_CONTEXT_MODELS: [&str; 4] = [
@@ -681,7 +697,7 @@ pub(super) const LONG_CONTEXT_MODELS: [&str; 4] = [
 ];
 
 // 支持思考的模型
-const SUPPORTED_THINKING_MODELS: [&str; 19] = [
+const SUPPORTED_THINKING_MODELS: [&str; 20] = [
     GPT_5,
     GPT_5_HIGH,
     GPT_5_LOW,
@@ -701,6 +717,7 @@ const SUPPORTED_THINKING_MODELS: [&str; 19] = [
     GROK_4,
     O3_PRO,
     CLAUDE_4_OPUS_THINKING_LEGACY,
+    SONIC,
 ];
 
 // 支持图像的模型（DEFAULT 始终支持）
@@ -736,7 +753,7 @@ const SUPPORTED_IMAGE_MODELS: [&str; 28] = [
 ];
 
 // 支持Max与非Max的模型
-const SUPPORTED_MAX_MODELS: [&str; 21] = [
+const SUPPORTED_MAX_MODELS: [&str; 22] = [
     GPT_5,
     GPT_5_HIGH,
     GPT_5_LOW,
@@ -758,6 +775,7 @@ const SUPPORTED_MAX_MODELS: [&str; 21] = [
     O4_MINI,
     GROK_3_BETA,
     GROK_4,
+    SONIC,
 ];
 
 // 只支持Max的模型

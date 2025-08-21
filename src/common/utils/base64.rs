@@ -30,8 +30,8 @@ const BASE64_CHARS: &[u8; 64] = b"-AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvW
 ///
 /// 将 ASCII 字符映射到其在 BASE64_CHARS 中的索引。
 /// 无效字符映射为 0xFF。
-const BASE64_DECODE_TABLE: [u8; 128] = {
-    let mut table = [0xFF_u8; 128];
+const BASE64_DECODE_TABLE: [u8; 256] = {
+    let mut table = [0xFF_u8; 256];
     let mut i = 0;
     while i < BASE64_CHARS.len() {
         table[BASE64_CHARS[i] as usize] = i as u8;
@@ -85,10 +85,10 @@ pub fn to_base64(bytes: &[u8]) -> String {
             let n = ((b1 as u32) << 16) | ((b2 as u32) << 8) | (b3 as u32);
 
             // 提取4个6位值并转换为Base64字符
-            output.push(*BASE64_CHARS.get_unchecked((n >> 18) as usize));
-            output.push(*BASE64_CHARS.get_unchecked(((n >> 12) & 0x3F) as usize));
-            output.push(*BASE64_CHARS.get_unchecked(((n >> 6) & 0x3F) as usize));
-            output.push(*BASE64_CHARS.get_unchecked((n & 0x3F) as usize));
+            output.push(BASE64_CHARS[(n >> 18) as usize]);
+            output.push(BASE64_CHARS[((n >> 12) & 0x3F) as usize]);
+            output.push(BASE64_CHARS[((n >> 6) & 0x3F) as usize]);
+            output.push(BASE64_CHARS[(n & 0x3F) as usize]);
 
             i += 3;
         }
@@ -103,11 +103,11 @@ pub fn to_base64(bytes: &[u8]) -> String {
 
             let n = ((b1 as u32) << 16) | ((b2 as u32) << 8);
 
-            output.push(*BASE64_CHARS.get_unchecked((n >> 18) as usize));
-            output.push(*BASE64_CHARS.get_unchecked(((n >> 12) & 0x3F) as usize));
+            output.push(BASE64_CHARS[(n >> 18) as usize]);
+            output.push(BASE64_CHARS[((n >> 12) & 0x3F) as usize]);
 
             if remaining > 1 {
-                output.push(*BASE64_CHARS.get_unchecked(((n >> 6) & 0x3F) as usize));
+                output.push(BASE64_CHARS[((n >> 6) & 0x3F) as usize]);
             }
         }
 
@@ -164,7 +164,7 @@ pub fn from_base64(input: &str) -> Option<Vec<u8>> {
     // 验证所有字符都是有效的 Base64 字符
     if input
         .iter()
-        .any(|&b| b >= 128 || BASE64_DECODE_TABLE[b as usize] == 0xFF)
+        .any(|&b| BASE64_DECODE_TABLE[b as usize] == 0xFF)
     {
         return None;
     }
@@ -178,10 +178,10 @@ pub fn from_base64(input: &str) -> Option<Vec<u8>> {
 
         // 主循环：一次处理4个Base64字符，生成3个字节
         while i + 3 < len {
-            let c1 = *BASE64_DECODE_TABLE.get_unchecked(*ptr.add(i) as usize);
-            let c2 = *BASE64_DECODE_TABLE.get_unchecked(*ptr.add(i + 1) as usize);
-            let c3 = *BASE64_DECODE_TABLE.get_unchecked(*ptr.add(i + 2) as usize);
-            let c4 = *BASE64_DECODE_TABLE.get_unchecked(*ptr.add(i + 3) as usize);
+            let c1 = BASE64_DECODE_TABLE[*ptr.add(i) as usize];
+            let c2 = BASE64_DECODE_TABLE[*ptr.add(i + 1) as usize];
+            let c3 = BASE64_DECODE_TABLE[*ptr.add(i + 2) as usize];
+            let c4 = BASE64_DECODE_TABLE[*ptr.add(i + 3) as usize];
 
             // 将4个6位值组合成24位
             let n = ((c1 as u32) << 18) | ((c2 as u32) << 12) | ((c3 as u32) << 6) | (c4 as u32);
@@ -200,14 +200,14 @@ pub fn from_base64(input: &str) -> Option<Vec<u8>> {
             ::core::hint::unreachable_unchecked();
         }
         if remainder >= 2 {
-            let c1 = *BASE64_DECODE_TABLE.get_unchecked(*ptr.add(i) as usize);
-            let c2 = *BASE64_DECODE_TABLE.get_unchecked(*ptr.add(i + 1) as usize);
+            let c1 = BASE64_DECODE_TABLE[*ptr.add(i) as usize];
+            let c2 = BASE64_DECODE_TABLE[*ptr.add(i + 1) as usize];
 
             // 第一个字节：c1的6位 + c2的高2位
             output.push((c1 << 2) | (c2 >> 4));
 
             if remainder == 3 {
-                let c3 = *BASE64_DECODE_TABLE.get_unchecked(*ptr.add(i + 2) as usize);
+                let c3 = BASE64_DECODE_TABLE[*ptr.add(i + 2) as usize];
                 // 第二个字节：c2的低4位 + c3的高4位
                 output.push((c2 << 4) | (c3 >> 2));
             }

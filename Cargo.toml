@@ -1,6 +1,6 @@
 [package]
 name = "cursor-api"
-version = "0.3.6-1"
+version = "0.3.6-2"
 edition = "2024"
 authors = ["wisdgod <nav@wisdgod.com>"]
 description = "OpenAI format compatibility layer for the Cursor API"
@@ -99,7 +99,7 @@ __compat = []
 [patch.crates-io]
 h2 = { path = "patch/h2-0.4.10" }
 reqwest = { path = "patch/reqwest-0.12.18" }
-rustls = { path = "patch/rustls-0.23.31" }
+rustls = { path = "patch/rustls-0.23.28" }
 chrono = { path = "patch/chrono-0.4.41" }
 ulid = { path = "patch/ulid-1.2.1" }
 dotenvy = { path = "patch/dotenvy-0.15.7" }

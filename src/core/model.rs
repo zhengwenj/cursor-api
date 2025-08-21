@@ -33,6 +33,7 @@ pub struct Model {
     pub server_id: &'static str,
     pub client_id: &'static str,
     pub id: &'static str,
+    pub display_name: &'static str,
     pub owned_by: &'static str,
     pub is_thinking: bool,
     pub is_image: bool,
@@ -45,15 +46,16 @@ impl Serialize for Model {
     where
         S: serde::Serializer,
     {
-        // 系统常量
         const MODEL_OBJECT: &str = "model";
         const CREATED: &i64 = &1706659200;
         const CREATED_AT: &str = "2024-01-31T00:00:00Z";
 
-        let mut state = serializer.serialize_struct(MODEL_OBJECT, 11)?;
+        let mut state = serializer.serialize_struct(MODEL_OBJECT, 13)?;
 
         state.serialize_field("id", &self.id)?;
-        state.serialize_field("display_name", &self.client_id)?;
+        state.serialize_field("client_id", &self.client_id)?;
+        state.serialize_field("server_id", &self.server_id)?;
+        state.serialize_field("display_name", &self.display_name)?;
         state.serialize_field("created", CREATED)?;
         state.serialize_field("created_at", CREATED_AT)?;
         state.serialize_field("object", MODEL_OBJECT)?;

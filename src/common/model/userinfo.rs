@@ -107,35 +107,35 @@ pub struct StripeProfile {
     // pub customer_balance: Option<f64>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy, Archive, RkyvDeserialize, RkyvSerialize)]
-pub struct ModelUsage {
-    #[serde(alias = "numRequests")]
-    pub num_requests: u32,
-    #[serde(
-        alias = "numRequestsTotal",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub total_requests: Option<u32>,
-    #[serde(alias = "numTokens")]
-    pub num_tokens: u32,
-    #[serde(alias = "maxRequestUsage", skip_serializing_if = "Option::is_none")]
-    pub max_requests: Option<u32>,
-    #[serde(alias = "maxTokenUsage", skip_serializing_if = "Option::is_none")]
-    pub max_tokens: Option<u32>,
-}
+// #[derive(Deserialize, Serialize, Clone, Copy, Archive, RkyvDeserialize, RkyvSerialize)]
+// pub struct ModelUsage {
+//     #[serde(alias = "numRequests")]
+//     pub num_requests: u32,
+//     #[serde(
+//         alias = "numRequestsTotal",
+//         default,
+//         skip_serializing_if = "Option::is_none"
+//     )]
+//     pub total_requests: Option<u32>,
+//     #[serde(alias = "numTokens")]
+//     pub num_tokens: u32,
+//     #[serde(alias = "maxRequestUsage", skip_serializing_if = "Option::is_none")]
+//     pub max_requests: Option<u32>,
+//     #[serde(alias = "maxTokenUsage", skip_serializing_if = "Option::is_none")]
+//     pub max_tokens: Option<u32>,
+// }
 
-#[derive(Deserialize, Serialize, Clone, Copy, Archive, RkyvDeserialize, RkyvSerialize)]
-pub struct UsageProfile {
-    #[serde(alias = "gpt-4")]
-    pub premium: ModelUsage,
-    #[serde(alias = "gpt-3.5-turbo")]
-    pub standard: ModelUsage,
-    // #[serde(alias = "gpt-4-32k")]
-    // pub unknown: ModelUsage,
-    #[serde(alias = "startOfMonth")]
-    pub start_of_month: DateTime<Utc>,
-}
+// #[derive(Deserialize, Serialize, Clone, Copy, Archive, RkyvDeserialize, RkyvSerialize)]
+// pub struct UsageProfile {
+//     #[serde(alias = "gpt-4")]
+//     pub premium: ModelUsage,
+//     #[serde(alias = "gpt-3.5-turbo")]
+//     pub standard: ModelUsage,
+//     // #[serde(alias = "gpt-4-32k")]
+//     // pub unknown: ModelUsage,
+//     #[serde(alias = "startOfMonth")]
+//     pub start_of_month: DateTime<Utc>,
+// }
 
 #[derive(Deserialize, Serialize, Clone, Archive, RkyvDeserialize, RkyvSerialize)]
 pub struct UserProfile {

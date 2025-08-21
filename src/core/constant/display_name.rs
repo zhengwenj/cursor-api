@@ -12,159 +12,86 @@ pub fn init_display_name_cache() {
 
 /// 计算 AI 模型标识符的显示名称。
 ///
-/// 规则：
-/// 1. 单个数字通过 '-' 连接时 (前后都不是数字)，'-' 变为 '.' (例如 "3-5" -> "3.5")。
-/// 2. 日期格式中的 '-' (如 YYYY-MM-DD, MM-DD) 保持不变。
-/// 3. 其他所有的 '-' 都被替换为空格 ' '。
-/// 4. 由原始 '-' 分隔的各部分（处理后）首字母大写 (Title Case)。
-/// 5. 特殊规则：如果原始标识符以 "gpt" 开头，则输出的对应部分为 "GPT"。
+/// # 转换规则
+///
+/// 1. **版本号合并**：单数字-单数字 → 小数点版本号（如 `3-5` → `3.5`）
+/// 2. **日期保留**：日期格式在括号中显示
+///    - `YYYY-MM-DD` 格式：`2024-04-09` → `(2024-04-09)`
+///    - `MM-DD` 格式：`03-25` → `(03-25)`  
+///    - `MMDD` 格式：`0528` → `(05-28)`
+/// 3. **时间标记**：`latest` 和 `legacy` 在括号中显示
+/// 4. **特殊前缀**：
+///    - `gpt` → `GPT`
+///    - `o1`/`o3`/`o4` → `O1`/`O3`/`O4`
+/// 5. **版本标记**：`v`/`r`/`k` 开头的版本号首字母大写（如 `v3.1` → `V3.1`）
+/// 6. **分隔符转换**：其他 `-` 转为空格，各部分首字母大写
 ///
 /// # Arguments
 ///
-/// * `identifier` - AI 模型的原始标识符字符串。
+/// * `identifier` - AI 模型的原始标识符字符串
 ///
 /// # Returns
 ///
-/// * `String` - 计算得到的显示名称。
+/// * `&'static str` - 格式化后的显示名称（缓存）
 ///
 /// # Examples
 ///
 /// ```
-/// assert_eq!(calculate_display_name_v4("claude-3-5-sonnet"), "Claude 3.5 Sonnet");
-/// assert_eq!(calculate_display_name_v4("gpt-4-turbo-2024-04-09"), "GPT 4 Turbo 2024-04-09"); // 日期 '-' 不变
-/// assert_eq!(calculate_display_name_v4("gemini-1.5-flash-500k"), "Gemini 1.5 Flash 500k");
-/// assert_eq!(calculate_display_name_v4("deepseek-v3"), "Deepseek V3");
-/// assert_eq!(calculate_display_name_v4("gpt-4o"), "GPT 4o");
-/// assert_eq!(calculate_display_name_v4("gpt-3.5-turbo"), "GPT 3.5 Turbo"); // 输入有 .
-/// assert_eq!(calculate_display_name_v4("gemini-2.5-pro-exp-03-25"), "Gemini 2.5 Pro Exp 03-25"); // 日期 '-' 不变
-/// assert_eq!(calculate_display_name_v4("version-10-beta"), "Version 10 Beta"); // 10 不是单数字
-/// assert_eq!(calculate_display_name_v4("model-1-test-9-case"), "Model 1 Test 9 Case"); // d-d 转义被空格隔开
-/// assert_eq!(calculate_display_name_v4("deepseek-r1-0528"), "Deepseek R1 0528"); // 新增测试
+/// // 基础转换
+/// assert_eq!(calculate_display_name("claude-3-5-sonnet"), "Claude 3.5 Sonnet");
+/// assert_eq!(calculate_display_name("deepseek-v3"), "Deepseek V3");
+///
+/// // GPT 特殊处理
+/// assert_eq!(calculate_display_name("gpt-4o"), "GPT 4o");
+/// assert_eq!(calculate_display_name("gpt-3.5-turbo"), "GPT 3.5 Turbo");
+///
+/// // 日期处理（放入括号）
+/// assert_eq!(calculate_display_name("gpt-4-turbo-2024-04-09"), "GPT 4 Turbo (2024-04-09)");
+/// assert_eq!(calculate_display_name("gemini-2.5-pro-exp-03-25"), "Gemini 2.5 Pro Exp (03-25)");
+/// assert_eq!(calculate_display_name("deepseek-r1-0528"), "Deepseek R1 (05-28)");
+///
+/// // 时间标记（放入括号）
+/// assert_eq!(calculate_display_name("gemini-2.5-pro-latest"), "Gemini 2.5 Pro (latest)");
+/// assert_eq!(calculate_display_name("claude-4-opus-legacy"), "Claude 4 Opus (legacy)");
+///
+/// // O 系列
+/// assert_eq!(calculate_display_name("o3-mini"), "O3 Mini");
+///
+/// // 边界情况
+/// assert_eq!(calculate_display_name("version-10-beta"), "Version 10 Beta"); // 10 不是单数字
+/// assert_eq!(calculate_display_name("model-1-test-9-case"), "Model 1 Test 9 Case"); // 单数字不相邻
 /// ```
-pub fn calculate_display_name_v4(identifier: &'static str) -> &'static str {
+pub fn calculate_display_name(identifier: &'static str) -> &'static str {
     if let Some(cached) = DISPLAY_NAME_CACHE.lock().get(identifier) {
         return cached;
     }
 
-    let result = calculate_display_name_internal(identifier);
+    let result = if identifier.is_empty() {
+        EMPTY_STRING
+    } else {
+        crate::leak::intern_static(calculate_display_name_internal(identifier))
+    };
 
     DISPLAY_NAME_CACHE.lock().insert(identifier, result);
 
     result
 }
 
+mod formatter;
+mod parser;
+mod tokenizer;
+
+use formatter::format_output;
+use parser::parse_patterns;
+use tokenizer::tokenize;
+
 #[inline(always)]
-fn calculate_display_name_internal(identifier: &'static str) -> &'static str {
-    const GPT: &str = "GPT";
+fn calculate_display_name_internal(identifier: &'static str) -> String {
+    let tokens = tokenize(identifier);
+    let patterns = parse_patterns(tokens);
+    let result = format_output(patterns);
 
-    if identifier.is_empty() {
-        return EMPTY_STRING;
-    }
-
-    let mut result = String::with_capacity(identifier.len());
-    let mut capitalize_next = true;
-    let mut prev_char: Option<char> = None;
-    let mut prev_prev_char: Option<char> = None;
-
-    let mut char_iter = identifier.chars().peekable();
-    if let Some(rest) = identifier.strip_prefix("gpt") {
-        if rest.is_empty() {
-            return GPT;
-        } else if unsafe { *rest.as_bytes().get_unchecked(0) } == b'-' {
-            result.push_str(GPT);
-            for _ in 0..4 {
-                char_iter.next();
-            }
-            result.push(' ');
-            capitalize_next = true;
-            prev_char = Some('-');
-            prev_prev_char = Some('t');
-        }
-    }
-
-    while let Some(current_char) = char_iter.next() {
-        match current_char {
-            '-' => {
-                let prev_is_digit = prev_char.is_some_and(|p| p.is_ascii_digit());
-                let next_is_digit = char_iter.peek().is_some_and(|&n| n.is_ascii_digit());
-
-                if prev_is_digit && next_is_digit {
-                    // 检查前面是否有多个数字
-                    let prev_is_single_digit =
-                        !prev_prev_char.is_some_and(|pp| pp.is_ascii_digit());
-
-                    // 检查后面是否只有一个数字
-                    let mut next_is_single_digit = true;
-                    let mut lookahead = char_iter.clone();
-                    lookahead.next(); // Skip the next digit we already know about
-                    if let Some(&next_next_char) = lookahead.peek()
-                        && next_next_char.is_ascii_digit()
-                    {
-                        next_is_single_digit = false;
-                    }
-
-                    // 只有当前后都是单个数字时，才转换为 '.'
-                    if prev_is_single_digit && next_is_single_digit {
-                        result.push('.');
-                        capitalize_next = false;
-                    } else {
-                        // 否则，如果是日期格式（两位数-两位数），保留 '-'
-                        // 其他情况转换为空格
-                        if is_date_pattern(prev_prev_char, prev_char, &mut char_iter.clone()) {
-                            result.push('-');
-                            capitalize_next = true;
-                        } else {
-                            result.push(' ');
-                            capitalize_next = true;
-                        }
-                    }
-                } else {
-                    result.push(' ');
-                    capitalize_next = true;
-                }
-                prev_prev_char = prev_char;
-                prev_char = Some('-');
-            }
-            c => {
-                if capitalize_next {
-                    result.extend(c.to_uppercase());
-                    capitalize_next = false;
-                } else {
-                    result.push(c);
-                }
-                prev_prev_char = prev_char;
-                prev_char = Some(c);
-            }
-        }
-    }
-
-    crate::leak::intern_static(result)
-}
-
-// 检查是否是日期模式（如 MM-DD 或类似格式）
-fn is_date_pattern(
-    prev_prev: Option<char>,
-    prev: Option<char>,
-    char_iter: &mut std::iter::Peekable<std::str::Chars>,
-) -> bool {
-    // 检查是否是两位数字-两位数字的格式
-    if let (Some(pp), Some(p)) = (prev_prev, prev)
-        && pp.is_ascii_digit()
-        && p.is_ascii_digit()
-    {
-        // 查看接下来的两个字符
-        let mut lookahead = char_iter.clone();
-        if let Some(&next1) = lookahead.peek()
-            && next1.is_ascii_digit()
-        {
-            lookahead.next();
-            if let Some(&next2) = lookahead.peek() {
-                // 如果是 DD-DD 格式，认为是日期
-                return next2.is_ascii_digit();
-            }
-        }
-    }
-    false
+    result
 }
 
 #[cfg(test)]
@@ -172,71 +99,208 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_display_name_v4_final() {
-        // Anthropic
-        assert_eq!(calculate_display_name_v4("claude-3-opus"), "Claude 3 Opus");
-        assert_eq!(
-            calculate_display_name_v4("claude-3.5-sonnet"),
-            "Claude 3.5 Sonnet"
-        ); // Input has dot
-        assert_eq!(
-            calculate_display_name_v4("claude-3-5-sonnet"),
-            "Claude 3.5 Sonnet"
-        ); // d-d conversion
-        assert_eq!(
-            calculate_display_name_v4("claude-3-haiku-200k"),
-            "Claude 3 Haiku 200k"
-        );
+    fn test_parser_output() {
+        let test_cases = vec![
+            // 基础测试
+            "",
+            "default",
+            "sonic",
+            // GPT 系列
+            "gpt",
+            "gpt-4",
+            "gpt-4o",
+            "gpt-3.5-turbo",
+            "gpt-4-turbo-2024-04-09",
+            "gpt-5-high-fast",
+            "gpt-5-mini",
+            // O 系列
+            "o1",
+            "o3",
+            "o3-mini",
+            "o3-pro",
+            "o4-mini",
+            "o1-preview",
+            // Claude 系列
+            "claude-3-opus",
+            "claude-3.5-sonnet",
+            "claude-3-5-sonnet",
+            "claude-4-opus-thinking",
+            "claude-4.1-opus-thinking",
+            "claude-3.7-sonnet-thinking",
+            "claude-4-opus-legacy",
+            "claude-4-opus-thinking-legacy",
+            "claude-3-haiku-200k",
+            "claude-3.5-sonnet-200k",
+            // Gemini 系列
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gemini-2.5-pro-latest",
+            "gemini-2.5-pro-exp-03-25",
+            "gemini-2.5-pro-preview-05-06",
+            "gemini-2.0-flash-thinking-exp",
+            "gemini-1.5-flash-500k",
+            "gemini-2.5-pro-max",
+            // Deepseek 系列
+            "deepseek-v3",
+            "deepseek-v3.1",
+            "deepseek-r1",
+            "deepseek-r1-0528",
+            // Grok 系列
+            "grok-2",
+            "grok-3",
+            "grok-3-beta",
+            "grok-3-mini",
+            "grok-4",
+            "grok-4-0709",
+            // 其他模型
+            "cursor-small",
+            "cursor-fast",
+            "kimi-k2-instruct",
+            "accounts/fireworks/models/kimi-k2-instruct",
+            // 版本号测试
+            "model-3-5",
+            "model-3.5",
+            "test-1-0",
+            "version-10-beta",
+            "model-10-5",
+            "app-2.5-release",
+            // 日期测试
+            "release-2024-04-09",
+            "update-03-25",
+            "version-0528",
+            "model-123",
+            "test-12345",
+            // 边界情况
+            "model-1-2-3",
+            "model-1-test-9-case",
+            "model-fast-experimental-latest",
+            "-start",
+            "end-",
+            "-",
+            "a--b",
+            "3-5",
+            "2024",
+            // 复杂组合
+            "gpt-4.5-preview",
+            "claude-3.5-sonnet-200k",
+            "gemini-1-5-flash-500k",
+        ];
 
-        // OpenAI (GPT & Date Preservation)
-        assert_eq!(calculate_display_name_v4("gpt-4"), "GPT 4");
-        assert_eq!(calculate_display_name_v4("gpt-4o"), "GPT 4o");
-        assert_eq!(calculate_display_name_v4("gpt-3.5-turbo"), "GPT 3.5 Turbo"); // Input has dot
-        assert_eq!(
-            calculate_display_name_v4("gpt-4-turbo-2024-04-09"),
-            "GPT 4 Turbo 2024-04-09"
-        ); // Date preserved!
-        assert_eq!(calculate_display_name_v4("gpt-4o-mini"), "GPT 4o Mini");
-        assert_eq!(calculate_display_name_v4("gpt"), "GPT");
-        assert_eq!(calculate_display_name_v4("gpt-"), "GPT "); // Trailing hyphen becomes space
+        println!("\n=== Parser Test Results ===\n");
 
-        // Google (Date Preservation)
-        assert_eq!(
-            calculate_display_name_v4("gemini-1.5-flash-500k"),
-            "Gemini 1.5 Flash 500k"
-        ); // Input has dot
-        assert_eq!(
-            calculate_display_name_v4("gemini-2.5-pro-exp-03-25"),
-            "Gemini 2.5 Pro Exp 03-25"
-        ); // Date preserved!
+        for identifier in test_cases {
+            println!("Input: {:?}", identifier);
 
-        // Deepseek
-        assert_eq!(calculate_display_name_v4("deepseek-v3"), "Deepseek V3");
-        assert_eq!(
-            calculate_display_name_v4("deepseek-r1-0528"),
-            "Deepseek R1 0528"
-        ); // 新增测试
+            let tokens = tokenize(identifier);
+            println!("  Tokens: {:?}", tokens);
 
-        // Other & Edge Cases
-        assert_eq!(calculate_display_name_v4("o1-mini"), "O1 Mini");
-        assert_eq!(
-            calculate_display_name_v4("model-1-test-9-case"),
-            "Model 1 Test 9 Case"
-        ); // d-d handled
-        assert_eq!(
-            calculate_display_name_v4("version-10-beta"),
-            "Version 10 Beta"
-        ); // 10 is not single digit
-        assert_eq!(
-            calculate_display_name_v4("alpha-1-5-omega"),
-            "Alpha 1.5 Omega"
-        ); // d-d handled
-        assert_eq!(calculate_display_name_v4("my-gpt-model"), "My Gpt Model"); // gpt not at start
-        assert_eq!(calculate_display_name_v4(""), ""); // Empty
-        assert_eq!(calculate_display_name_v4("-start-"), " Start "); // Leading/trailing hyphens
-        assert_eq!(calculate_display_name_v4("a-b-c"), "A B C");
-        assert_eq!(calculate_display_name_v4("3-5"), "3.5"); // Only d-d
-        assert_eq!(calculate_display_name_v4("2024-release"), "2024 Release"); // Number-text
-        assert_eq!(calculate_display_name_v4("data-01-01"), "Data 01-01"); // Date like MM-DD
+            let patterns = parse_patterns(tokens);
+            println!("  Main parts: {:?}", patterns.main_parts);
+            println!("  Date parts: {:?}", patterns.date_parts);
+
+            let output = format_output(patterns);
+            println!("  Output: {:?}", output);
+            println!("  ---");
+        }
+    }
+
+    #[test]
+    fn test_tokenizer_details() {
+        println!("\n=== Tokenizer Details ===\n");
+
+        let test_cases = vec![
+            "gpt-4-turbo-2024-04-09",
+            "claude-3.5-sonnet-thinking",
+            "deepseek-r1-0528",
+            "gemini-2.5-pro-exp-03-25",
+        ];
+
+        for identifier in test_cases {
+            println!("Input: {:?}", identifier);
+            let tokens = tokenize(identifier);
+
+            for (i, token) in tokens.iter().enumerate() {
+                println!("  Token[{}]: {:?}", i, token);
+                println!("    content: {:?}", token.content);
+                println!("    meta: {{");
+                println!("      is_digit_only: {}", token.meta.is_digit_only);
+                println!("      digit_count: {}", token.meta.digit_count);
+                println!("      has_dot: {}", token.meta.has_dot);
+                println!(
+                    "      first_char: {:?} ({})",
+                    token.meta.first_char as char, token.meta.first_char
+                );
+                println!("      len: {}", token.meta.len);
+                println!("    }}");
+            }
+            println!();
+        }
+    }
+
+    #[test]
+    fn test_pattern_recognition() {
+        println!("\n=== Pattern Recognition ===\n");
+
+        let special_cases = vec![
+            ("Single digit merge", "model-3-5-test"),
+            ("Version with dot", "v3.1-release"),
+            ("Date YYYY-MM-DD", "version-2024-04-09"),
+            ("Date MM-DD", "update-03-25"),
+            ("Date MMDD", "release-0528"),
+            ("Latest marker", "model-latest"),
+            ("Legacy marker", "model-legacy"),
+            ("Mixed", "gpt-4.5-turbo-latest-2024-04-09"),
+        ];
+
+        for (description, identifier) in special_cases {
+            println!("{}: {:?}", description, identifier);
+
+            let tokens = tokenize(identifier);
+            let patterns = parse_patterns(tokens);
+
+            println!("  Patterns breakdown:");
+            for (i, pattern) in patterns.main_parts.iter().enumerate() {
+                println!("    Main[{}]: {:?}", i, pattern);
+            }
+            for (i, pattern) in patterns.date_parts.iter().enumerate() {
+                println!("    Date[{}]: {:?}", i, pattern);
+            }
+
+            let output = format_output(patterns);
+            println!("  Final: {:?}", output);
+            println!();
+        }
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        println!("\n=== Edge Cases ===\n");
+
+        let edge_cases = vec![
+            ("Empty", ""),
+            ("Single hyphen", "-"),
+            ("Double hyphen", "--"),
+            ("Start hyphen", "-model"),
+            ("End hyphen", "model-"),
+            ("Multiple hyphens", "a---b"),
+            ("Just numbers", "123"),
+            ("Just dot", "."),
+            ("Dot at start", ".model"),
+            ("Dot at end", "model."),
+            ("Multiple dots", "model...test"),
+            ("Mixed separators", "model-1.5-test"),
+        ];
+
+        for (description, identifier) in edge_cases {
+            println!("{}: {:?}", description, identifier);
+
+            let tokens = tokenize(identifier);
+            println!("  Tokens: {:?}", tokens);
+
+            let patterns = parse_patterns(tokens);
+            let output = format_output(patterns);
+            println!("  Output: {:?}", output);
+            println!();
+        }
     }
 }

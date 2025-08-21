@@ -230,13 +230,6 @@ struct ThreadSafePtr(NonNull<TokenInner>);
 unsafe impl Send for ThreadSafePtr {}
 unsafe impl Sync for ThreadSafePtr {}
 
-impl ::core::ops::Deref for ThreadSafePtr {
-    type Target = NonNull<TokenInner>;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target { &self.0 }
-}
-
 /// 全局 Token 缓存池
 static TOKEN_MAP: ManuallyInit<RwLock<HashMap<TokenKey, ThreadSafePtr, ::ahash::RandomState>>> =
     ManuallyInit::new();

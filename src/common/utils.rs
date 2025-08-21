@@ -18,8 +18,7 @@ pub use hex::{byte_to_hex, hex_to_byte};
 pub use string_builder::StringBuilder;
 
 use super::model::userinfo::{
-    GetTeamsResponse, ListActiveSessionsResponse, Session, StripeProfile, Team, UsageProfile,
-    UserProfile,
+    GetTeamsResponse, ListActiveSessionsResponse, Session, StripeProfile, Team, UserProfile,
 };
 use crate::{
     app::{
@@ -184,9 +183,8 @@ pub async fn get_token_profile(
     if include_user {
         if include_sessions {
             // 并发获取所有数据，user为必需
-            let (mut stripe, _, mut user, teams, is_on_new_pricing, sessions) = tokio::join!(
+            let (mut stripe, mut user, teams, is_on_new_pricing, sessions) = tokio::join!(
                 get_stripe_profile(&client, token.as_str(), is_pri),
-                get_usage_profile(&client, user_id, maybe_token.as_str(), is_pri),
                 get_user_profile(&client, user_id, maybe_token.as_str(), is_pri),
                 get_teams(&client, user_id, maybe_token.as_str(), is_pri),
                 get_is_on_new_pricing(&client, user_id, maybe_token.as_str(), is_pri),
@@ -214,9 +212,8 @@ pub async fn get_token_profile(
             (user, stripe, sessions)
         } else {
             // 并发获取所有数据，user为必需
-            let (mut stripe, _, mut user, teams, is_on_new_pricing) = tokio::join!(
+            let (mut stripe, mut user, teams, is_on_new_pricing) = tokio::join!(
                 get_stripe_profile(&client, token.as_str(), is_pri),
-                get_usage_profile(&client, user_id, maybe_token.as_str(), is_pri),
                 get_user_profile(&client, user_id, maybe_token.as_str(), is_pri),
                 get_teams(&client, user_id, maybe_token.as_str(), is_pri),
                 get_is_on_new_pricing(&client, user_id, maybe_token.as_str(), is_pri)
@@ -244,9 +241,8 @@ pub async fn get_token_profile(
         }
     } else {
         // 仅获取stripe数据
-        let (mut stripe, _, teams) = tokio::join!(
+        let (mut stripe, teams) = tokio::join!(
             get_stripe_profile(&client, token.as_str(), is_pri),
-            get_usage_profile(&client, user_id, maybe_token.as_str(), is_pri),
             get_teams(&client, user_id, maybe_token.as_str(), is_pri),
         );
 
@@ -267,27 +263,27 @@ pub async fn get_token_profile(
     }
 }
 
-/// 获取用户使用情况配置文件
-pub async fn get_usage_profile(client: &Client, user_id: &str, auth_token: &str, is_pri: bool) {
-    if !*crate::app::lazy::log::DEBUG {
-        return;
-    }
+// /// 获取用户使用情况配置文件
+// pub async fn get_usage_profile(client: &Client, user_id: &str, auth_token: &str, is_pri: bool) {
+//     if !*crate::app::lazy::log::DEBUG {
+//         return;
+//     }
 
-    let request = super::client::build_usage_request(client, user_id, auth_token, is_pri);
-    let response = match request.send().await {
-        Ok(r) => r,
-        Err(_) => {
-            crate::debug!("<get_usage_profile> send error");
-            return;
-        }
-    };
-    crate::debug!("<get_usage_profile> got {}", response.status());
-    let usage = response.json::<UsageProfile>().await.ok();
-    crate::debug!(
-        "<get_usage_profile> got {}",
-        __unwrap!(serde_json::to_string_pretty(&usage))
-    );
-}
+//     let request = super::client::build_usage_request(client, user_id, auth_token, is_pri);
+//     let response = match request.send().await {
+//         Ok(r) => r,
+//         Err(_) => {
+//             crate::debug!("<get_usage_profile> send error");
+//             return;
+//         }
+//     };
+//     crate::debug!("<get_usage_profile> got {}", response.status());
+//     let usage = response.json::<UsageProfile>().await.ok();
+//     crate::debug!(
+//         "<get_usage_profile> got {}",
+//         __unwrap!(serde_json::to_string_pretty(&usage))
+//     );
+// }
 
 /// 获取Stripe付费配置文件
 pub async fn get_stripe_profile(
@@ -384,7 +380,9 @@ pub async fn get_token_usage(
         )
         .await?;
 
-        if let Some(usage) = res.usage_events_display.first()?.token_usage {
+        if let Some(first) = res.usage_events_display.first()
+            && let Some(usage) = first.token_usage
+        {
             token_usage = Some(usage);
             break;
         };
@@ -529,8 +527,7 @@ pub fn tokeninfo_to_token(info: key_config::TokenInfo) -> Option<ExtToken> {
 /// 压缩数据为gzip格式
 #[inline]
 fn compress_gzip(data: &[u8]) -> Result<Vec<u8>, ::std::io::Error> {
-    use std::io::Write as _;
-
+    use ::std::io::Write as _;
     use flate2::{Compression, write::GzEncoder};
 
     const LEVEL: Compression = Compression::new(6);
@@ -558,20 +555,24 @@ pub fn encode_message(
         return Ok(encoded);
     }
 
+    // 提前检查长度是否溢出
+    if estimated_size > u32::MAX as usize {
+        __cold_path!();
+        return Err(LENGTH_OVERFLOW_MSG.into());
+    }
+
+    use ::core::mem::MaybeUninit;
+
+    // 创建未初始化的缓冲区：[头部 5B][消息体]
+    let mut buffer = Vec::<MaybeUninit<u8>>::with_capacity(5 + estimated_size);
+
     unsafe {
-        use ::core::{alloc::Layout, ptr};
+        // 设置长度，但内容仍未初始化
+        buffer.set_len(5 + estimated_size);
 
-        // 分配连续内存块：[头部 5B][消息体]
-        let layout = Layout::from_size_align_unchecked(5 + estimated_size, 1);
-        let ptr = ::std::alloc::alloc(layout);
-        if ptr.is_null() {
-            ::std::alloc::handle_alloc_error(layout);
-        }
-
-        let header_ptr = ptr;
-        let body_ptr = ptr.add(5);
-
-        // 直接编码到预分配的内存
+        // 获取消息体部分的可变引用并编码
+        let header_ptr: *mut u8 = buffer.as_mut_ptr().cast();
+        let body_ptr = header_ptr.add(5);
         message.encode_raw(&mut ::core::slice::from_raw_parts_mut(
             body_ptr,
             estimated_size,
@@ -579,13 +580,16 @@ pub fn encode_message(
 
         // 压缩处理：仅当压缩后更小时才使用压缩版本
         let (compression_flag, final_len) = if estimated_size >= COMPRESSION_THRESHOLD {
-            let compressed =
-                compress_gzip(::core::slice::from_raw_parts(body_ptr, estimated_size))?;
+            let body_slice = ::core::slice::from_raw_parts(body_ptr, estimated_size);
+            let compressed = compress_gzip(body_slice)?;
+            let compressed_len = compressed.len();
 
-            if compressed.len() < estimated_size {
-                // 原地覆盖为压缩数据
-                ptr::copy_nonoverlapping(compressed.as_ptr(), body_ptr, compressed.len());
-                (0x01, compressed.len())
+            if compressed_len < estimated_size {
+                // 覆盖为压缩数据
+                ::core::ptr::copy_nonoverlapping(compressed.as_ptr(), body_ptr, compressed_len);
+                // 截断到实际使用的长度
+                buffer.set_len(5 + compressed_len);
+                (0x01, compressed_len)
             } else {
                 (0x00, estimated_size)
             }
@@ -593,48 +597,60 @@ pub fn encode_message(
             (0x00, estimated_size)
         };
 
-        // 构建协议头：[压缩标志 1B][长度 4B BE]
-        let len = u32::try_from(final_len).map_err(|_| LENGTH_OVERFLOW_MSG)?;
+        // 初始化头部
         *header_ptr = compression_flag;
-        ptr::copy_nonoverlapping(len.to_be_bytes().as_ptr(), header_ptr.add(1), 4);
 
-        // 转换为 Vec，保留原始容量避免重分配
-        Ok(Vec::from_raw_parts(
-            ptr,
-            5 + final_len,      // 实际使用
-            5 + estimated_size, // 已分配
-        ))
+        // 构建协议头：[压缩标志 1B][长度 4B BE]
+        ::core::hint::assert_unchecked(final_len <= u32::MAX as usize);
+        let len_bytes = (final_len as u32).to_be_bytes();
+
+        // 直接拷贝长度字节
+        ::core::ptr::copy_nonoverlapping(len_bytes.as_ptr(), header_ptr.add(1), 4);
+
+        // 转换为已初始化的 Vec<u8>
+        Ok(::core::mem::transmute(buffer))
     }
 }
 
-/// 生成 PKCE code_verifier 和对应的 code_challenge (S256 method).
-/// 返回一个包含 (verifier, challenge) 的元组。
+/// 生成 PKCE code_verifier 和对应的 code_challenge (S256 method)
 #[inline]
 fn generate_pkce_pair() -> ([u8; 43], [u8; 43]) {
+    use ::core::mem::MaybeUninit;
     use rand::TryRngCore as _;
     use sha2::Digest as _;
 
-    // 1. 生成 code_verifier 的原始随机字节 (32 bytes is recommended)
-    let mut verifier_bytes = [0u8; 32];
+    // 生成 32 字节随机数作为 verifier
+    let mut verifier_bytes = MaybeUninit::<[u8; 32]>::uninit();
 
-    // 使用 OsRng 填充字节。如果失败（极其罕见），则直接 panic
-    rand::rngs::OsRng
-        .try_fill_bytes(&mut verifier_bytes)
-        .expect("获取系统安全随机数失败，这是一个严重错误！");
+    // 直接填充到未初始化内存
+    unsafe {
+        let bytes_ptr = verifier_bytes.as_mut_ptr().cast();
+        let bytes_slice = ::core::slice::from_raw_parts_mut(bytes_ptr, 32);
 
-    // 2. 将随机字节编码为 URL 安全 Base64 字符串，这就是 code_verifier
-    let mut code_verifier = [0; 43];
-    __unwrap_panic!(URL_SAFE_NO_PAD.encode_slice(verifier_bytes, &mut code_verifier));
+        rand::rngs::OsRng
+            .try_fill_bytes(bytes_slice)
+            .expect("获取系统安全随机数失败，这是一个严重错误！");
 
-    // 3. 计算 code_verifier 字符串的 SHA-256 哈希值
-    let hash_result = sha2::Sha256::digest(code_verifier);
+        // 此时 verifier_bytes 已完全初始化
+        let verifier_bytes = verifier_bytes.assume_init();
 
-    // 4. 将哈希结果编码为 URL 安全 Base64 字符串，这就是 code_challenge
-    let mut code_challenge = [0; 43];
-    __unwrap_panic!(URL_SAFE_NO_PAD.encode_slice(hash_result, &mut code_challenge));
+        // Base64 编码为 code_verifier
+        let mut code_verifier = MaybeUninit::<[u8; 43]>::uninit();
+        let verifier_ptr = code_verifier.as_mut_ptr().cast();
+        let verifier_slice = ::core::slice::from_raw_parts_mut(verifier_ptr, 43);
+        __unwrap!(URL_SAFE_NO_PAD.encode_slice(verifier_bytes, verifier_slice));
+        let code_verifier = code_verifier.assume_init();
 
-    // 5. 同时返回 verifier 和 challenge
-    (code_verifier, code_challenge)
+        // SHA-256 哈希后 Base64 编码为 code_challenge
+        let hash_result = sha2::Sha256::digest(code_verifier);
+        let mut code_challenge = MaybeUninit::<[u8; 43]>::uninit();
+        let challenge_ptr = code_challenge.as_mut_ptr().cast();
+        let challenge_slice = ::core::slice::from_raw_parts_mut(challenge_ptr, 43);
+        __unwrap!(URL_SAFE_NO_PAD.encode_slice(hash_result, challenge_slice));
+        let code_challenge = code_challenge.assume_init();
+
+        (code_verifier, code_challenge)
+    }
 }
 
 pub async fn get_new_token(ext_token: &mut ExtToken, is_pri: bool) -> bool {
